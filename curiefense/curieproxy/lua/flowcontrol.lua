@@ -81,6 +81,7 @@ TO DO
 key exists?
 key expiration
 other peripheral matching
+react.
 ]]
 --[===[
 [

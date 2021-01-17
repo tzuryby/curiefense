@@ -179,3 +179,56 @@ function build_key(request_map, key_data, entry_id, entry_name)
     request_map.handle:logDebug(string.format("build_key  KEY hashed (%s)", hashed_key))
     return hashed_key
 end
+
+
+function limit_react(request_map, rulename, action, key, ttl)
+
+    local handle = request_map.handle
+    if not action or action.type == "default" then
+        action = {
+            ["type"] = "default",
+            ["params"] = {
+                ["status"] = "503",
+                ["block_mode"] = true
+            }
+        }
+    end
+
+    if not action.params then action.params = {} end
+
+    action.params.reason = { initiator = "rate limit", reason = rulename}
+    -- handle:logDebug(string.format("limit react --- action %s", action.type))
+    if action.type == "monitor" then
+        return
+
+    elseif action.type == "ban" then
+        ttl = tonumber(action.params.ttl)
+        redis_ban_key(gen_ban_key(key), ttl)
+        -- recursive call
+        limit_react(request_map, rulename, action.params.action)
+
+    else
+        action.block_mode = (action.type ~= "request_header")
+        custom_response(
+            request_map,
+            action.params
+        )
+
+    end
+end
+
+function redis_is_banned(key)
+    local redis_conn = redis_connection()
+    local is_banned = redis_conn:get(key)
+    if "userdata: NULL" == tostring(is_banned) then
+        is_banned = false
+    end
+    return is_banned
+end
+
+function redis_ban_key(key, ttl)
+    local redis_conn = redis_connection()
+
+    redis_conn:set(key, "1")
+    redis_conn:expire(key, ttl)
+end

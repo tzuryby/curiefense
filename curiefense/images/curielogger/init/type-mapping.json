@@ -22,36 +22,42 @@
       "path": {
         "type": "keyword"
       },
-      "timers": {
+      "blocked": {
+        "type": "boolean"
+      },
+
+      "block_reason": {
+        "type": "flattened"
+      },
+      "tags": {
+        "type": "flattened"
+      },
+      "rxtimers": {
         "properties": {
-          "rx": {
-            "properties": {
-              "firstupstreambyte": {
-                "type": "float"
-              },
-              "lastupstreambyte": {
-                "type": "float"
-              },
-              "lastbyte": {
-                "type": "float"
-              }
-            }
+          "firstupstreambyte": {
+            "type": "float"
           },
-          "tx": {
-            "properties": {
-              "firstdownstreambyte": {
-                "type": "float"
-              },
-              "firstupstreambyte": {
-                "type": "float"
-              },
-              "lastdownstreambyte": {
-                "type": "float"
-              },
-              "lastupstreambyte": {
-                "type": "float"
-              }
-            }
+          "lastupstreambyte": {
+            "type": "float"
+          },
+          "lastbyte": {
+            "type": "float"
+          }
+        }
+      },
+      "txtimers": {
+        "properties": {
+          "firstdownstreambyte": {
+            "type": "float"
+          },
+          "firstupstreambyte": {
+            "type": "float"
+          },
+          "lastdownstreambyte": {
+            "type": "float"
+          },
+          "lastupstreambyte": {
+            "type": "float"
           }
         }
       },
@@ -161,12 +167,6 @@
           },
           "attributes": {
             "type": "flattened"
-          },
-          "block_reason": {
-            "type": "flattened"
-          },
-          "tags": {
-            "type": "flattened"
           }
         }
       },
@@ -182,13 +182,13 @@
             "type": "keyword"
           },
           "headers": {
-            "type": "object"
+            "type": "flattened"
           },
           "headersbytes": {
             "type": "integer"
           },
           "trailers": {
-            "type": "object"
+            "type": "flattened"
           }
         }
       },
