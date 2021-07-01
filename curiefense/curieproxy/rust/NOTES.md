@@ -2,8 +2,7 @@
 
 An initial implementation of all filtering components had been written. The following is currently handled in Lua:
 
- * getting the information required by the filtering engine:
-    - 
+ * getting the information required by the filtering engine
  * request replies
  * logging
 
@@ -33,6 +32,26 @@ Takes five arguments:
  * *body*, optionnaly, the HTTP request body. Note that large bodies will have a performance impact, and should be size-limited before calling this function.
  * *ip*, the string-encoded IP address in canonical format.
  * a Lua table containing the *grasshopper* functions (such as the imported grasshopper module), or `nil` if not available.
+
+It will perform all the curieproxy checks, and return a pair, with:
+
+ * a JSON-encoded Decision (see below),
+ * a list of strings, containing all encountered errors
+
+### `inspect_waf`
+
+Takes five arguments:
+
+ * *meta*, a Lua table containing the following entries:
+
+    - `path`: the "path" part of the HTTP request, containing the full, raw URI (ie. something like `/a/b?c=d&e=f`);
+    - `method`: the HTTP verb (such as `GET`, `POST`, etc.);
+    - `authority`: optionnaly, the `:authority` HTTP2 header, if available.
+    
+ * *headers*, a Lua table containing the HTTP headers (keys are the header names, values the header values).
+ * *body*, optionnaly, the HTTP request body. Note that large bodies will have a performance impact, and should be size-limited before calling this function.
+ * *ip*, the string-encoded IP address in canonical format.
+ * *waf_id*, the id of the waf profile to apply
 
 It will perform all the curieproxy checks, and return a pair, with:
 

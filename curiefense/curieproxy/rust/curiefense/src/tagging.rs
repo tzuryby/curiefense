@@ -91,7 +91,10 @@ pub fn tag_request(is_human: bool, cfg: &Config, rinfo: &RequestInfo) -> (Tags, 
                 if a.atype == SimpleActionT::Monitor || (a.atype == SimpleActionT::Challenge && is_human) {
                     continue;
                 }
-                return (tags, SimpleDecision::Action(a.clone(), Some(serde_json::json!("tag action"))));
+                return (
+                    tags,
+                    SimpleDecision::Action(a.clone(), Some(serde_json::json!("tag action"))),
+                );
             }
         }
     }

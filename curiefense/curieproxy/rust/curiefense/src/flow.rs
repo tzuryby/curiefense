@@ -84,7 +84,10 @@ pub fn flow_check(
                 if check_flow(&mut cnx, &redis_key, elem.step, elem.ttl, elem.is_last)? {
                     return Ok(SimpleDecision::Pass);
                 } else {
-                    bad = SimpleDecision::Action(elem.action.clone(), Some(serde_json::json!({"initiator":"flow_check"})));
+                    bad = SimpleDecision::Action(
+                        elem.action.clone(),
+                        Some(serde_json::json!({"initiator":"flow_check"})),
+                    );
                 }
             }
             Ok(bad)
