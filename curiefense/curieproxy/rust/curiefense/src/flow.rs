@@ -99,10 +99,10 @@ pub fn flow_check(
                         tags.insert(&elem.name);
                         bad = SimpleDecision::Action(
                             elem.action.clone(),
-                            Some(serde_json::json!({
+                            serde_json::json!({
                                 "initiator": "flow_check",
                                 "name": elem.name
-                            })),
+                            }),
                         );
                     }
                     FlowResult::NonLast => {}

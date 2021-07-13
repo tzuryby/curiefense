@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone)]
 pub enum SimpleDecision {
     Pass,
-    Action(SimpleAction, Option<serde_json::Value>),
+    Action(SimpleAction, serde_json::Value),
 }
 
 #[derive(Debug, Clone)]
@@ -272,6 +272,7 @@ impl SimpleAction {
             }
             SimpleActionT::Redirect(to) => {
                 let mut headers = HashMap::new();
+                action.content = "You are being redirected".into();
                 headers.insert("Location".into(), to.clone());
                 action.atype = ActionType::Block;
                 action.headers = Some(headers);
@@ -287,7 +288,7 @@ impl SimpleAction {
         is_human: bool,
         mgh: &Option<GH>,
         headers: &RequestField,
-        reason: Option<serde_json::Value>,
+        reason: serde_json::Value,
     ) -> Decision {
         let mut action = match self.to_action(is_human) {
             None => match (mgh, headers.get("user-agent")) {
@@ -296,20 +297,16 @@ impl SimpleAction {
             },
             Some(a) => a,
         };
-        if let Some(r) = reason {
-            action.reason = r;
-        }
+        action.reason = reason;
         Decision::Action(action)
     }
 
-    pub fn to_decision_no_challenge(&self, reason: Option<serde_json::Value>) -> Decision {
+    pub fn to_decision_no_challenge(&self, reason: serde_json::Value) -> Decision {
         let mut action = match self.to_action(true) {
             None => Action::default(),
             Some(a) => a,
         };
-        if let Some(r) = reason {
-            action.reason = r;
-        }
+        action.reason = reason;
         Decision::Action(action)
     }
 }
