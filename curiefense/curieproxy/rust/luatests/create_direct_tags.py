@@ -40,13 +40,13 @@ def make_request(st: Set[str]) -> Tuple[Any, str]:
     if "forcedeny" in st:
         r["response"]["action"] = "custom_response"
         r["response"]["block_mode"] = True
-        r["response"]["status"] = 503
+        r["response"]["status"] = 403
     elif "bypass" in st:
         pass
     elif "deny" in st and "allow" not in st:
         r["response"]["action"] = "custom_response"
         r["response"]["block_mode"] = True
-        r["response"]["status"] = 503
+        r["response"]["status"] = 403
     elif "allowbot" in st:
         pass
     elif "denybot" in st:
