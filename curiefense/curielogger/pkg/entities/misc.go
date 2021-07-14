@@ -59,13 +59,16 @@ type NameValue struct {
 }
 
 type RequestAttributes struct {
-	ipnum  uint32 `json:"ipnum,omitempty"`
-	IP     string `json:"ip,omitempty"`
-	Query  string `json:"query,omitempty"`
-	URI    string `json:"uri,omitempty"`
-	Path   string `json:"path,omitempty"`
-	Method string `json:"method,omitempty"`
+	ipnum  		uint32 `json:"ipnum,omitempty"`
+	IP     		string `json:"ip,omitempty"`
+	Query  		string `json:"query,omitempty"`
+	URI    		string `json:"uri,omitempty"`
+	Path   		string `json:"path,omitempty"`
+	Method 		string `json:"method,omitempty"`
+	Authority 	string `json:"authority,omitempty"`
 }
+
+
 
 type Request struct {
 	RequestId    string                 `json:"requestid"`
