@@ -256,9 +256,9 @@ export default Vue.extend({
 
     fetchList() {
       const lineMatchingIP =
-          /^((((\d{1,3})\.){3}\d{1,3}(\/\d{1,2}))|([0-9a-f]+:+){1,8}([0-9a-f]+)?(\/\d{1,3})?)((\s+)?([#;?].+))?/gm
+          /^((((\d{1,3})\.){3}\d{1,3}(\/\d{1,2})?)|([0-9a-f]+:+){1,8}([0-9a-f]+)?(\/\d{1,3})?)((\s+)?([#;?].+))?/gm
       const lineMatchingASN = /(as\d{3,6})((\s+)?([#;?].+))?/gmi
-      const singleIP = /^((((\d{1,3})\.){3}\d{1,3}(\/\d{1,2}))|([0-9a-f]+:+){1,8}([0-9a-f]+)?(\/\d{1,3})?)$/
+      const singleIP = /^((((\d{1,3})\.){3}\d{1,3}(\/\d{1,2})?)|([0-9a-f]+:+){1,8}([0-9a-f]+)?(\/\d{1,3})?)$/
       const singleASN = /(as\d{3,6})/i
       // try every node / element of String type with the regex.
       const objectParser = (data: any, store: TagRuleSectionEntry[]) => {
