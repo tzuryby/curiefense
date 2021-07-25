@@ -29,13 +29,11 @@ describe('EntriesRelationList.vue', () => {
       entries: [
         [
           'headers',
-          'user-agent',
-          'curl',
+          ['user-agent', 'curl'],
         ],
         [
           'headers',
-          'content-type',
-          'application/json',
+          ['content-type', 'application/json'],
         ],
       ],
     }
@@ -47,7 +45,7 @@ describe('EntriesRelationList.vue', () => {
       ],
     }
     const onUpdate = (rule: TagRule['rule']) => {
-      wrapper.setProps({rule: rule})
+      wrapper.setProps({rule})
     }
     wrapper = mount(EntriesRelationList, {
       propsData: {
@@ -188,7 +186,7 @@ describe('EntriesRelationList.vue', () => {
         ],
       }
       const onUpdate = (rule: TagRule['rule']) => {
-        wrapper.setProps({rule: rule})
+        wrapper.setProps({rule})
       }
       wrapper = mount(EntriesRelationList, {
         propsData: {
@@ -636,8 +634,7 @@ describe('EntriesRelationList.vue', () => {
         entries: [
           [
             'headers',
-            'user-agent',
-            'curl',
+            ['user-agent', 'curl'],
           ],
         ],
       }
@@ -665,9 +662,11 @@ describe('EntriesRelationList.vue', () => {
 
   describe('validators', () => {
     let newEntryTextarea: Wrapper<Vue>
+    let newEntrySecondAttr: Wrapper<Vue>
     let component: Wrapper<Vue>
     let newEntryRows: WrapperArray<Vue>
     let newEntryRow: Wrapper<Vue>
+    let confirmAddEntryButton: Wrapper<Vue>
     let options: WrapperArray<Vue>
     beforeEach( async () => {
       component = wrapper.findComponent(EntriesRelationList)
@@ -679,14 +678,15 @@ describe('EntriesRelationList.vue', () => {
       newEntryRows = component.findAll('.new-entry-row')
       newEntryRow = newEntryRows.at(0)
       newEntryTextarea = newEntryRow.find('.new-entry-textarea')
+      newEntrySecondAttr = newEntryRow.find('.new-entry-value-annotation-input')
       const typeSelection = newEntryRow.find('.new-entry-type-selection')
       typeSelection.trigger('click')
       options = typeSelection.findAll('option')
+      confirmAddEntryButton = component.find('.confirm-add-entry-button')
     })
     test('should not add entry if it contains an error or empty first attr', async () => {
       newEntryTextarea.setValue('')
       // confirm add new entry
-      const confirmAddEntryButton = component.find('.confirm-add-entry-button')
       confirmAddEntryButton.trigger('click')
       await Vue.nextTick()
       // check
@@ -697,7 +697,28 @@ describe('EntriesRelationList.vue', () => {
     test('should highlight duplicated entries', async () => {
       newEntryTextarea.setValue('1.2.3.4\n1.2.3.4\n1.2.3.4')
       // confirm add new entry
-      const confirmAddEntryButton = component.find('.confirm-add-entry-button')
+      confirmAddEntryButton.trigger('click')
+      await Vue.nextTick()
+      // check
+      expect((wrapper.vm as any).duplicatedEntries.length).toEqual(1)
+    })
+    test('should validate duplicated entries if category is args, cookies, headers', async () => {
+      // open new entry row
+      const section = component.findAll('.section').at(1)
+      const addEntryButton = section.find('.add-entry-button')
+      addEntryButton.trigger('click')
+      await Vue.nextTick()
+      // change entry type to headers
+      options.at(7).setSelected()
+      await Vue.nextTick()
+      // add input to new entry row
+      newEntryRow = section.find('.new-entry-row')
+      const newEntryFirstAttr = newEntryRow.find('.new-entry-name-input')
+      const duplicateValues = entryData2.entries[0][1]
+      newEntryFirstAttr.setValue(duplicateValues[0])
+      newEntrySecondAttr.setValue(duplicateValues[1])
+      // confirm add new entry
+      confirmAddEntryButton = newEntryRow.find('.confirm-add-entry-button')
       confirmAddEntryButton.trigger('click')
       await Vue.nextTick()
       // check
@@ -731,7 +752,6 @@ describe('EntriesRelationList.vue', () => {
       // change entry type to headers
       options.at(7).setSelected()
       await Vue.nextTick()
-      const newEntrySecondAttr = newEntryRow.find('.new-entry-value-annotation-input')
       newEntrySecondAttr.setValue('\\')
       // check
       expect((wrapper.vm as any).entriesErrors.length).toEqual(1)
@@ -740,7 +760,6 @@ describe('EntriesRelationList.vue', () => {
       // change entry type to headers
       options.at(7).setSelected()
       await Vue.nextTick()
-      const newEntrySecondAttr = newEntryRow.find('.new-entry-value-annotation-input')
       newEntrySecondAttr.setValue('\\')
       await Vue.nextTick()
       newEntrySecondAttr.setValue('something')

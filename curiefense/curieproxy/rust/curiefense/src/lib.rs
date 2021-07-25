@@ -37,7 +37,7 @@ fn acl_block(blocking: bool, code: i32, tags: &[String]) -> Decision {
         },
         block_mode: blocking,
         ban: false,
-        status: 503,
+        status: 403,
         headers: None,
         reason: json!({"action": code, "initiator": "acl", "reason": tags }),
         content: "access denied".to_string(),
@@ -48,14 +48,14 @@ fn acl_block(blocking: bool, code: i32, tags: &[String]) -> Decision {
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
         if let Some(ua) = reqinfo.headers.get("user-agent") {
-            logs.debug(format!("Checking rbzid cookie {} with user-agent {}",rbzid, ua));
+            logs.debug(format!("Checking rbzid cookie {} with user-agent {}", rbzid, ua));
             return match gh.parse_rbzid(&rbzid.replace('-', "="), ua) {
                 Some(b) => b,
                 None => {
                     logs.error("Something when wrong when calling parse_rbzid");
                     false
                 }
-            }
+            };
         } else {
             logs.warning("Could not find useragent!");
         }
@@ -135,7 +135,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
 
     if let SimpleDecision::Action(action, reason) = profiling_dec {
         let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, reason);
-        if decision.is_blocking() {
+        if decision.is_final() {
             return (decision, tags);
         }
     }
@@ -146,7 +146,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
         // TODO, check for monitor
         Ok(SimpleDecision::Action(a, reason)) => {
             let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, reason);
-            if decision.is_blocking() {
+            if decision.is_final() {
                 return (decision, tags);
             }
         }
@@ -157,7 +157,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     let limit_check = limit_check(logs, &urlmap.name, &reqinfo, &urlmap.limits, &mut tags);
     if let SimpleDecision::Action(action, reason) = limit_check {
         let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, reason);
-        if decision.is_blocking() {
+        if decision.is_final() {
             return (decision, tags);
         }
     }
@@ -227,7 +227,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
 
     // otherwise, run waf_check
     let waf_result = match HSDB.read() {
-        Ok(rd) => waf_check(&reqinfo, &urlmap.waf_profile, rd),
+        Ok(rd) => waf_check(logs, &reqinfo, &urlmap.waf_profile, rd),
         Err(rr) => {
             logs.error(format!("Could not get lock on HSDB: {}", rr));
             Ok(())
@@ -253,4 +253,35 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
         },
         tags,
     )
+}
+
+// generic entry point when the request map has already been parsed
+pub fn waf_check_generic_request_map(
+    configpath: &str,
+    reqinfo: &RequestInfo,
+    waf_id: &str,
+    logs: &mut Logs,
+) -> Decision {
+    logs.debug("WAF inspection starts");
+    let waf_profile = match with_config(configpath, logs, |_slogs, cfg| cfg.waf_profiles.get(waf_id).cloned()) {
+        Some(Some(prof)) => prof,
+        _ => {
+            logs.error("WAF profile not found");
+            return Decision::Pass;
+        }
+    };
+
+    let waf_result = match HSDB.read() {
+        Ok(rd) => waf_check(logs, &reqinfo, &waf_profile, rd),
+        Err(rr) => {
+            logs.error(format!("Could not get lock on HSDB: {}", rr));
+            Ok(())
+        }
+    };
+    logs.debug("WAF checks done");
+
+    match waf_result {
+        Ok(()) => Decision::Pass,
+        Err(wb) => Decision::Action(wb.to_action()),
+    }
 }
