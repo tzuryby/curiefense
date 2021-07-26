@@ -21,7 +21,11 @@ fn urldecode_bytes(input: &[u8]) -> Vec<u8> {
     let mut bytes = input.iter().copied();
     while let Some(mut b) = bytes.next() {
         loop {
-            if b == b'%' {
+            if b == b'+' {
+                out.push(32);
+                break;
+            }
+            else if b == b'%' {
                 if let Some(h) = bytes.next() {
                     if let Some(hv) = from_hex_digit(h) {
                         if let Some(l) = bytes.next() {
@@ -96,7 +100,7 @@ mod test_lib {
         assert!(urldecode_str("ABCD%40") == "ABCD@");
         assert!(urldecode_str("ABCD%40EFG") == "ABCD@EFG");
         assert!(urldecode_str("%27%28%29%2a%2b%2C%2D%2e%2F") == "'()*+,-./");
-        assert!(urldecode_str("ABCD+EFG") == "ABCD+EFG");
+        assert!(urldecode_str("ABCD+EFG") == "ABCD EFG");
         assert!(
             urldecode_str("http://www.example.com/foo/bar?x=AB%20CD%3d~~F%7C%60G")
                 == "http://www.example.com/foo/bar?x=AB CD=~~F|`G"

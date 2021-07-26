@@ -285,7 +285,7 @@
     "operand": "(\"'|'\"|--)[\\s\\<\\>;-]",
     "category": "sqli",
     "subcategory": "escape-character",
-    "risk": 3
+    "risk": 2
   },
   {
     "id": "100032",
@@ -348,7 +348,7 @@
     "operand": ".*<[- ~]{4,}>",
     "category": "xss",
     "subcategory": "tag insertion",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100039",
@@ -372,7 +372,7 @@
     "id": "100041",
     "name": "100041",
     "msg": "XSS Attempt (Inline Javascript Injection)",
-    "operand": ".*\\W(function|alert|prompt|eval)\\W?.*\\(.*\\).*",
+    "operand": "(function|alert|prompt|eval).*\\(.*\\)",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
@@ -390,7 +390,7 @@
     "id": "100043",
     "name": "100043",
     "msg": "XSS Attempt (Inline Javascript Event Handler Injection)",
-    "operand": "\\bon(abort|blur|change|click|dblclick|dragdrop|error|focus|keydown|keypress|keyup|load|mousedown|mousemove|mouseout|mouseover|mouseup|move|readystatechange|reset|resize|select|submit|unload)\\b\\W*?=",
+    "operand": "on(abort|blur|change|click|dblclick|dragdrop|error|focus|keydown|keypress|keyup|load|mousedown|mousemove|mouseout|mouseover|mouseup|move|readystatechange|reset|resize|select|submit|unload)\\W*?=",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
@@ -417,7 +417,7 @@
     "id": "100046",
     "name": "100046",
     "msg": "XSS Attempt (resource loading)",
-    "operand": "['\"=;]res\\:.*?[\\|/]",
+    "operand": "res\\:.*?[\\|/]",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
@@ -426,10 +426,10 @@
     "id": "100047",
     "name": "100047",
     "msg": "XSS Attempt (Meta Programming)",
-    "operand": "\\.(call|apply)\\W.*(this|window|document|name|body|location)",
+    "operand": "\\.(call|apply).*\\(.+\\)",
     "category": "xss",
     "subcategory": "xss",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100048",
@@ -438,7 +438,7 @@
     "operand": "('|\")>.*<!",
     "category": "xss",
     "subcategory": "xss",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100049",
@@ -465,7 +465,7 @@
     "operand": "(\\\\.\\.){2,}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100052",
@@ -474,7 +474,7 @@
     "operand": "^/(-|\\.|~)",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100053",
@@ -483,7 +483,7 @@
     "operand": "^/[\\(\\)]",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100054",
@@ -492,7 +492,7 @@
     "operand": "^/\\{\\d+\\}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100055",
@@ -501,7 +501,7 @@
     "operand": "^///",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100056",
@@ -510,7 +510,7 @@
     "operand": "^/(\\\\.){3,}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100057",
@@ -519,7 +519,7 @@
     "operand": "^/about:.+",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100058",
@@ -528,7 +528,7 @@
     "operand": "^/(~|_)?admin((_|-).*)?/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100059",
@@ -537,7 +537,7 @@
     "operand": "^/admisapi/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100060",
@@ -546,7 +546,7 @@
     "operand": "/adodb/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100061",
@@ -555,7 +555,7 @@
     "operand": "/advwebadmin/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100062",
@@ -564,7 +564,7 @@
     "operand": "/adxmlrpc.php",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100063",
@@ -573,7 +573,7 @@
     "operand": "/db/mysql/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100064",
@@ -582,7 +582,7 @@
     "operand": "/apache/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100065",
@@ -591,7 +591,7 @@
     "operand": "/.*\\.inc\\.php.*",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100066",
@@ -600,13 +600,13 @@
     "operand": "~.+\\.(bak|copy|old|swp|tmp.*)",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100067",
     "name": "100067",
     "msg": "RFI/LFI/OSCI",
-    "operand": "/win.ini",
+    "operand": "(boot|system|win).ini",
     "category": "generic",
     "subcategory": "generic",
     "risk": 5
@@ -627,7 +627,7 @@
     "operand": "/f?cgi-bin/_?(admin|config|include|sh|shell|global)",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100070",
@@ -636,7 +636,7 @@
     "operand": "/f?cgi-bin/.+\\.(ini|dat|dll|pl|exe|asp|xml|cgi|mdb|dat|php|php3|perl|aspx|html|bz2|7z|bz2|gz|jar|rar|tar|tgz|war|z|zip)",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100071",
@@ -645,7 +645,7 @@
     "operand": "/conf/ssl/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100072",
@@ -654,7 +654,7 @@
     "operand": "/crypto/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100073",
@@ -663,7 +663,7 @@
     "operand": "\\:\\:\\$DATA",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100074",
@@ -672,7 +672,7 @@
     "operand": "/fbsd/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100075",
@@ -688,15 +688,6 @@
     "name": "100076",
     "msg": "RFI/LFI/OSCI",
     "operand": "/ht/(bin|docs)",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100077",
-    "name": "100077",
-    "msg": "RFI/LFI/OSCI",
-    "operand": "/\\.htaccess",
     "category": "generic",
     "subcategory": "generic",
     "risk": 5
@@ -780,7 +771,7 @@
     "operand": "/mail(file)?.cgi",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100088",
@@ -789,7 +780,7 @@
     "operand": "/mailgu(ard|st)/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100089",
@@ -798,7 +789,7 @@
     "operand": "/mail/(inc|src)/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100090",
@@ -807,7 +798,7 @@
     "operand": "/maillist/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100091",
@@ -816,7 +807,7 @@
     "operand": "/mail_log_files/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100092",
@@ -825,7 +816,7 @@
     "operand": "/mailnews.cgi",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100093",
@@ -834,7 +825,7 @@
     "operand": "/mail\\.php",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100094",
@@ -843,7 +834,7 @@
     "operand": "/mailpost.exe",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100095",
@@ -906,7 +897,7 @@
     "operand": "/_old/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100102",
@@ -915,7 +906,7 @@
     "operand": "/old_files/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100103",
@@ -924,7 +915,7 @@
     "operand": "/oldfiles/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100104",
@@ -933,7 +924,7 @@
     "operand": "/old/wp-admin/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100105",
@@ -942,7 +933,7 @@
     "operand": "/_vti",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100106",
@@ -951,7 +942,7 @@
     "operand": "^/'",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100107",
@@ -960,7 +951,7 @@
     "operand": "^/admin",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100109",
@@ -969,7 +960,7 @@
     "operand": "\\\\\\.",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100110",
@@ -978,7 +969,7 @@
     "operand": "([$@{}()\\[\\]].*){8,}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100111",
@@ -987,7 +978,7 @@
     "operand": "^[\\[\\]$;.\"(),'`{}]{7,}$",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100112",
@@ -996,31 +987,31 @@
     "operand": "/\\.(\\w|\\.|-)+/?",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100113",
     "name": "100113",
     "msg": "system resource",
-    "operand": "%20onload=",
+    "operand": "onload=",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100114",
     "name": "100114",
     "msg": "system resource",
-    "operand": "%3e%3c",
+    "operand": "><",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100115",
     "name": "100115",
     "msg": "system resource",
-    "operand": "\\);}}--></script><script",
+    "operand": "</script><script",
     "category": "generic",
     "subcategory": "generic",
     "risk": 5
@@ -1029,34 +1020,25 @@
     "id": "100116",
     "name": "100116",
     "msg": "system resource",
-    "operand": "../../../../../",
+    "operand": "(../){4,}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100117",
     "name": "100117",
     "msg": "system resource",
-    "operand": "/.../.././../",
+    "operand": "(/+.+){4,}",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100118",
     "name": "100118",
     "msg": "system resource",
-    "operand": "/.htaccess",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100119",
-    "name": "100119",
-    "msg": "system resource",
-    "operand": "//../..//..",
+    "operand": "/?\\.?htaccess",
     "category": "generic",
     "subcategory": "generic",
     "risk": 5
@@ -1065,37 +1047,28 @@
     "id": "100120",
     "name": "100120",
     "msg": "system resource",
-    "operand": "/Acunetix",
+    "operand": "acunetix",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100121",
-    "name": "100121",
-    "msg": "system resource",
-    "operand": "/acunetix",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100122",
     "name": "100122",
     "msg": "system resource",
-    "operand": "/ppim/email/root.email",
+    "operand": "root.email",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100123",
     "name": "100123",
     "msg": "system resource",
-    "operand": "/ppim/password.dat",
+    "operand": "password.dat",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100124",
@@ -1104,79 +1077,25 @@
     "operand": "/var/www/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100125",
     "name": "100125",
     "msg": "system resource",
-    "operand": "/~1/",
+    "operand": "/~(1|admin|log|nobody|root|stats|webstats|wsdocs)/",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100126",
-    "name": "100126",
-    "msg": "system resource",
-    "operand": "/~admin/",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100127",
-    "name": "100127",
-    "msg": "system resource",
-    "operand": "/~log/",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100128",
-    "name": "100128",
-    "msg": "system resource",
-    "operand": "/~nobody/etc/passwd",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100129",
-    "name": "100129",
-    "msg": "system resource",
-    "operand": "/~root/",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100130",
-    "name": "100130",
-    "msg": "system resource",
-    "operand": "/~stats/",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100131",
-    "name": "100131",
-    "msg": "system resource",
-    "operand": "/~webstats/",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100132",
     "name": "100132",
     "msg": "system resource",
-    "operand": "/~wsdocs/",
+    "operand": "headless",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100133",
@@ -1185,16 +1104,7 @@
     "operand": "appscan_fingerprint",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100134",
-    "name": "100134",
-    "msg": "system resource",
-    "operand": "boot.ini",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100135",
@@ -1203,7 +1113,7 @@
     "operand": "cmd.exe",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100136",
@@ -1212,7 +1122,7 @@
     "operand": "code=phold",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100137",
@@ -1221,7 +1131,7 @@
     "operand": "document.cookie",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100138",
@@ -1239,16 +1149,7 @@
     "operand": "global.asa",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100140",
-    "name": "100140",
-    "msg": "system resource",
-    "operand": "htaccess",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100141",
@@ -1257,7 +1158,7 @@
     "operand": "modtest",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100142",
@@ -1266,61 +1167,34 @@
     "operand": "nessustest",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100143",
     "name": "100143",
     "msg": "system resource",
-    "operand": "php_info()",
+    "operand": "php_?info\\(\\)",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100144",
-    "name": "100144",
-    "msg": "system resource",
-    "operand": "phpinfo()",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100146",
-    "name": "100146",
-    "msg": "system resource",
-    "operand": "system.ini",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
-  },
-  {
-    "id": "100147",
-    "name": "100147",
-    "msg": "system resource",
-    "operand": "windows/win.ini",
-    "category": "generic",
-    "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100148",
     "name": "100148",
     "msg": "system resource",
-    "operand": "Xx<XaXaXXaXaX>xX",
+    "operand": "\\w+<\\w+>\\w+",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100149",
     "name": "100149",
     "msg": "system resource",
-    "operand": " & dir",
+    "operand": "\\s\\&\\sdir",
     "category": "generic",
     "subcategory": "generic",
-    "risk": 5
+    "risk": 4
   },
   {
     "id": "100150",
@@ -1335,28 +1209,10 @@
     "id": "100151",
     "name": "100151",
     "msg": "OSCI (OS Command Injection) Attempt",
-    "operand": "(&&|\\|\\||;|`)\\s*?(arch|ash|awk|base64|basename|bash|bc|bsh|bunzip2|cat|chcon|chgrp|chmod|chown|chroot|cjpeg|cksum|clear|comm|configure|cp|cpio|csh|csplit|curl|cut|date|dc|dd|df|diff|diff3|dig|dir|dircolors|dirname|djpeg|dmesg|dnsdomainname|doexec|domainname|dos2unix|du|dumpkeys|echo|ed|egrep|eject|elinks|env|ex|expand|expr|ext|factor|false|fdisk|fgrep|find|finger|fixps|fmt|fold|free|gawk|grep|groups|gtar|gunzip|gzip|halt|hdparm|head|hell|history|hostid|hostname|httpd|id|identify|ifconfig|igawk|install|ipcalc|join|kbd_mode|kill|last|lastlog|link|links|ln|loadkeys|locate|login|logname|look|ls|lsmod|lynx|mac2unix|mail|man|manweb|md5sum|mdu|mkdir|mkfifo|mkfs|mknod|mktemp|more|mount|mt|mtr|mv|namei|nano|nc|ncftp|nedit-nc|netstat|nice|nisdomainname|nl|nohup|nslookup|od|paste|pathchk|pdf2dsc|pdf2ps|pdfinfo|pdftotext|perl|pgawk|pico|pine|ping|ping6|pinky|pr|printenv|printf|ps|ps2ascii|ps2epsi|ps2frag|ps2pdf|ps2pdf12|ps2pdf13|ps2pdf14|ps2pdfwr|ps2pk|ps2ps|psbook|ptx|pwd|quota|readelf|readlink|reboot|red|rename|resize|rm|rmdir|rpm|runcon|rundig|rvi|sed|seq|gid|serial|uid|setfont|sfdisk|sftp|sh|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|shred|shuf|sleep|slocate|sort|split|ssh|stat|stty|stty cooked|stty raw|su|sum|switchdesk|sync|tac|tail|tar|tcsh|tee|telnet|test|time|timeout|tr|tracepath|tracepath6|traceroute|traceroute6|tree|true|truncate|tsort|tty|umask|umount|uname|unexpand|unicode_start|unicode_stop|uniq|unlink|ungid|unuid|untar|unzip|updatedb|uptime|useradd|users|usleep|vdir|viwc|wget|is|whereis|which|who|whoami|whois|xinit|xpdf|xrandr|yes|ypdomainname|zcat|zip|zipinfo)(\\s|;|&|`|#|$)",
+    "operand": "(\\|\\||&&|`|;)\\s*(\\w{2,}[-_]?\\w*)\\s*([\\w\\W]+)?(;)",
     "category": "osci",
     "subcategory": "osci",
-    "risk": 5
-  },
-  {
-    "id": "100152",
-    "name": "100152",
-    "msg": "OSCI (OS Command Injection) Attempt",
-    "operand": "(arch|ash|awk|base64|basename|bash|bc|bsh|bunzip2|cat|chcon|chgrp|chmod|chown|chroot|cjpeg|cksum|clear|comm|configure|cp|cpio|csh|csplit|curl|cut|date|dc|dd|df|diff|diff3|dig|dir|dircolors|dirname|djpeg|dmesg|dnsdomainname|doexec|domainname|dos2unix|du|dumpkeys|echo|ed|egrep|eject|elinks|env|ex|expand|expr|ext|factor|false|fdisk|fgrep|find|finger|fixps|fmt|fold|free|gawk|grep|groups|gtar|gunzip|gzip|halt|hdparm|head|hell|history|hostid|hostname|httpd|id|identify|ifconfig|igawk|install|ipcalc|join|kbd_mode|kill|last|lastlog|link|links|ln|loadkeys|locate|login|logname|look|ls|lsmod|lynx|mac2unix|mail|man|manweb|md5sum|mdu|mkdir|mkfifo|mkfs|mknod|mktemp|more|mount|mt|mtr|mv|namei|nano|nc|ncftp|nedit-nc|netstat|nice|nisdomainname|nl|nohup|nslookup|od|paste|pathchk|pdf2dsc|pdf2ps|pdfinfo|pdftotext|perl|pgawk|pico|pine|ping|ping6|pinky|pr|printenv|printf|ps|ps2ascii|ps2epsi|ps2frag|ps2pdf|ps2pdf12|ps2pdf13|ps2pdf14|ps2pdfwr|ps2pk|ps2ps|psbook|ptx|pwd|quota|readelf|readlink|reboot|red|rename|resize|rm|rmdir|rpm|runcon|rundig|rvi|sed|seq|gid|serial|uid|setfont|sfdisk|sftp|sh|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|shred|shuf|sleep|slocate|sort|split|ssh|stat|stty|stty cooked|stty raw|su|sum|switchdesk|sync|tac|tail|tar|tcsh|tee|telnet|test|time|timeout|tr|tracepath|tracepath6|traceroute|traceroute6|tree|true|truncate|tsort|tty|umask|umount|uname|unexpand|unicode_start|unicode_stop|uniq|unlink|ungid|unuid|untar|unzip|updatedb|uptime|useradd|users|usleep|vdir|viwc|wget|is|whereis|which|who|whoami|whois|xinit|xpdf|xrandr|yes|ypdomainname|zcat|zip|zipinfo)\\s+(-+[a-z]+)",
-    "category": "osci",
-    "subcategory": "osci",
-    "risk": 5
-  },
-  {
-    "id": "100153",
-    "name": "100153",
-    "msg": "OSCI (OS Command Injection) Attempt",
-    "operand": "(&&|\\|\\||;|`)\\s*?(arch|ash|awk|base64|basename|bash|bc|bsh|bunzip2|cat|chcon|chgrp|chmod|chown|chroot|cjpeg|cksum|clear|comm|configure|cp|cpio|csh|csplit|curl|cut|date|dc|dd|df|diff|diff3|dig|dir|dircolors|dirname|djpeg|dmesg|dnsdomainname|doexec|domainname|dos2unix|du|dumpkeys|echo|ed|egrep|eject|elinks|env|ex|expand|expr|ext|factor|false|fdisk|fgrep|find|finger|fixps|fmt|fold|free|gawk|grep|groups|gtar|gunzip|gzip|halt|hdparm|head|hell|history|hostid|hostname|httpd|id|identify|ifconfig|igawk|install|ipcalc|join|kbd_mode|kill|last|lastlog|link|links|ln|loadkeys|locate|login|logname|look|ls|lsmod|lynx|mac2unix|mail|man|manweb|md5sum|mdu|mkdir|mkfifo|mkfs|mknod|mktemp|more|mount|mt|mtr|mv|namei|nano|nc|ncftp|nedit-nc|netstat|nice|nisdomainname|nl|nohup|nslookup|od|paste|pathchk|pdf2dsc|pdf2ps|pdfinfo|pdftotext|perl|pgawk|pico|pine|ping|ping6|pinky|pr|printenv|printf|ps|ps2ascii|ps2epsi|ps2frag|ps2pdf|ps2pdf12|ps2pdf13|ps2pdf14|ps2pdfwr|ps2pk|ps2ps|psbook|ptx|pwd|quota|readelf|readlink|reboot|red|rename|resize|rm|rmdir|rpm|runcon|rundig|rvi|sed|seq|gid|serial|uid|setfont|sfdisk|sftp|sh|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|shred|shuf|sleep|slocate|sort|split|ssh|stat|stty|stty cooked|stty raw|su|sum|switchdesk|sync|tac|tail|tar|tcsh|tee|telnet|test|time|timeout|tr|tracepath|tracepath6|traceroute|traceroute6|tree|true|truncate|tsort|tty|umask|umount|uname|unexpand|unicode_start|unicode_stop|uniq|unlink|ungid|unuid|untar|unzip|updatedb|uptime|useradd|users|usleep|vdir|viwc|wget|is|whereis|which|who|whoami|whois|xinit|xpdf|xrandr|yes|ypdomainname|zcat|zip|zipinfo)\\s+((-+[a-z]+)|(/\\w){2,})",
-    "category": "osci",
-    "subcategory": "osci",
-    "risk": 5
+    "risk": 3
   },
   {
     "id": "100154",
@@ -1368,37 +1224,10 @@
     "risk": 5
   },
   {
-    "id": "100155",
-    "name": "100155",
-    "msg": "OSCI (OS Command Injection) Attempt",
-    "operand": "(arch|ash|awk|base64|basename|bash|bc|bsh|bunzip2|cat|chcon|chgrp|chmod|chown|chroot|cjpeg|cksum|clear|comm|configure|cp|cpio|csh|csplit|curl|cut|date|dc|dd|df|diff|diff3|dig|dir|dircolors|dirname|djpeg|dmesg|dnsdomainname|doexec|domainname|dos2unix|du|dumpkeys|echo|ed|egrep|eject|elinks|env|ex|expand|expr|ext|factor|false|fdisk|fgrep|find|finger|fixps|fmt|fold|free|gawk|grep|groups|gtar|gunzip|gzip|halt|hdparm|head|hell|history|hostid|hostname|httpd|id|identify|ifconfig|igawk|install|ipcalc|join|kbd_mode|kill|last|lastlog|link|links|ln|loadkeys|locate|login|logname|look|ls|lsmod|lynx|mac2unix|mail|man|manweb|md5sum|mdu|mkdir|mkfifo|mkfs|mknod|mktemp|more|mount|mt|mtr|mv|namei|nano|nc|ncftp|nedit-nc|netstat|nice|nisdomainname|nl|nohup|nslookup|od|paste|pathchk|pdf2dsc|pdf2ps|pdfinfo|pdftotext|perl|pgawk|pico|pine|ping|ping6|pinky|pr|printenv|printf|ps|ps2ascii|ps2epsi|ps2frag|ps2pdf|ps2pdf12|ps2pdf13|ps2pdf14|ps2pdfwr|ps2pk|ps2ps|psbook|ptx|pwd|quota|readelf|readlink|reboot|red|rename|resize|rm|rmdir|rpm|runcon|rundig|rvi|sed|seq|gid|serial|uid|setfont|sfdisk|sftp|sh|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|shred|shuf|sleep|slocate|sort|split|ssh|stat|stty|stty cooked|stty raw|su|sum|switchdesk|sync|tac|tail|tar|tcsh|tee|telnet|test|time|timeout|tr|tracepath|tracepath6|traceroute|traceroute6|tree|true|truncate|tsort|tty|umask|umount|uname|unexpand|unicode_start|unicode_stop|uniq|unlink|ungid|unuid|untar|unzip|updatedb|uptime|useradd|users|usleep|vdir|viwc|wget|is|whereis|which|who|whoami|whois|xinit|xpdf|xrandr|yes|ypdomainname|zcat|zip|zipinfo)(\\s+(-|&&|\\|\\||;|>|<).*){2,}[ -~]",
-    "category": "osci",
-    "subcategory": "osci",
-    "risk": 5
-  },
-  {
-    "id": "100156",
-    "name": "100156",
-    "msg": "OSCI (OS Command Injection) Attempt",
-    "operand": ";.*\\$\\((arch|ash|awk|base64|basename|bash|bc|bsh|bunzip2|cat|chcon|chgrp|chmod|chown|chroot|cjpeg|cksum|clear|comm|configure|cp|cpio|csh|csplit|curl|cut|date|dc|dd|df|diff|diff3|dig|dir|dircolors|dirname|djpeg|dmesg|dnsdomainname|doexec|domainname|dos2unix|du|dumpkeys|echo|ed|egrep|eject|elinks|env|ex|expand|expr|ext|factor|false|fdisk|fgrep|find|finger|fixps|fmt|fold|free|gawk|grep|groups|gtar|gunzip|gzip|halt|hdparm|head|hell|history|hostid|hostname|httpd|id|identify|ifconfig|igawk|install|ipcalc|join|kbd_mode|kill|last|lastlog|link|links|ln|loadkeys|locate|login|logname|look|ls|lsmod|lynx|mac2unix|mail|man|manweb|md5sum|mdu|mkdir|mkfifo|mkfs|mknod|mktemp|more|mount|mt|mtr|mv|namei|nano|nc|ncftp|nedit-nc|netstat|nice|nisdomainname|nl|nohup|nslookup|od|paste|pathchk|pdf2dsc|pdf2ps|pdfinfo|pdftotext|perl|pgawk|pico|pine|ping|ping6|pinky|pr|printenv|printf|ps|ps2ascii|ps2epsi|ps2frag|ps2pdf|ps2pdf12|ps2pdf13|ps2pdf14|ps2pdfwr|ps2pk|ps2ps|psbook|ptx|pwd|quota|readelf|readlink|reboot|red|rename|resize|rm|rmdir|rpm|runcon|rundig|rvi|sed|seq|gid|serial|uid|setfont|sfdisk|sftp|sh|sha1sum|sha224sum|sha256sum|sha384sum|sha512sum|shred|shuf|sleep|slocate|sort|split|ssh|stat|stty|stty cooked|stty raw|su|sum|switchdesk|sync|tac|tail|tar|tcsh|tee|telnet|test|time|timeout|tr|tracepath|tracepath6|traceroute|traceroute6|tree|true|truncate|tsort|tty|umask|umount|uname|unexpand|unicode_start|unicode_stop|uniq|unlink|ungid|unuid|untar|unzip|updatedb|uptime|useradd|users|usleep|vdir|viwc|wget|is|whereis|which|who|whoami|whois|xinit|xpdf|xrandr|yes|ypdomainname|zcat|zip|zipinfo).*\\)",
-    "category": "osci",
-    "subcategory": "osci",
-    "risk": 5
-  },
-  {
-    "id": "100157",
-    "name": "100157",
-    "msg": "XSS Attempt (Win OSCI)",
-    "operand": "[A-Za-z]\\:.+\\.(exe|bat|cmd|dll)",
-    "category": "xss",
-    "subcategory": "xss",
-    "risk": 5
-  },
-  {
     "id": "100158",
     "name": "100158",
-    "msg": "XSS Attempt (Win OSCI)",
-    "operand": "\\w\\.(exe|bat|cmd|dll|sh|bash)($|(\\?.*))",
+    "msg": "OSCI Attempt (Win/Posix OSCI)",
+    "operand": "\\w\\.(exe|bat|cmd|dll|z?sh|bash)",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
@@ -1416,7 +1245,7 @@
     "id": "100160",
     "name": "100160",
     "msg": "XSS Attempt (anchor, img or script)",
-    "operand": "%3c.+%3e.+%3c%2f.+%3e",
+    "operand": "<.+>.+</.+>",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
@@ -1425,7 +1254,7 @@
     "id": "100161",
     "name": "100161",
     "msg": "XSS Attempt (anchor, img or script)",
-    "operand": "%3c.+%2f%3e",
+    "operand": "<.+/>",
     "category": "xss",
     "subcategory": "xss",
     "risk": 5
