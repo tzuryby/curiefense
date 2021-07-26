@@ -35,7 +35,7 @@
                 metadata:
                   filter_metadata:
                     envoy.filters.http.lua:
-                      xff_trusted_hops: 1
+                      xff_trusted_hops: XFF_TRUSTED
           http_filters:
           - name: envoy.filters.http.lua
             typed_config:
