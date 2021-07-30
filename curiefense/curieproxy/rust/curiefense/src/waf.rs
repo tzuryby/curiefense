@@ -137,10 +137,11 @@ pub fn waf_check(
         Headers => &rinfo.headers,
         Cookies => &rinfo.cookies,
         Args => &rinfo.rinfo.qinfo.args,
+        Path => &rinfo.rinfo.qinfo.path_as_map,
     };
 
     // check section profiles
-    for idx in &[Headers, Cookies, Args] {
+    for idx in &[Path, Headers, Cookies, Args] {
         section_check(
             *idx,
             profile.sections.get(*idx),
@@ -153,7 +154,7 @@ pub fn waf_check(
     let mut hca_keys: HashMap<String, (SectionIdx, String)> = HashMap::new();
 
     // run libinjection on non-whitelisted sections
-    for idx in &[Headers, Cookies, Args] {
+    for idx in &[Path, Headers, Cookies, Args] {
         // note that there is no risk check with injection, every match triggers a block.
         injection_check(*idx, getsection(*idx), &omit, &mut hca_keys)?;
     }

@@ -6,12 +6,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "regex": [
                 {
@@ -33,6 +35,10 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
     },
     {
@@ -42,12 +48,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "regex": [
                 {
@@ -69,7 +77,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "argschecks",
@@ -78,12 +91,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 3,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "names": [
                 {
@@ -124,7 +139,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "lvl2",
@@ -133,12 +153,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 2,
         "min_args_risk": 2,
         "min_cookies_risk": 2,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -150,7 +172,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "lvl3",
@@ -159,12 +186,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 3,
         "min_args_risk": 3,
         "min_cookies_risk": 3,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -176,7 +205,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "lvl4",
@@ -185,12 +219,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 4,
         "min_args_risk": 4,
         "min_cookies_risk": 4,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -202,7 +238,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "lvl5",
@@ -211,12 +252,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 5,
         "min_args_risk": 5,
         "min_cookies_risk": 5,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -228,7 +271,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "lvl135",
@@ -237,12 +285,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 3,
         "min_cookies_risk": 5,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -254,7 +304,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "__default__",
@@ -263,12 +318,14 @@
         "max_header_length": 1024,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -280,7 +337,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "e2e000000002",
@@ -289,12 +351,14 @@
         "max_header_length": 50,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "names": [],
             "regex": []
@@ -306,7 +370,12 @@
         "cookies": {
             "names": [],
             "regex": []
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     },
     {
         "id": "rr",
@@ -315,12 +384,14 @@
         "max_header_length": 50,
         "max_cookie_length": 1024,
         "max_arg_length": 1024,
+        "max_path_length": 1024,
         "max_headers_count": 42,
         "max_cookies_count": 42,
         "max_args_count": 512,
         "min_headers_risk": 1,
         "min_args_risk": 1,
         "min_cookies_risk": 1,
+        "min_path_risk": 1,
         "args": {
             "names": [
                 {
@@ -422,6 +493,11 @@
                     "exclusions": {}
                 }
             ]
+        },
+         "path": {
+            "names": [],
+            "regex": []
         }
+
     }
 ]

@@ -13,6 +13,7 @@ pub struct Section<A> {
     pub headers: A,
     pub cookies: A,
     pub args: A,
+    pub path: A,
 }
 
 #[derive(Debug, Clone)]
@@ -49,11 +50,18 @@ impl Default for WafProfile {
                     names: HashMap::new(),
                     regex: Vec::new(),
                 },
+                path: WafSection {
+                    max_count: 42,
+                    max_length: 1024,
+                    names: HashMap::new(),
+                    regex: Vec::new(),
+                }
             },
             min_risks: Section {
                 headers: 1,
                 args: 1,
                 cookies: 1,
+                path: 1,
             },
         }
     }
@@ -80,6 +88,7 @@ pub enum SectionIdx {
     Headers,
     Cookies,
     Args,
+    Path,
 }
 
 impl<A> Section<A> {
@@ -88,6 +97,7 @@ impl<A> Section<A> {
             SectionIdx::Headers => &self.headers,
             SectionIdx::Cookies => &self.cookies,
             SectionIdx::Args => &self.args,
+            SectionIdx::Path => &self.path,
         }
     }
 
@@ -96,6 +106,7 @@ impl<A> Section<A> {
             SectionIdx::Headers => &mut self.headers,
             SectionIdx::Cookies => &mut self.cookies,
             SectionIdx::Args => &mut self.args,
+            SectionIdx::Path => &mut self.path,
         }
     }
 }
@@ -109,6 +120,7 @@ where
             headers: Default::default(),
             cookies: Default::default(),
             args: Default::default(),
+            path: Default::default(),
         }
     }
 }
@@ -174,11 +186,13 @@ fn convert_entry(entry: RawWafProfile) -> anyhow::Result<(String, WafProfile)> {
                 headers: mk_section(entry.headers, entry.max_header_length, entry.max_headers_count)?,
                 cookies: mk_section(entry.cookies, entry.max_cookie_length, entry.max_cookies_count)?,
                 args: mk_section(entry.args, entry.max_arg_length, entry.max_args_count)?,
+                path: mk_section(entry.path, entry.max_arg_length, 1)?,
             },
             min_risks: Section {
                 headers: entry.min_headers_risk,
                 cookies: entry.min_cookies_risk,
                 args: entry.min_args_risk,
+                path: entry.min_path_risk,
             },
         },
     ))

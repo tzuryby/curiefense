@@ -32,6 +32,7 @@ pub struct JRequestMap {
     headers: RequestField,
     cookies: RequestField,
     args: RequestField,
+    path_as_map: RequestField,
     attrs: JAttrs,
 }
 
@@ -69,6 +70,7 @@ impl JRequestMap {
             query: self.attrs.query,
             uri: Some(self.attrs.uri),
             args: self.args,
+            path_as_map: self.path_as_map,
         };
         let vtags: Vec<String> = self.attrs.tags.into_iter().map(|(k, _)| k).collect();
         (
