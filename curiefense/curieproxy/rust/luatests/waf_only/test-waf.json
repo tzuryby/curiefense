@@ -65,6 +65,38 @@
       ":authority": "localhost:30081"
     }
   },
+   {
+    "waf_id": "__default__",
+    "response": {
+      "action": "custom_response",
+      "block_mode": false,
+      "status": 403
+    },
+    "name": "sqli (path)",
+    "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
+      "x-forwarded-for": "23.129.64.253",
+      ":path": "\/test\/' or 1=1--/foo?v=1",
+      ":method": "GET",
+      ":authority": "localhost:30081"
+    }
+  },
+    {
+    "waf_id": "__default__",
+    "response": {
+      "action": "custom_response",
+      "block_mode": false,
+      "status": 403
+    },
+    "name": "sqli (path)",
+    "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
+      "x-forwarded-for": "23.129.64.253",
+      ":path": "\/test\/'%20or%201=1--/foo?v=1",
+      ":method": "GET",
+      ":authority": "localhost:30081"
+    }
+  },
   {
     "waf_id": "omitted",
     "response": {

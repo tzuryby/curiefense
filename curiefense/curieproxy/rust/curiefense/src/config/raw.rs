@@ -245,15 +245,18 @@ pub struct RawWafProfile {
     pub max_header_length: usize,
     pub max_cookie_length: usize,
     pub max_arg_length: usize,
+    pub max_path_length: usize,
     pub max_headers_count: usize,
     pub max_cookies_count: usize,
     pub max_args_count: usize,
     pub min_headers_risk: u8,
     pub min_cookies_risk: u8,
     pub min_args_risk: u8,
+    pub min_path_risk: u8,
     pub args: RawWafProperties,
     pub headers: RawWafProperties,
     pub cookies: RawWafProperties,
+    pub path: RawWafProperties,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

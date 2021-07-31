@@ -72,12 +72,15 @@ fn map_args(logs: &mut Logs, path: &str, mcontent_type: Option<&str>, mbody: Opt
             logs.debug("body parsed");
         }
     }
+    let mut path_as_map = RequestField::default();
+    path_as_map.add("path".to_string(), qpath.clone());
 
     QueryInfo {
         qpath,
         query,
         uri,
         args,
+        path_as_map,
     }
 }
 
@@ -91,6 +94,7 @@ pub struct QueryInfo {
     /// URL decoded path, if decoding worked
     pub uri: Option<String>,
     pub args: RequestField,
+    pub path_as_map: RequestField,
 }
 
 #[derive(Debug, Clone)]
