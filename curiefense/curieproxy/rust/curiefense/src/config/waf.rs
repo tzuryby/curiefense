@@ -186,7 +186,7 @@ fn convert_entry(entry: RawWafProfile) -> anyhow::Result<(String, WafProfile)> {
                 headers: mk_section(entry.headers, entry.max_header_length, entry.max_headers_count)?,
                 cookies: mk_section(entry.cookies, entry.max_cookie_length, entry.max_cookies_count)?,
                 args: mk_section(entry.args, entry.max_arg_length, entry.max_args_count)?,
-                path: mk_section(entry.path, entry.max_arg_length, 1)?,
+                path: mk_section(entry.path, entry.max_path_length, 1)?,
             },
             min_risks: Section {
                 headers: entry.min_headers_risk,
