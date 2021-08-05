@@ -90,9 +90,72 @@ pub fn parse_urlencoded_params_bytes(args: &mut RequestField, query: &[u8]) {
     }
 }
 
+
+fn base64dec_all(input: &str) -> Result<Vec<u8>,&str> {
+    const BAD_PADDING_MESSAGE:&str = "bad padding";
+    if input.len() % 4 == 1 {
+        return Err(BAD_PADDING_MESSAGE);
+    }
+    let mut i = 4;
+    let mut v:u32 = 0;
+    let mut res: Vec<u8> = Vec::default();
+    let mut pad = 0;
+    for c in input.chars() {
+        let n = match c {
+            '0'..='9' => 52+(c as u8)-('0' as u8),
+            'A'..='Z' => (c as u8)-('A' as u8),
+            'a'..='z' => 26+(c as u8)-('a' as u8),
+            '+'|'-' => 62,
+            '/'|'_' => 63,
+            '=' => {
+                if (pad >= 2) || (i >= 3)  {
+                    return Err("bad padding")
+                }
+                pad += 1;
+                0
+            },
+            _ =>  return Err("invalid baase64 character"),
+        } as u32;
+        v <<= 6;
+        v |= n;
+        i -= 1;
+        if i == 0 {
+            res.push((v >> 16) as u8);
+            if pad < 2 {
+                res.push((v >> 8) as u8);
+            }
+            if pad < 1 {
+                res.push(v as u8);
+            }
+            i = 4;
+            v = 0;
+        }
+    }
+    if  (i == 3) || ((pad > 0) && (i != 4)) {
+        return Err(BAD_PADDING_MESSAGE)
+    }
+    if i == 1 {
+        res.push((v >> 10) as u8);
+        res.push((v >> 2) as u8);
+    } else if i == 2 {
+        res.push((v >> 4) as u8);
+    }
+    Ok(res)
+}
+
+/// decodes an url encoded string into a string, which can contain REPLACEMENT CHARACTER on decoding failure
+pub fn base64dec_all_str(input: &str) -> Result<String, &str> {
+    match base64dec_all(input) {
+        Ok(d) => Ok(String::from_utf8_lossy(&d).into_owned()),
+        Err(e) => Err(e),
+    }
+}
+
+
 #[cfg(test)]
 mod test_lib {
     use super::urldecode_str;
+    use super::base64dec_all_str;
 
     #[test]
     fn test_urldecode_normal() {
@@ -123,4 +186,41 @@ mod test_lib {
         assert!(urldecode_str("%F0%9F%91%BE%20Exterminate%21%") == "👾 Exterminate!%");
         assert!(urldecode_str("%F0%9F%BE%20%21%") == "� !%");
     }
+
+    #[test]
+    fn test_ok_base64dec_all_str() {
+        for (input, output) in [
+            ("", ""),
+            ("Zm9v", "foo"),
+            ("QQ==", "A"),
+            ("QQ", "A"),
+            ("QUI=", "AB"),
+            ("QUI", "AB"),
+            ("QUE+", "AA>"),
+            ("QUE-", "AA>"),
+            ("QUE/", "AA?"),
+            ("QUE_", "AA?"),
+            ("bTxLTFNqZGhmPkxLSkhGemVsSWpmZXpsbsOpw6Bkw6vDhGtmZQ==", "m<KLSjdhf>LKJHFzelIjfezlnéàdëÄkfe"),
+        ].iter() {
+            println!("base64 dec {:?} => {:?} / expect {:?}", input, base64dec_all_str(&input), output);
+            assert!(base64dec_all_str(&input) == Ok(output.to_string()));
+        }
+    }
+    #[test]
+    fn test_err_base64dec_all_str() {
+        for (input, output) in [
+            ("A", "bad padding"),
+            ("A==", "bad padding"),
+            ("ABC==", "bad padding"),
+            ("ABCD==", "bad padding"),
+            ("ABCDE==", "bad padding"),
+            ("QUIDA", "bad padding"),
+            ("QUIDE=", "bad padding"),
+            ("QUIDE=A", "bad padding"),
+            ("QUID===", "bad padding"),
+        ].iter() {
+            assert!(base64dec_all_str(&input) == Err(output));
+        }
+    }
+
 }

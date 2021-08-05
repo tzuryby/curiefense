@@ -20,6 +20,20 @@ local redisport = os.getenv("REDIS_PORT") or 6379
 
 local lfs = require 'lfs'
 
+
+local function red(x)
+   return "\27[31m" .. x .. "\27[0m"
+end
+
+local function fail(x)
+   return red("FAIL: " .. x)
+end
+
+local function printfail(x)
+   print(fail(x))
+end
+
+
 local function ends_with(str, ending)
   return ending == "" or str:sub(-#ending) == ending
 end
@@ -104,6 +118,7 @@ end
 
 -- testing from envoy metadata
 local function test_raw_request(request_path)
+  errors = 0
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
@@ -131,13 +146,15 @@ local function test_raw_request(request_path)
     end
 
     if not good then
-      for _, log in ipairs(r.logs) do
-          print(log["elapsed_micros"] .. "µs " .. log["message"])
-      end
+--      for _, log in ipairs(r.logs) do
+--          print(log["elapsed_micros"] .. "µs " .. log["message"])
+--      end
       print(response)
-      error("mismatch in " .. raw_request_map.name)
+      printfail("mismatch in " .. raw_request_map.name)
+      errors = errors+1
     end
   end
+  return errors
 end
 
 -- remove all keys from redis
@@ -153,6 +170,7 @@ end
 local function test_ratelimit(request_path)
   print("Rate limit " .. request_path)
   clean_redis()
+  local errors = 0
   local raw_request_maps = load_json_file(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
@@ -173,10 +191,12 @@ local function test_ratelimit(request_path)
       socket.sleep(raw_request_map.delay)
     end
   end
+  return errors
 end
 
 -- testing for control flow
 local function test_flow(request_path)
+  local errors = 0
   print("Flow control " .. request_path)
   clean_redis()
   local raw_request_maps = load_json_file(request_path)
@@ -199,6 +219,7 @@ local function test_flow(request_path)
       socket.sleep(raw_request_map.delay)
     end
   end
+  return errors
 end
 
 -- running waf only filter
@@ -221,13 +242,16 @@ local function run_inspect_waf(raw_request_map)
 
     local response, merr = curiefense.inspect_waf(meta, headers, raw_request_map.body, ip, raw_request_map.waf_id)
     if merr then
+       print("failed to run test" .. merr)
       error(merr)
     end
     return response
 end
 
+
 -- testing waf only filtering
 local function test_waf(request_path)
+  local errors = 0
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
@@ -238,53 +262,86 @@ local function test_waf(request_path)
 
     for _, log in ipairs(r.logs) do
         if log["message"] == "WAF profile not found" then
-          print("waf profile not found")
+          printfail("waf profile not found")
           good = false
         end
     end
 
     if r.action ~= raw_request_map.response.action then
-      print("Expected action " .. cjson.encode(raw_request_map.response.action) ..
+      printfail("Expected action " .. cjson.encode(raw_request_map.response.action) ..
         ", but got " .. cjson.encode(r.action))
       good = false
     end
     if r.response ~= cjson.null then
       if r.response.status ~= raw_request_map.response.status then
-        print("Expected status " .. cjson.encode(raw_request_map.response.status) ..
+        printfail("Expected status " .. cjson.encode(raw_request_map.response.status) ..
           ", but got " .. cjson.encode(r.response.status))
         good = false
       end
     end
 
     if not good then
-      for _, log in ipairs(r.logs) do
-          print(log["elapsed_micros"] .. "µs " .. log["message"])
-      end
-      error("mismatch in " .. raw_request_map.name)
+--      for _, log in ipairs(r.logs) do
+--          print(log["elapsed_micros"] .. "µs " .. log["message"])
+--      end
+      printfail("mismatch in " .. raw_request_map.name)
+      errors = errors + 1
     end
   end
+  return errors
 end
 
+
+waf_errors = 0
 for file in lfs.dir[[luatests/waf_only]] do
   if ends_with(file, ".json") then
-    test_waf("luatests/waf_only/" .. file)
+    waf_errors = waf_errors + test_waf("luatests/waf_only/" .. file)
   end
 end
 
+raw_request_errors = 0
 for file in lfs.dir[[luatests/raw_requests]] do
   if ends_with(file, ".json") then
-    test_raw_request("luatests/raw_requests/" .. file)
+    raw_request_errors = raw_request_errors + test_raw_request("luatests/raw_requests/" .. file)
   end
 end
 
+flow_errors = 0
 for file in lfs.dir[[luatests/flows]] do
   if ends_with(file, ".json") then
-    test_flow("luatests/flows/" .. file)
+    flow_errors = flow_errors + test_flow("luatests/flows/" .. file)
   end
 end
 
+ratelimit_errors = 0
 for file in lfs.dir[[luatests/ratelimit]] do
   if ends_with(file, ".json") then
-    test_ratelimit("luatests/ratelimit/" .. file)
+    ratelimit_errors = ratelimit_errors + test_ratelimit("luatests/ratelimit/" .. file)
   end
 end
+
+
+print("====================== SUMMARY ==============================")
+if waf_errors == 0 then
+   print("All waf tests succeeded")
+else
+   printfail(waf_errors .. " WAF tests failed")
+end
+if raw_request_errors == 0 then
+   print("All raw request test succeeded")
+else
+   printfail(raw_request_errors .. " raw request tests failed")
+end
+if flow_errors == 0 then
+   print("All flow test succeeded")
+else
+   printfail(flow_errors .. " flow tests failed")
+end
+if ratelimit_errors == 0 then
+   print("All rate limit test succeeded")
+else
+   printfail(ratelimit_errors .. " rate limit tests failed")
+end
+print("=============================================================")
+
+return waf_errors and raw_request_errors and flow_errors and ratelimit_errors

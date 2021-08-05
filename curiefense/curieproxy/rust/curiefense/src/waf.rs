@@ -9,7 +9,8 @@ use crate::interface::{Action, ActionType};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use crate::Logs;
-use crate::utils::url::urldecode_str;
+use crate::utils::url::{urldecode_str, base64dec_all_str};
+use htmlescape::decode_html;
 
 #[derive(Debug, Clone)]
 pub struct WafMatched {
@@ -231,39 +232,50 @@ fn section_check(
     Ok(())
 }
 
+const DECODERS: &[fn(&str) -> Result<String,&str> ] = &[
+    |v:  &str| { Ok(v.to_string()) },
+    |v :&str| { Ok(urldecode_str(v)) },
+    |v :&str| { base64dec_all_str(v) },
+    |v :&str| { Ok(urldecode_str(&urldecode_str(v))) },
+    |v :&str| { base64dec_all_str(v).and_then(|x|{Ok(urldecode_str(&x))}) },
+    |v :&str| { decode_html(v).or(Err("html decoding failed"))  },
+];
+
 fn injection_check(
     idx: SectionIdx,
     params: &RequestField,
     omit: &Omitted,
     hca_keys: &mut HashMap<String, (SectionIdx, String)>,
 ) -> Result<(), WafBlock> {
+
     for (name, value) in params.iter() {
         if !omit.entries.get(idx).contains(name) {
-            if !omit
-                .exclusions
-                .get(idx)
-                .get(name)
-                .map(|st| st.contains("libinjection"))
-                .unwrap_or(false)
-            {
-                for val in [ value, &urldecode_str(&value) ].iter() {
-                    if let Some((b, fp)) = sqli(val) {
-                        if b {
-                            return Err(WafBlock::SqlInjection(
-                                WafMatched::new(idx, name.clone(), val.to_string().clone()),
-                                fp,
-                            ));
+            for dec in DECODERS.iter() {
+                if let Ok(val) = dec(&value) {
+                    if !omit
+                        .exclusions
+                        .get(idx)
+                        .get(name)
+                        .map(|st| st.contains("libinjection"))
+                        .unwrap_or(false)
+                    {
+                        if let Some((b, fp)) = sqli(&val) {
+                            if b {
+                                return Err(WafBlock::SqlInjection(
+                                    WafMatched::new(idx, name.clone(), val.clone()),
+                                    fp,
+                                ));
+                            }
+                        }
+                        if let Some(b) = xss(&val) {
+                            if b {
+                                return Err(WafBlock::Xss(WafMatched::new(idx, name.clone(), val.clone())));
+                            }
                         }
                     }
-                    if let Some(b) = xss(val) {
-                        if b {
-                            return Err(WafBlock::Xss(WafMatched::new(idx, name.clone(), val.to_string().clone())));
-                        }
-                    }
+                    hca_keys.insert(val.clone(), (idx, name.clone()));
                 }
             }
-
-            hca_keys.insert(value.clone(), (idx, name.clone()));
         }
     }
 
