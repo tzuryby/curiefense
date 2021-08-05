@@ -29,6 +29,8 @@ libinjection = "0.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 multipart = "0.17.1"
 xmlparser = "0.13.3"
+htmlescape = "0.3.1"
+
 
 # iptools dependencies
 rand = "0.8.3"

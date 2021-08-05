@@ -10,6 +10,7 @@ use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use crate::Logs;
 use crate::utils::url::{urldecode_str, base64dec_all_str};
+use htmlescape::decode_html;
 
 #[derive(Debug, Clone)]
 pub struct WafMatched {
@@ -237,6 +238,7 @@ const DECODERS: &[fn(&str) -> Result<String,&str> ] = &[
     |v :&str| { base64dec_all_str(v) },
     |v :&str| { Ok(urldecode_str(&urldecode_str(v))) },
     |v :&str| { base64dec_all_str(v).and_then(|x|{Ok(urldecode_str(&x))}) },
+    |v :&str| { decode_html(v).or(Err("html decoding failed"))  },
 ];
 
 fn injection_check(
