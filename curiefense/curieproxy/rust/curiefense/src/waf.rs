@@ -271,7 +271,7 @@ fn injection_check(
                             }
                         }
                     }
-                    hca_keys.insert(value.clone(), (idx, name.clone()));
+                    hca_keys.insert(val.clone(), (idx, name.clone()));
                 }
             }
         }
