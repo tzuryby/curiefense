@@ -20,6 +20,20 @@ local redisport = os.getenv("REDIS_PORT") or 6379
 
 local lfs = require 'lfs'
 
+
+local function red(x)
+   return "\27[31m" .. x .. "\27[0m"
+end
+
+local function fail(x)
+   return red("FAIL: " .. x)
+end
+
+local function printfail(x)
+   print(fail(x))
+end
+
+
 local function ends_with(str, ending)
   return ending == "" or str:sub(-#ending) == ending
 end
@@ -136,7 +150,8 @@ local function test_raw_request(request_path)
 --          print(log["elapsed_micros"] .. "µs " .. log["message"])
 --      end
       print(response)
-      error("mismatch in " .. raw_request_map.name)
+      printfail("mismatch in " .. raw_request_map.name)
+      errors = errors+1
     end
   end
   return errors
@@ -231,18 +246,6 @@ local function run_inspect_waf(raw_request_map)
       error(merr)
     end
     return response
-end
-
-local function red(x)
-   return "\27[31m" .. x .. "\27[0m"
-end
-
-local function fail(x)
-   return red("FAIL: " .. x)
-end
-
-local function printfail(x)
-   print(fail(x))
 end
 
 
