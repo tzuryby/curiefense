@@ -50,7 +50,6 @@ global:
       kibana: "100m"
       uiserver: "100m"
       confserver_init: "100m"
-      confserver_nginx: "10m"
       confserver_uwsgi: "100m"
       curietasker: "100m"
       prometheus: "100m"
