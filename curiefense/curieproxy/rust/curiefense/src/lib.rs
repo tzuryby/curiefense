@@ -30,6 +30,8 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::interface::{BlockReason, Location};
+
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
         if let Some(ua) = reqinfo.headers.get("user-agent") {
@@ -89,14 +91,14 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     let mut tags = Tags::default();
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
-    tags.insert("all");
+    tags.insert("all", Location::Request);
 
     logs.debug(|| format!("Inspection starts (grasshopper active: {})", mgh.is_some()));
 
     #[allow(clippy::large_enum_variant)]
     enum RequestMappingResult<A> {
         NoSecurityPolicy,
-        BodyTooLarge(Action, RequestInfo),
+        BodyTooLarge((Action, BlockReason), RequestInfo),
         Res(A),
     }
 
@@ -160,16 +162,16 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
             }
         }) {
             Some(RequestMappingResult::Res(x)) => x,
-            Some(RequestMappingResult::BodyTooLarge(action, rinfo)) => {
-                return (Decision::Action(action), tags, rinfo);
+            Some(RequestMappingResult::BodyTooLarge((action, br), rinfo)) => {
+                return (Decision::action(action, vec![br]), tags, rinfo);
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
-                return (Decision::Pass, tags, map_request(logs, &[], &[], 0, &raw));
+                return (Decision::pass(Vec::new()), tags, map_request(logs, &[], &[], 0, &raw));
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
-                return (Decision::Pass, tags, map_request(logs, &[], &[], 0, &raw));
+                return (Decision::pass(Vec::new()), tags, map_request(logs, &[], &[], 0, &raw));
             }
         };
 
@@ -205,7 +207,7 @@ pub fn content_filter_check_generic_request_map(
         Some(Some(prof)) => prof,
         _ => {
             logs.error("Content Filter profile not found");
-            return (Decision::Pass, map_request(logs, &[], &[], 25, raw), tags);
+            return (Decision::pass(Vec::new()), map_request(logs, &[], &[], 25, raw), tags);
         }
     };
 
@@ -213,11 +215,8 @@ pub fn content_filter_check_generic_request_map(
         if body.len() > waf_profile.max_body_size {
             logs.error("body too large, exiting early");
             let reqinfo = map_request(logs, &waf_profile.decoding, &[], 0, raw);
-            return (
-                Decision::Action(body_too_large(waf_profile.max_body_size, body.len())),
-                reqinfo,
-                tags,
-            );
+            let (a, br) = body_too_large(waf_profile.max_body_size, body.len());
+            return (Decision::action(a, vec![br]), reqinfo, tags);
         }
     }
 
@@ -234,8 +233,8 @@ pub fn content_filter_check_generic_request_map(
 
     (
         match waf_result {
-            Ok(()) => Decision::Pass,
-            Err(wb) => Decision::Action(wb.to_action()),
+            Ok(()) => Decision::pass(Vec::new()),
+            Err(d) => d,
         },
         reqinfo,
         tags,

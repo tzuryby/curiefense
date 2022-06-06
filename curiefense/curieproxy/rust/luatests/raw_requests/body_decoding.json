@@ -14,6 +14,18 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -50,6 +62,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -86,6 +106,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -122,6 +150,18 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny1"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -159,6 +199,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -194,6 +242,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -230,6 +286,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -266,6 +330,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_malformed"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -302,6 +374,18 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -339,6 +423,18 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny1"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -375,6 +471,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
+      "triggers": [
+        {
+          "initiator": "decoding",
+          "active": true,
+          "section": "body",
+          "type": "body_missing"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",

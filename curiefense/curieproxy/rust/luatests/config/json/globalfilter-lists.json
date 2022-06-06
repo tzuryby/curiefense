@@ -590,5 +590,34 @@
             }
          ]
       }
+   },
+   {
+      "id": "incl000000001",
+      "name": "incl000000001",
+      "source": "self-managed",
+      "mdate": "2020-11-22T00:00:00.000Z",
+      "description": "E2E test tag rules",
+      "active": true,
+      "tags": [
+         "incl000000001"
+      ],
+      "rule": {
+         "relation": "OR",
+         "sections": [
+            {
+               "relation": "OR",
+               "entries": [
+                  [
+                     "headers",
+                     [
+                        "include",
+                        "true"
+                     ],
+                     "annotation"
+                  ]
+               ]
+            }
+         ]
+      }
    }
 ]

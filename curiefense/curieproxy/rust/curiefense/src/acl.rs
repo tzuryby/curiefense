@@ -1,16 +1,15 @@
 use crate::config::raw::AclProfile;
-use crate::interface::Tags;
+use crate::interface::{BlockReason, Tags};
 
-use serde::Serialize;
 use std::collections::HashSet;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct AclDecision {
     pub allowed: bool,
-    pub tags: Vec<String>,
+    pub r: BlockReason,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub enum AclResult {
     /// passthrough found
     Passthrough(AclDecision),
@@ -18,7 +17,7 @@ pub enum AclResult {
     Match(BotHuman),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct BotHuman {
     pub bot: Option<AclDecision>,
     pub human: Option<AclDecision>,
@@ -26,11 +25,14 @@ pub struct BotHuman {
 
 pub fn check_acl(tags: &Tags, acl: &AclProfile) -> AclResult {
     let subcheck = |checks: &HashSet<String>, allowed: bool| {
-        let tags: Vec<String> = checks.intersection(tags.as_hash_ref()).cloned().collect();
+        let tags = tags.intersect_tags(checks);
         if tags.is_empty() {
             None
         } else {
-            Some(AclDecision { allowed, tags })
+            Some(AclDecision {
+                allowed,
+                r: BlockReason::acl(tags, allowed),
+            })
         }
     };
     subcheck(&acl.force_deny, false)

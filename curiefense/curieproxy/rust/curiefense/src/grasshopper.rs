@@ -1,6 +1,6 @@
+use crate::interface::BlockReason;
 use crate::requestfields::RequestField;
 use crate::{Action, ActionType, Decision};
-use serde_json::json;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 
@@ -104,19 +104,21 @@ impl Grasshopper for DynGrasshopper {
 }
 
 pub fn gh_fail_decision(reason: &str) -> Decision {
-    Decision::Action(Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        reason: json!({"initiator": "phase01", "reason": reason}),
-        headers: None,
-        status: 500,
-        content: "internal_error".to_string(),
-        extra_tags: None,
-    })
+    Decision::action(
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            ban: false,
+            headers: None,
+            status: 500,
+            content: "internal_error".to_string(),
+            extra_tags: None,
+        },
+        vec![BlockReason::phase01_unknown(reason)],
+    )
 }
 
-pub fn challenge_phase01<GH: Grasshopper>(gh: &GH, ua: &str, tags: Vec<String>) -> Decision {
+pub fn challenge_phase01<GH: Grasshopper>(gh: &GH, ua: &str, reasons: Vec<BlockReason>) -> Decision {
     let seed = match gh.gen_new_seed(ua) {
         None => return gh_fail_decision("could not call gen_new_seed"),
         Some(s) => s,
@@ -148,22 +150,18 @@ pub fn challenge_phase01<GH: Grasshopper>(gh: &GH, ua: &str, tags: Vec<String>) 
 
     // here humans are accepted, as they were not denied
     // (this would have been caught by the previous guard)
-    Decision::Action(Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        reason: if tags.is_empty() {
-            // this happens for rate limit / flow control / tag action
-            json!({"initiator": "phase01", "reason": "challenge"})
-        } else {
-            // this only happens for acl challenges
-            json!({"initiator": "phase01", "reason": "challenge", "tags": tags})
+    Decision::action(
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            ban: false,
+            headers: Some(hdrs),
+            status: 247,
+            content,
+            extra_tags: Some(["challenge_phase01"].iter().map(|s| s.to_string()).collect()),
         },
-        headers: Some(hdrs),
-        status: 247,
-        content,
-        extra_tags: Some(["challenge_phase01"].iter().map(|s| s.to_string()).collect()),
-    })
+        reasons,
+    )
 }
 
 fn extract_zebra(headers: &RequestField) -> Option<String> {
@@ -189,14 +187,16 @@ pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, uri: &str, headers: &RequestF
 
     nheaders.insert("Set-Cookie".to_string(), cookie);
 
-    Some(Decision::Action(Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        reason: json!({"initiator": "phase02", "reason": "challenge"}),
-        headers: Some(nheaders),
-        status: 248,
-        content: "{}".to_string(),
-        extra_tags: Some(["challenge_phase02"].iter().map(|s| s.to_string()).collect()),
-    }))
+    Some(Decision::action(
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            ban: false,
+            headers: Some(nheaders),
+            status: 248,
+            content: "{}".to_string(),
+            extra_tags: Some(["challenge_phase02"].iter().map(|s| s.to_string()).collect()),
+        },
+        vec![BlockReason::phase02()],
+    ))
 }

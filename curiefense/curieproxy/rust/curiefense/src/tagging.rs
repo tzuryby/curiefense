@@ -2,85 +2,139 @@ use crate::config::globalfilter::{
     GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterSSection, GlobalFilterSection, PairEntry, SingleEntry,
 };
 use crate::config::raw::Relation;
-use crate::interface::{SimpleActionT, SimpleDecision, Tags};
+use crate::interface::{BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
+use std::collections::HashSet;
 use std::net::IpAddr;
 
-fn check_relation<A, F>(rinfo: &RequestInfo, rel: Relation, elems: &[A], checker: F) -> bool
+struct MatchResult {
+    matched: HashSet<Location>,
+    matching: bool,
+}
+
+fn check_relation<A, F>(rinfo: &RequestInfo, rel: Relation, elems: &[A], checker: F) -> MatchResult
 where
-    F: Fn(&RequestInfo, &A) -> bool,
+    F: Fn(&RequestInfo, &A) -> MatchResult,
 {
-    match rel {
-        Relation::And => elems.iter().all(|sub| checker(rinfo, sub)),
-        Relation::Or => elems.iter().any(|sub| checker(rinfo, sub)),
+    let mut matched = HashSet::new();
+    let mut matching = match rel {
+        Relation::And => true,
+        Relation::Or => false,
+    };
+    for sub in elems {
+        let mtch = checker(rinfo, sub);
+        matched.extend(mtch.matched);
+        matching = match rel {
+            Relation::And => matching && mtch.matching,
+            Relation::Or => matching || mtch.matching,
+        };
+    }
+    MatchResult { matched, matching }
+}
+
+fn check_pair<F>(pr: &PairEntry, s: &RequestField, locf: F) -> Option<HashSet<Location>>
+where
+    F: Fn(&str) -> Location,
+{
+    s.get(&pr.key).and_then(|v| {
+        if &pr.exact == v || pr.re.as_ref().map(|re| re.is_match(v)).unwrap_or(false) {
+            Some(std::iter::once(locf(v)).collect())
+        } else {
+            None
+        }
+    })
+}
+
+fn check_single(pr: &SingleEntry, s: &str, loc: Location) -> Option<HashSet<Location>> {
+    if pr.exact == s || pr.re.as_ref().map(|re| re.is_match(s)).unwrap_or(false) {
+        Some(std::iter::once(loc).collect())
+    } else {
+        None
     }
 }
 
-fn check_pair(pr: &PairEntry, s: &RequestField) -> bool {
-    s.get(&pr.key)
-        .map(|v| &pr.exact == v || pr.re.as_ref().map(|re| re.is_match(v)).unwrap_or(false))
-        .unwrap_or(false)
-}
-
-fn check_single(pr: &SingleEntry, s: &str) -> bool {
-    pr.exact == s || pr.re.as_ref().map(|re| re.is_match(s)).unwrap_or(false)
-}
-
-fn check_entry(rinfo: &RequestInfo, sub: &GlobalFilterEntry) -> bool {
-    let c = match &sub.entry {
-        GlobalFilterEntryE::Ip(addr) => rinfo.rinfo.geoip.ip.map(|i| &i == addr).unwrap_or(false),
-        GlobalFilterEntryE::Network(net) => rinfo.rinfo.geoip.ip.map(|i| net.contains(&i)).unwrap_or(false),
-        GlobalFilterEntryE::Range4(net4) => match rinfo.rinfo.geoip.ip {
-            Some(IpAddr::V4(ip4)) => net4.contains(&ip4),
-            _ => false,
-        },
-        GlobalFilterEntryE::Range6(net6) => match rinfo.rinfo.geoip.ip {
-            Some(IpAddr::V6(ip6)) => net6.contains(&ip6),
-            _ => false,
-        },
-        GlobalFilterEntryE::Path(pth) => check_single(pth, &rinfo.rinfo.qinfo.qpath),
-        GlobalFilterEntryE::Query(qry) => check_single(qry, &rinfo.rinfo.qinfo.query),
-        GlobalFilterEntryE::Uri(uri) => check_single(uri, &rinfo.rinfo.qinfo.uri),
+fn check_entry(rinfo: &RequestInfo, sub: &GlobalFilterEntry) -> MatchResult {
+    fn bool(loc: Location, b: bool) -> Option<HashSet<Location>> {
+        if b {
+            Some(std::iter::once(loc).collect())
+        } else {
+            None
+        }
+    }
+    fn mbool(loc: Location, mb: Option<bool>) -> Option<HashSet<Location>> {
+        bool(loc, mb.unwrap_or(false))
+    }
+    let r = match &sub.entry {
+        GlobalFilterEntryE::Ip(addr) => mbool(Location::Ip, rinfo.rinfo.geoip.ip.map(|i| &i == addr)),
+        GlobalFilterEntryE::Network(net) => mbool(Location::Ip, rinfo.rinfo.geoip.ip.map(|i| net.contains(&i))),
+        GlobalFilterEntryE::Range4(net4) => bool(
+            Location::Ip,
+            match rinfo.rinfo.geoip.ip {
+                Some(IpAddr::V4(ip4)) => net4.contains(&ip4),
+                _ => false,
+            },
+        ),
+        GlobalFilterEntryE::Range6(net6) => bool(
+            Location::Ip,
+            match rinfo.rinfo.geoip.ip {
+                Some(IpAddr::V6(ip6)) => net6.contains(&ip6),
+                _ => false,
+            },
+        ),
+        GlobalFilterEntryE::Path(pth) => check_single(pth, &rinfo.rinfo.qinfo.qpath, Location::Path),
+        GlobalFilterEntryE::Query(qry) => check_single(qry, &rinfo.rinfo.qinfo.query, Location::Path),
+        GlobalFilterEntryE::Uri(uri) => check_single(uri, &rinfo.rinfo.qinfo.uri, Location::Uri),
         GlobalFilterEntryE::Country(cty) => rinfo
             .rinfo
             .geoip
             .country_iso
             .as_ref()
-            .map(|ccty| check_single(cty, ccty.to_lowercase().as_ref()))
-            .unwrap_or(false),
+            .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip)),
         GlobalFilterEntryE::Region(cty) => rinfo
             .rinfo
             .geoip
             .region
             .as_ref()
-            .map(|ccty| check_single(cty, ccty.to_lowercase().as_ref()))
-            .unwrap_or(false),
+            .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip)),
         GlobalFilterEntryE::SubRegion(cty) => rinfo
             .rinfo
             .geoip
             .subregion
             .as_ref()
-            .map(|ccty| check_single(cty, ccty.to_lowercase().as_ref()))
-            .unwrap_or(false),
-        GlobalFilterEntryE::Method(mtd) => check_single(mtd, &rinfo.rinfo.meta.method),
-        GlobalFilterEntryE::Header(hdr) => check_pair(hdr, &rinfo.headers),
-        GlobalFilterEntryE::Args(arg) => check_pair(arg, &rinfo.rinfo.qinfo.args),
-        GlobalFilterEntryE::Cookies(arg) => check_pair(arg, &rinfo.cookies),
-        GlobalFilterEntryE::Asn(asn) => rinfo.rinfo.geoip.asn.map(|casn| casn == *asn).unwrap_or(false),
+            .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip)),
+        GlobalFilterEntryE::Method(mtd) => check_single(mtd, &rinfo.rinfo.meta.method, Location::Request),
+        GlobalFilterEntryE::Header(hdr) => check_pair(hdr, &rinfo.headers, |h| {
+            Location::HeaderValue(hdr.key.clone(), h.to_string())
+        }),
+        GlobalFilterEntryE::Args(arg) => check_pair(arg, &rinfo.rinfo.qinfo.args, |a| {
+            Location::UriArgumentValue(arg.key.clone(), a.to_string())
+        }),
+        GlobalFilterEntryE::Cookies(arg) => check_pair(arg, &rinfo.cookies, |c| {
+            Location::CookieValue(arg.key.clone(), c.to_string())
+        }),
+        GlobalFilterEntryE::Asn(asn) => mbool(Location::Ip, rinfo.rinfo.geoip.asn.map(|casn| casn == *asn)),
         GlobalFilterEntryE::Company(cmp) => rinfo
             .rinfo
             .geoip
             .company
             .as_ref()
-            .map(|ccmp| check_single(cmp, ccmp.as_str()))
-            .unwrap_or(false),
-        GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host),
+            .and_then(|ccmp| check_single(cmp, ccmp.as_str(), Location::Ip)),
+        GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
     };
-    c ^ sub.negated
+    match r {
+        Some(matched) => MatchResult {
+            matched,
+            matching: !sub.negated,
+        },
+        None => MatchResult {
+            matched: HashSet::new(),
+            matching: sub.negated,
+        },
+    }
 }
 
-fn check_subsection(rinfo: &RequestInfo, sub: &GlobalFilterSSection) -> bool {
+fn check_subsection(rinfo: &RequestInfo, sub: &GlobalFilterSSection) -> MatchResult {
     check_relation(rinfo, sub.relation, &sub.entries, check_entry)
 }
 
@@ -91,49 +145,64 @@ pub fn tag_request(
 ) -> (Tags, SimpleDecision) {
     let mut tags = Tags::default();
     if is_human {
-        tags.insert("human");
+        tags.insert("human", Location::Request);
     } else {
-        tags.insert("bot");
+        tags.insert("bot", Location::Request);
     }
-    tags.insert_qualified("ip", &rinfo.rinfo.geoip.ipstr);
+    tags.insert_qualified("ip", &rinfo.rinfo.geoip.ipstr, Location::Request);
     tags.insert_qualified(
         "geo-continent-name",
         rinfo.rinfo.geoip.continent_name.as_deref().unwrap_or("nil"),
+        Location::Request,
     );
     tags.insert_qualified(
         "geo-continent-code",
         rinfo.rinfo.geoip.continent_code.as_deref().unwrap_or("nil"),
+        Location::Request,
     );
-    tags.insert_qualified("geo-city", rinfo.rinfo.geoip.city_name.as_deref().unwrap_or("nil"));
+    tags.insert_qualified(
+        "geo-city",
+        rinfo.rinfo.geoip.city_name.as_deref().unwrap_or("nil"),
+        Location::Request,
+    );
     tags.insert_qualified(
         "geo-country",
         rinfo.rinfo.geoip.country_name.as_deref().unwrap_or("nil"),
+        Location::Request,
     );
-    tags.insert_qualified("geo-region", rinfo.rinfo.geoip.region.as_deref().unwrap_or("nil"));
-    tags.insert_qualified("geo-subregion", rinfo.rinfo.geoip.subregion.as_deref().unwrap_or("nil"));
+    tags.insert_qualified(
+        "geo-region",
+        rinfo.rinfo.geoip.region.as_deref().unwrap_or("nil"),
+        Location::Request,
+    );
+    tags.insert_qualified(
+        "geo-subregion",
+        rinfo.rinfo.geoip.subregion.as_deref().unwrap_or("nil"),
+        Location::Request,
+    );
     match rinfo.rinfo.geoip.asn {
         None => {
-            tags.insert_qualified("geo-asn", "nil");
+            tags.insert_qualified("geo-asn", "nil", Location::Request);
         }
         Some(asn) => {
             let sasn = format!("{}", asn);
-            tags.insert_qualified("geo-asn", &sasn);
+            tags.insert_qualified("geo-asn", &sasn, Location::Request);
         }
     }
     for psection in globalfilters {
-        if check_relation(rinfo, psection.relation, &psection.sections, check_subsection) {
-            tags.extend(psection.tags.clone());
+        let mtch = check_relation(rinfo, psection.relation, &psection.sections, check_subsection);
+        if mtch.matching {
+            let rtags = psection.tags.clone().with_locs(&mtch.matched);
+            tags.extend(rtags);
             if let Some(a) = &psection.action {
                 if a.atype == SimpleActionT::Monitor || (a.atype == SimpleActionT::Challenge && is_human) {
                     continue;
+                } else {
+                    return (
+                        tags.clone(),
+                        SimpleDecision::Action(a.clone(), vec![BlockReason::acl(tags, false)]),
+                    );
                 }
-                return (
-                    tags,
-                    SimpleDecision::Action(
-                        a.clone(),
-                        serde_json::json!({"initiator": "tag action", "tags": psection.tags}),
-                    ),
-                );
             }
         }
     }
@@ -193,7 +262,7 @@ mod tests {
         )
     }
 
-    fn t_check_entry(negated: bool, entry: GlobalFilterEntryE) -> bool {
+    fn t_check_entry(negated: bool, entry: GlobalFilterEntryE) -> MatchResult {
         check_entry(&mk_rinfo(), &GlobalFilterEntry { negated, entry })
     }
 
@@ -215,47 +284,47 @@ mod tests {
     #[test]
     fn check_entry_ip_in() {
         let r = t_check_entry(false, GlobalFilterEntryE::Ip("52.78.12.56".parse().unwrap()));
-        assert!(r);
+        assert!(r.matching);
     }
     #[test]
     fn check_entry_ip_in_neg() {
         let r = t_check_entry(true, GlobalFilterEntryE::Ip("52.78.12.56".parse().unwrap()));
-        assert!(!r);
+        assert!(!r.matching);
     }
     #[test]
     fn check_entry_ip_out() {
         let r = t_check_entry(false, GlobalFilterEntryE::Ip("52.78.12.57".parse().unwrap()));
-        assert!(!r);
+        assert!(!r.matching);
     }
 
     #[test]
     fn check_path_in() {
         let r = t_check_entry(false, GlobalFilterEntryE::Path(single_re(".*adminl%20e.*")));
-        assert!(r);
+        assert!(r.matching);
     }
 
     #[test]
     fn check_path_in_not_partial_match() {
         let r = t_check_entry(false, GlobalFilterEntryE::Path(single_re("adminl%20e")));
-        assert!(r);
+        assert!(r.matching);
     }
 
     #[test]
     fn check_path_out() {
         let r = t_check_entry(false, GlobalFilterEntryE::Path(single_re(".*adminl e.*")));
-        assert!(!r);
+        assert!(!r.matching);
     }
 
     #[test]
     fn check_headers_exact() {
         let r = t_check_entry(false, GlobalFilterEntryE::Header(double_re("accept", "*/*")));
-        assert!(r);
+        assert!(r.matching);
     }
 
     #[test]
     fn check_headers_match() {
         let r = t_check_entry(false, GlobalFilterEntryE::Header(double_re("user-agent", "^curl.*")));
-        assert!(r);
+        assert!(r.matching);
     }
 
     fn mk_globalfilterentries(lst: &[&str]) -> Vec<GlobalFilterEntry> {
@@ -289,9 +358,9 @@ mod tests {
         for (ip, expected) in samples {
             ri.rinfo.geoip.ip = Some(ip.parse().unwrap());
             println!("UN {} {:?}", ip, ssection);
-            assert_eq!(check_subsection(&ri, &ssection), *expected);
+            assert_eq!(check_subsection(&ri, &ssection).matching, *expected);
             println!("OP {} {:?}", ip, optimized);
-            assert_eq!(check_subsection(&ri, &optimized), *expected);
+            assert_eq!(check_subsection(&ri, &optimized).matching, *expected);
         }
     }
 

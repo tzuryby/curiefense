@@ -1,16 +1,14 @@
 use hyperscan::Matching;
 use lazy_static::lazy_static;
 use libinjection::{sqli, xss};
-use serde_json::json;
 use std::collections::{HashMap, HashSet};
 
 use crate::config::contentfilter::{
     rule_tags, ContentFilterEntryMatch, ContentFilterProfile, ContentFilterRules, ContentFilterSection, Section,
     SectionIdx,
 };
-use crate::config::raw::ContentFilterRule;
 use crate::config::utils::XDataSource;
-use crate::interface::{Action, ActionType, Tags};
+use crate::interface::{Action, ActionType, BDecision, BlockReason, Decision, Initiator, Location, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use crate::Logs;
@@ -36,78 +34,15 @@ lazy_static! {
     .collect();
 }
 
-#[derive(Debug, Clone)]
-pub struct ContentFilterMatched {
-    pub section: SectionIdx,
-    pub name: String,
-    pub value: String,
-}
-
-impl ContentFilterMatched {
-    fn new(section: SectionIdx, name: String, value: String) -> Self {
-        ContentFilterMatched { section, name, value }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ContentFilterMatch {
-    pub matched: ContentFilterMatched,
-    pub ids: Vec<ContentFilterRule>,
-}
-
-#[derive(Debug, Clone)]
-pub enum ContentFilterBlock {
-    TooManyEntries(SectionIdx),
-    EntryTooLarge(SectionIdx, String),
-    Mismatch(ContentFilterMatched),
-    Block(HashSet<String>),
-    Monitor(HashSet<String>),
-}
-
-impl ContentFilterBlock {
-    pub fn to_action(&self) -> Action {
-        let reason = match self {
-            ContentFilterBlock::Block(ids) => json!({
-                "initiator": "content_filter",
-                "tags": ids,
-                "name": "block"
-            }),
-            ContentFilterBlock::Monitor(ids) => json!({
-                "initiator": "content_filter",
-                "tags": ids,
-                "name": "monitor"
-            }),
-            ContentFilterBlock::TooManyEntries(idx) => json!({
-                "section": idx,
-                "initiator": "content_filter",
-                "value": "Too many entries"
-            }),
-            ContentFilterBlock::EntryTooLarge(idx, nm) => json!({
-                "section": idx,
-                "name": nm,
-                "initiator": "content_filter",
-                "value": "Entry too large"
-            }),
-            ContentFilterBlock::Mismatch(wmatch) => json!({
-                "section": wmatch.section,
-                "name": wmatch.name,
-                "initiator": "content_filter",
-                "value": wmatch.value,
-                "msg": "Mismatch"
-            }),
-        };
-        let block_mode = !matches!(self, ContentFilterBlock::Monitor(_));
-
-        Action {
-            atype: ActionType::Block,
-            block_mode,
-            ban: false,
-            status: 403,
-            headers: None,
-            reason,
-            content: "Access denied".to_string(),
-            extra_tags: None,
-        }
+pub fn cf_default_action(block_mode: bool) -> Action {
+    Action {
+        atype: ActionType::Block,
+        block_mode,
+        ban: false,
+        status: 403,
+        headers: None,
+        content: "Access denied".to_string(),
+        extra_tags: None,
     }
 }
 
@@ -127,6 +62,18 @@ fn get_section(idx: SectionIdx, rinfo: &RequestInfo) -> &RequestField {
     }
 }
 
+fn block_on(reasons: Vec<BlockReason>) -> Result<(), Decision> {
+    if reasons.is_empty() {
+        Ok(())
+    } else {
+        let mut mx = BDecision::Monitor;
+        for r in reasons.iter() {
+            mx = std::cmp::max(mx, r.decision);
+        }
+        Err(Decision::action(cf_default_action(mx == BDecision::Blocking), reasons))
+    }
+}
+
 /// Runs the Content Filter part of curiefense
 pub fn content_filter_check(
     logs: &mut Logs,
@@ -134,7 +81,7 @@ pub fn content_filter_check(
     rinfo: &RequestInfo,
     profile: &ContentFilterProfile,
     mhsdb: Option<&ContentFilterRules>,
-) -> Result<(), ContentFilterBlock> {
+) -> Result<(), Decision> {
     use SectionIdx::*;
     let mut omit = Default::default();
 
@@ -154,7 +101,8 @@ pub fn content_filter_check(
             get_section(*idx, rinfo),
             profile.ignore_alphanum,
             &mut omit,
-        )?;
+        )
+        .map_err(|reason| Decision::action(cf_default_action(true), vec![reason]))?;
     }
 
     let kept = profile.active.union(&profile.report).cloned().collect::<HashSet<_>>();
@@ -174,53 +122,63 @@ pub fn content_filter_check(
         hca_keys.extend(section_content);
     }
 
-    injection_check(tags, &hca_keys, &omit, test_xss, test_sqli);
+    let iblock = injection_check(tags, &hca_keys, &omit, test_xss, test_sqli);
+    block_on(iblock)?;
 
     let mut specific_tags = Tags::default();
 
     // finally, hyperscan check
     match mhsdb {
         Some(hsdb) => {
-            if let Err(rr) = hyperscan(
+            match hyperscan(
                 logs,
                 tags,
                 &mut specific_tags,
                 hca_keys,
                 hsdb,
                 &kept,
+                &profile.active,
+                &profile.report,
                 &profile.ignore,
                 &omit.exclusions,
             ) {
-                logs.error(|| rr.to_string())
+                Err(rr) => {
+                    logs.error(|| rr.to_string());
+                    Ok(())
+                }
+                Ok(reasons) => {
+                    tags.extend(specific_tags);
+                    block_on(reasons)
+                }
             }
         }
         None => {
             logs.warning(||format!("no hsdb found for profile {}, it probably means that no rules were matched by the active/report/ignore", profile.id));
+            Ok(())
         }
     }
 
+    /*
     let sactive = specific_tags.intersect(&profile.active);
     let sreport = specific_tags.intersect(&profile.report);
-    tags.extend(specific_tags);
 
     if !sactive.is_empty() {
-        return Err(ContentFilterBlock::Block(sactive));
+        return Err(block(sactive));
     }
     if !sreport.is_empty() {
-        return Err(ContentFilterBlock::Monitor(sreport));
+        return Err(monitor(sreport));
     }
 
     let active = tags.intersect(&profile.active);
     if !active.is_empty() {
-        return Err(ContentFilterBlock::Block(active));
+        return Err(block::Block(active));
     }
 
     let report = tags.intersect(&profile.report);
     if !report.is_empty() {
-        return Err(ContentFilterBlock::Monitor(report));
+        return Err(monitor(report));
     }
-
-    Ok(())
+    */
 }
 
 /// checks a section (headers, args, cookies) against the policy
@@ -232,10 +190,10 @@ fn section_check(
     params: &RequestField,
     ignore_alphanum: bool,
     omit: &mut Omitted,
-) -> Result<(), ContentFilterBlock> {
+) -> Result<(), BlockReason> {
     if idx != SectionIdx::Path && params.len() > section.max_count {
         if section.max_count > 0 {
-            return Err(ContentFilterBlock::TooManyEntries(idx));
+            return Err(BlockReason::too_many_entries(idx, params.len(), section.max_count));
         } else {
             logs.warning(|| format!("In section {:?}, param_count = 0", idx));
         }
@@ -245,7 +203,7 @@ fn section_check(
         // skip decoded parameters for length checks
         if !name.ends_with(":decoded") && value.len() > section.max_length {
             if section.max_length > 0 {
-                return Err(ContentFilterBlock::EntryTooLarge(idx, name.to_string()));
+                return Err(BlockReason::entry_too_large(idx, name, value.len(), section.max_length));
             } else {
                 logs.warning(|| format!("In section {:?}, max_length = 0", idx));
             }
@@ -267,11 +225,7 @@ fn section_check(
             if matched {
                 omit.entries.at(idx).insert(name.to_string());
             } else if name_entry.restrict {
-                return Err(ContentFilterBlock::Mismatch(ContentFilterMatched::new(
-                    idx,
-                    name.to_string(),
-                    value.to_string(),
-                )));
+                return Err(BlockReason::restricted(Location::from_value(idx, name, value)));
             } else if tags.has_intersection(&name_entry.exclusions) {
                 omit.entries.at(idx).insert(name.to_string());
             } else if !name_entry.exclusions.is_empty() {
@@ -309,7 +263,8 @@ fn injection_check(
     omit: &Omitted,
     test_xss: bool,
     test_sqli: bool,
-) {
+) -> Vec<BlockReason> {
+    let mut out = Vec::new();
     for (value, (idx, name)) in hca_keys.iter() {
         let omit_tags = omit.exclusions.get(*idx).get(name);
         let rtest_xss = test_xss
@@ -321,26 +276,31 @@ fn injection_check(
                 .map(|tgs| LIBINJECTION_SQLI_TAGS.intersection(tgs).next().is_some())
                 .unwrap_or(false);
         if rtest_sqli {
-            if let Some((b, _)) = sqli(value) {
+            if let Some((b, fp)) = sqli(value) {
                 if b {
-                    tags.insert_qualified("cf-rule-id", "libinjection-sqli");
-                    tags.insert_qualified("cf-rule-category", "libinjection");
-                    tags.insert_qualified("cf-rule-subcategory", "libinjection-sqli");
-                    tags.insert_qualified("cf-rule-risk", "libinjection");
+                    let locs = Location::from_value(*idx, name, value);
+                    tags.insert_qualified("cf-rule-id", "libinjection-sqli", locs.clone());
+                    tags.insert_qualified("cf-rule-category", "libinjection", locs.clone());
+                    tags.insert_qualified("cf-rule-subcategory", "libinjection-sqli", locs.clone());
+                    tags.insert_qualified("cf-rule-risk", "libinjection", locs.clone());
+                    out.push(BlockReason::sqli(locs, fp));
                 }
             }
         }
         if rtest_xss {
             if let Some(b) = xss(value) {
                 if b {
-                    tags.insert_qualified("cf-rule-id", "libinjection-xss");
-                    tags.insert_qualified("cf-rule-category", "libinjection");
-                    tags.insert_qualified("cf-rule-subcategory", "libinjection-xss");
-                    tags.insert_qualified("cf-rule-risk", "libinjection");
+                    let locs = Location::from_value(*idx, name, value);
+                    tags.insert_qualified("cf-rule-id", "libinjection-xss", locs.clone());
+                    tags.insert_qualified("cf-rule-category", "libinjection", locs.clone());
+                    tags.insert_qualified("cf-rule-subcategory", "libinjection-xss", locs.clone());
+                    tags.insert_qualified("cf-rule-risk", "libinjection", locs.clone());
+                    out.push(BlockReason::xss(locs));
                 }
             }
         }
     }
+    out
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -351,9 +311,11 @@ fn hyperscan(
     hca_keys: HashMap<String, (SectionIdx, String)>,
     sigs: &ContentFilterRules,
     global_kept: &HashSet<String>,
+    active: &HashSet<String>,
+    report: &HashSet<String>,
     global_ignore: &HashSet<String>,
     exclusions: &Section<HashMap<String, HashSet<String>>>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<BlockReason>> {
     let scratch = sigs.db.alloc_scratch()?;
     // TODO: use `intersperse` when this stabilizes
     let to_scan = hca_keys.keys().cloned().collect::<Vec<_>>().join("\n");
@@ -365,8 +327,10 @@ fn hyperscan(
     logs.debug(|| format!("matching content filter signatures: {}", found));
 
     if !found {
-        return Ok(());
+        return Ok(Vec::new());
     }
+
+    let mut founds: HashSet<(&str, Location, BDecision)> = HashSet::new();
 
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
@@ -388,15 +352,35 @@ fn hyperscan(
                         && !new_tags.has_intersection(global_ignore)
                         && !new_specific_tags.has_intersection(global_ignore)
                     {
-                        tags.extend(new_tags);
-                        specific_tags.extend(new_specific_tags);
+                        let location = Location::from_value(sid, &name, &k);
+                        tags.merge(new_tags.with_loc(&location));
+                        specific_tags.merge(new_specific_tags.with_loc(&location));
+                        let decision = if specific_tags.has_intersection(active) {
+                            BDecision::Blocking
+                        } else if specific_tags.has_intersection(report) {
+                            BDecision::Monitor
+                        } else if tags.has_intersection(active) {
+                            BDecision::Blocking
+                        } else {
+                            BDecision::Monitor
+                        };
+                        founds.insert((&sig.id, location, decision));
                     }
                 }
             }
             Matching::Continue
         })?;
     }
-    Ok(())
+    Ok(founds
+        .into_iter()
+        .map(|(sigid, location, decision)| BlockReason {
+            initiator: Initiator::ContentFilter {
+                ruleid: sigid.to_string(),
+            },
+            location: std::iter::once(location).collect(),
+            decision,
+        })
+        .collect())
 }
 
 fn mask_section(masking_seed: &[u8], sec: &mut RequestField, section: &ContentFilterSection) -> HashSet<XDataSource> {
@@ -463,6 +447,7 @@ mod test {
             method: "GET".to_string(),
             path: "/foo?arg1=avalue1&arg2=avalue2".to_string(),
             extra: HashMap::default(),
+            requestid: None,
         };
         let mut logs = Logs::default();
         let headers = [("h1", "value1"), ("h2", "value2")]

@@ -3,7 +3,7 @@ use crate::config::raw::{
     RawContentFilterProperties,
 };
 use crate::config::utils::Matching;
-use crate::interface::Tags;
+use crate::interface::RawTags;
 use crate::logs::Logs;
 
 use hyperscan::prelude::{pattern, Builder, CompileFlags, Pattern, Patterns, VectoredDatabase};
@@ -268,11 +268,11 @@ fn convert_rule(entry: &ContentFilterRule) -> anyhow::Result<Pattern> {
     )
 }
 
-pub fn rule_tags(sig: &ContentFilterRule) -> (Tags, Tags) {
-    let mut new_specific_tags = Tags::default();
+pub fn rule_tags(sig: &ContentFilterRule) -> (RawTags, RawTags) {
+    let mut new_specific_tags = RawTags::default();
     new_specific_tags.insert_qualified("cf-rule-id", &sig.id);
 
-    let mut new_tags = Tags::default();
+    let mut new_tags = RawTags::default();
     new_tags.insert_qualified("cf-rule-risk", &format!("{}", sig.risk));
     new_tags.insert_qualified("cf-rule-category", &sig.category);
     new_tags.insert_qualified("cf-rule-subcategory", &sig.subcategory);
@@ -311,22 +311,22 @@ pub fn resolve_rules(
     let rule_kept = |r: &ContentFilterRule, prof: &ContentFilterProfile| -> bool {
         let (spec_tags, all_tags) = rule_tags(r);
         // not pretty :)
-        if !spec_tags.intersect(&prof.ignore).is_empty() {
+        if spec_tags.has_intersection(&prof.ignore) {
             return false;
         }
-        if !all_tags.intersect(&prof.ignore).is_empty() {
+        if all_tags.has_intersection(&prof.ignore) {
             return false;
         }
-        if !spec_tags.intersect(&prof.active).is_empty() {
+        if spec_tags.has_intersection(&prof.active) {
             return true;
         }
-        if !all_tags.intersect(&prof.active).is_empty() {
+        if all_tags.has_intersection(&prof.active) {
             return true;
         }
-        if !spec_tags.intersect(&prof.report).is_empty() {
+        if spec_tags.has_intersection(&prof.report) {
             return true;
         }
-        if !all_tags.intersect(&prof.report).is_empty() {
+        if all_tags.has_intersection(&prof.report) {
             return true;
         }
         false

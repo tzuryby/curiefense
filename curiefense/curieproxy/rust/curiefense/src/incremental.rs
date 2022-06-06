@@ -20,9 +20,9 @@ use crate::{
         hostmap::SecurityPolicy,
         Config,
     },
-    contentfilter::ContentFilterBlock,
+    contentfilter::cf_default_action,
     grasshopper::Grasshopper,
-    interface::{Action, Decision, Tags},
+    interface::{Action, BlockReason, Decision, Location, Tags},
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
     tagging::tag_request,
@@ -66,7 +66,7 @@ pub fn inspect_init(
 
 /// called when the content filter policy is violated
 /// no tags are returned though!
-fn early_block(idata: IData, action: Action) -> (Logs, (Decision, Tags, RequestInfo)) {
+fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, (Decision, Tags, RequestInfo)) {
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
     let rawrequest = RawRequest {
@@ -82,7 +82,7 @@ fn early_block(idata: IData, action: Action) -> (Logs, (Decision, Tags, RequestI
         0,
         &rawrequest,
     );
-    (logs, (Decision::Action(action), Tags::default(), reqinfo))
+    (logs, (Decision::action(action, vec![br]), Tags::default(), reqinfo))
 }
 
 /// incrementally add headers, can exit early if there are too many headers, or they are too large
@@ -96,10 +96,12 @@ pub fn add_header(
     if dt.secpol.content_filter_active {
         let hdrs = &dt.secpol.content_filter_profile.sections.headers;
         if dt.headers.len() + new_headers.len() > hdrs.max_count {
-            return Err(early_block(
-                dt,
-                ContentFilterBlock::TooManyEntries(SectionIdx::Headers).to_action(),
-            ));
+            let br = BlockReason::too_many_entries(
+                SectionIdx::Headers,
+                dt.headers.len() + new_headers.len(),
+                hdrs.max_count,
+            );
+            return Err(early_block(dt, cf_default_action(true), br));
         }
         for (k, v) in new_headers {
             let kl = k.to_lowercase();
@@ -107,15 +109,14 @@ pub fn add_header(
                 if let Ok(content_length) = v.parse::<usize>() {
                     let max_size = dt.secpol.content_filter_profile.max_body_size;
                     if content_length > max_size {
-                        return Err(early_block(dt, body_too_large(max_size, content_length)));
+                        let (a, br) = body_too_large(max_size, content_length);
+                        return Err(early_block(dt, a, br));
                     }
                 }
             }
             if v.len() > hdrs.max_length {
-                return Err(early_block(
-                    dt,
-                    ContentFilterBlock::EntryTooLarge(SectionIdx::Headers, kl).to_action(),
-                ));
+                let br = BlockReason::entry_too_large(SectionIdx::Headers, &kl, v.len(), hdrs.max_length);
+                return Err(early_block(dt, cf_default_action(true), br));
             }
             dt.headers.insert(kl, v);
         }
@@ -132,7 +133,8 @@ pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, (Decisi
     let new_size = cur_body_size + new_body.len();
     let max_size = dt.secpol.content_filter_profile.max_body_size;
     if new_size > max_size {
-        return Err(early_block(dt, body_too_large(max_size, new_size)));
+        let (a, br) = body_too_large(max_size, new_size);
+        return Err(early_block(dt, a, br));
     }
 
     match dt.body.as_mut() {
@@ -173,7 +175,7 @@ pub async fn finalize<GH: Grasshopper>(
     };
 
     let (mut tags, globalfilter_dec) = tag_request(is_human, globalfilters, &reqinfo);
-    tags.insert("all");
+    tags.insert("all", Location::Request);
     let dec = analyze(
         &mut logs,
         mgh,
@@ -252,6 +254,7 @@ mod test {
                 method: "GET".to_string(),
                 path: "/path/to/somewhere".to_string(),
                 extra: HashMap::default(),
+                requestid: None,
             },
             1,
         )

@@ -5,20 +5,36 @@
       ":method": "GET",
       ":path": "/direct?deny=deny&denybot=denybot",
       "user-agent": "dummy",
-      "x-forwarded-for": "23.129.64.253"
+      "x-forwarded-for": "23.129.64.253",
+      "include": "true"
     },
     "name": "deny (bot)",
     "response": {
       "action": "custom_response",
       "status": 403,
       "block_mode": true,
-      "reason": {
-        "initiator": "acl",
-        "action": 5,
-        "reason": [
-          "denybot"
-        ]
-      },
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny"
+        },
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "denybot",
+          "matched_tags": [
+            "denybot"
+          ],
+          "name": "denybot"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",
@@ -38,7 +54,8 @@
         "bot",
         "sante",
         "deny",
-        "denybot"
+        "denybot",
+        "incl000000001"
       ]
     }
   },
@@ -56,13 +73,28 @@
       "action": "custom_response",
       "status": 403,
       "block_mode": true,
-      "reason": {
-        "initiator": "acl",
-        "action": 5,
-        "reason": [
-          "deny"
-        ]
-      },
+      "triggers": [
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "deny",
+          "matched_tags": [
+            "deny"
+          ],
+          "name": "deny"
+        },
+        {
+          "initiator": "acl",
+          "active": true,
+          "section": "uri",
+          "value": "denybot",
+          "matched_tags": [
+            "denybot"
+          ],
+          "name": "denybot"
+        }
+      ],
       "tags": [
         "geo-city:nil",
         "geo-continent-name:north-america",

@@ -126,6 +126,27 @@ local function show_logs(logs)
   end
 end
 
+local function equals(o1, o2)
+  if o1 == o2 then return true end
+  local o1Type = type(o1)
+  local o2Type = type(o2)
+  if o1Type ~= o2Type then return false end
+  if o1Type ~= 'table' then return false end
+  local keySet = {}
+
+    for key1, value1 in pairs(o1) do
+        local value2 = o2[key1]
+        if value2 == nil or equals(value1, value2, ignore_mt) == false then
+            return false
+        end
+        keySet[key1] = true
+    end
+
+    for key2, _ in pairs(o2) do
+        if not keySet[key2] then return false end
+    end
+    return true
+  end
 
 -- testing from envoy metadata
 local function test_raw_request(request_path)
@@ -152,11 +173,17 @@ local function test_raw_request(request_path)
           ", but got " .. cjson.encode(r.response.block_mode))
         good = false
       end
-      if raw_request_map.response.reason then
-        local actual = cjson.encode(r.response.reason)
-        local expected = cjson.encode(raw_request_map.response.reason)
-        if actual ~= expected then
-          print("Expected reason " .. expected ..  ", but got " .. actual)
+      if raw_request_map.response.triggers then
+        local actual = r.response.triggers
+        local expected = raw_request_map.response.triggers
+
+        if equals(actual, expected) == false then
+          local jactual = cjson.encode(actual)
+          local jexpected = cjson.encode(expected)
+          print("Expected triggers:")
+          print("  " ..  jexpected)
+          print("but got:")
+          print("  " .. jactual)
           good = false
         end
       end

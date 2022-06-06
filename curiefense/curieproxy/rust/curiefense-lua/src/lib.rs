@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use curiefense::content_filter_check_generic_request_map;
 use curiefense::inspect_generic_request_map;
-use curiefense::interface::Decision;
 use curiefense::logs::Logs;
 use curiefense::utils::{InspectionResult, RawRequest};
 
@@ -46,11 +45,8 @@ fn lua_inspect_content_filter(
     );
 
     Ok(match res {
-        Err(rr) => (
-            Decision::Pass.to_json_raw(serde_json::Value::Null, Logs::default()),
-            Some(rr),
-        ),
-        Ok(ir) => ir.into_json(),
+        Err(rr) => ("null".to_string(), Some(rr)),
+        Ok(ir) => ir.into_legacy_json(),
     })
 }
 
@@ -121,11 +117,8 @@ fn lua_inspect_request(
     );
 
     Ok(match res {
-        Err(rr) => (
-            Decision::Pass.to_json_raw(serde_json::Value::Null, Logs::default()),
-            Some(rr),
-        ),
-        Ok(ir) => ir.into_json(),
+        Err(rr) => ("null".to_string(), Some(rr)),
+        Ok(ir) => ir.into_legacy_json(),
     })
 }
 
@@ -185,11 +178,8 @@ fn lua_test_inspect_request(
     );
 
     Ok(match res {
-        Err(rr) => (
-            Decision::Pass.to_json_raw(serde_json::Value::Null, Logs::default()),
-            Some(rr),
-        ),
-        Ok(ir) => ir.into_json(),
+        Err(rr) => ("null".to_string(), Some(rr)),
+        Ok(ir) => ir.into_legacy_json(),
     })
 }
 

@@ -1,4 +1,3 @@
-use serde_json::json;
 use std::collections::HashMap;
 
 use crate::acl::{check_acl, AclDecision, AclResult, BotHuman};
@@ -9,26 +8,28 @@ use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::flow_check;
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
-use crate::interface::{Action, ActionType, Decision, SimpleDecision, Tags};
+use crate::interface::{Action, ActionType, BlockReason, Decision, Location, SimpleDecision, Tags};
 use crate::limit::limit_check;
 use crate::logs::Logs;
 use crate::utils::{BodyDecodingResult, RequestInfo};
 
-fn acl_block(blocking: bool, code: i32, tags: &[String]) -> Decision {
-    Decision::Action(Action {
-        atype: if blocking {
-            ActionType::Block
-        } else {
-            ActionType::Monitor
+fn acl_block(blocking: bool, _code: i32, reasons: Vec<BlockReason>) -> Decision {
+    Decision::action(
+        Action {
+            atype: if blocking {
+                ActionType::Block
+            } else {
+                ActionType::Monitor
+            },
+            block_mode: blocking,
+            ban: false,
+            status: 403,
+            headers: None,
+            content: "access denied".to_string(),
+            extra_tags: None,
         },
-        block_mode: blocking,
-        ban: false,
-        status: 403,
-        headers: None,
-        reason: json!({"action": code, "initiator": "acl", "reason": tags }),
-        content: "access denied".to_string(),
-        extra_tags: None,
-    })
+        reasons,
+    )
 }
 
 pub enum CfRulesArg<'t> {
@@ -53,32 +54,36 @@ pub async fn analyze<GH: Grasshopper>(
     let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
 
     logs.debug("request tagged");
-    tags.insert_qualified("securitypolicy", secpolname);
-    tags.insert_qualified("securitypolicy-entry", &securitypolicy.name);
-    tags.insert_qualified("aclid", &securitypolicy.acl_profile.id);
-    tags.insert_qualified("aclname", &securitypolicy.acl_profile.name);
-    tags.insert_qualified("contentfilterid", &securitypolicy.content_filter_profile.id);
-    tags.insert_qualified("contentfiltername", &securitypolicy.content_filter_profile.name);
+    tags.insert_qualified("securitypolicy", secpolname, Location::Request);
+    tags.insert_qualified("securitypolicy-entry", &securitypolicy.name, Location::Request);
+    tags.insert_qualified("aclid", &securitypolicy.acl_profile.id, Location::Request);
+    tags.insert_qualified("aclname", &securitypolicy.acl_profile.name, Location::Request);
+    tags.insert_qualified(
+        "contentfilterid",
+        &securitypolicy.content_filter_profile.id,
+        Location::Request,
+    );
+    tags.insert_qualified(
+        "contentfiltername",
+        &securitypolicy.content_filter_profile.name,
+        Location::Request,
+    );
 
     if !securitypolicy.content_filter_profile.content_type.is_empty()
         && reqinfo.rinfo.qinfo.body_decoding != BodyDecodingResult::ProperlyDecoded
     {
-        let error: &str = if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
-            rr
+        let reason = if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
+            BlockReason::body_malformed(rr)
         } else {
-            "Expected a body, but there were none"
+            BlockReason::body_missing()
         };
         // we expect the body to be properly decoded
         let action = Action {
-            reason: json!({
-                "initiator": "body_decoding",
-                "error": error
-            }),
             status: 403,
             ..Action::default()
         };
         return (
-            Decision::Action(action),
+            Decision::action(action, vec![reason]),
             tags,
             masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
         );
@@ -96,9 +101,12 @@ pub async fn analyze<GH: Grasshopper>(
     }
     logs.debug("challenge phase2 ignored");
 
+    let mut brs = Vec::new();
+
     if let SimpleDecision::Action(action, reason) = globalfilter_dec {
         logs.debug(|| format!("Global filter decision {:?}", reason));
-        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, reason);
+        brs.extend(reason);
+        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
         if decision.is_final() {
             return (
                 decision,
@@ -106,13 +114,16 @@ pub async fn analyze<GH: Grasshopper>(
                 masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
             );
         }
+        // if the decision was not adopted, get the reason vector back
+        brs = decision.reasons;
     }
 
     match flow_check(logs, flows, &reqinfo, &mut tags).await {
         Err(rr) => logs.error(|| rr.to_string()),
         Ok(SimpleDecision::Pass) => {}
-        Ok(SimpleDecision::Action(a, reason)) => {
-            let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, reason);
+        Ok(SimpleDecision::Action(a, curbrs)) => {
+            brs.extend(curbrs);
+            let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, brs);
             if decision.is_final() {
                 return (
                     decision,
@@ -120,14 +131,17 @@ pub async fn analyze<GH: Grasshopper>(
                     masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
                 );
             }
+            // if the decision was not adopted, get the reason vector back
+            brs = decision.reasons;
         }
     }
     logs.debug("flow checks done");
 
     // limit checks
     let limit_check = limit_check(logs, &securitypolicy.name, &reqinfo, &securitypolicy.limits, &mut tags);
-    if let SimpleDecision::Action(action, reason) = limit_check.await {
-        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, reason);
+    if let SimpleDecision::Action(action, curbrs) = limit_check.await {
+        brs.extend(curbrs);
+        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
         if decision.is_final() {
             return (
                 decision,
@@ -135,24 +149,27 @@ pub async fn analyze<GH: Grasshopper>(
                 masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
             );
         }
+        // if the decision was not adopted, get the reason vector back
+        brs = decision.reasons;
     }
     logs.debug(|| format!("limit checks done ({} limits)", securitypolicy.limits.len()));
 
     let acl_result = check_acl(&tags, &securitypolicy.acl_profile);
     logs.debug(|| format!("ACL result: {:?}", acl_result));
     // store the check_acl result here
-    let blockcode: Option<(i32, Vec<String>)> = match acl_result {
+    let blockcode: Option<i32> = match acl_result {
         AclResult::Passthrough(dec) => {
             if dec.allowed {
                 logs.debug("ACL passthrough detected");
                 return (
-                    Decision::Pass,
+                    Decision::pass(brs),
                     tags,
                     masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
                 );
             } else {
                 logs.debug("ACL force block detected");
-                Some((0, dec.tags))
+                brs.push(dec.r);
+                Some(0)
             }
         }
         // bot blocked, human blocked
@@ -160,32 +177,35 @@ pub async fn analyze<GH: Grasshopper>(
         AclResult::Match(BotHuman {
             bot: Some(AclDecision {
                 allowed: false,
-                tags: bot_tags,
+                r: bot_reason,
             }),
             human: Some(AclDecision {
                 allowed: false,
-                tags: human_tags,
+                r: human_reason,
             }),
         }) => {
             logs.debug("ACL human block detected");
-            Some((5, if is_human { human_tags } else { bot_tags }))
+            brs.push(human_reason);
+            brs.push(bot_reason);
+            Some(5)
         }
         // human blocked, always block, even if it is a bot
         AclResult::Match(BotHuman {
             bot: _,
             human: Some(AclDecision {
                 allowed: false,
-                tags: dtags,
+                r: human_reason,
             }),
         }) => {
             logs.debug("ACL human block detected");
-            Some((5, dtags))
+            brs.push(human_reason);
+            Some(5)
         }
         // robot blocked, should be challenged
         AclResult::Match(BotHuman {
             bot: Some(AclDecision {
                 allowed: false,
-                tags: dtags,
+                r: bot_reason,
             }),
             human: _,
         }) => {
@@ -195,8 +215,9 @@ pub async fn analyze<GH: Grasshopper>(
                 match (reqinfo.headers.get("user-agent"), &mgh) {
                     (Some(ua), Some(gh)) => {
                         logs.debug("ACL challenge detected: challenged");
+                        brs.push(bot_reason);
                         return (
-                            challenge_phase01(gh, ua, dtags),
+                            challenge_phase01(gh, ua, brs),
                             tags,
                             masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
                         );
@@ -209,7 +230,8 @@ pub async fn analyze<GH: Grasshopper>(
                                 ggh.is_some()
                             )
                         });
-                        Some((3, dtags))
+                        brs.push(bot_reason);
+                        Some(3)
                     }
                 }
             }
@@ -220,9 +242,9 @@ pub async fn analyze<GH: Grasshopper>(
 
     // if the acl is active, and we had a block result, immediately block
     if securitypolicy.acl_active {
-        if let Some((cde, tgs)) = blockcode {
+        if let Some(cde) = blockcode {
             return (
-                acl_block(true, cde, &tgs),
+                acl_block(true, cde, brs),
                 tags,
                 masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
             );
@@ -246,18 +268,21 @@ pub async fn analyze<GH: Grasshopper>(
 
     (
         match content_filter_result {
-            Ok(()) => {
-                // if content filter was ok, but we had an acl decision, return the monitored acl decision for logged purposes
-                if let Some((cde, tgs)) = blockcode {
-                    acl_block(false, cde, &tgs)
-                } else {
-                    Decision::Pass
+            Ok(()) => Decision::pass(brs),
+            Err(decision) => {
+                brs.extend(decision.reasons.into_iter().map(|mut reason| {
+                    if !securitypolicy.content_filter_active {
+                        reason.decision.inactive();
+                    }
+                    reason
+                }));
+                match decision.maction {
+                    None => Decision::pass(brs),
+                    Some(mut action) => {
+                        action.block_mode &= securitypolicy.content_filter_active;
+                        Decision::action(action, brs)
+                    }
                 }
-            }
-            Err(wb) => {
-                let mut action = wb.to_action();
-                action.block_mode &= securitypolicy.content_filter_active;
-                Decision::Action(action)
             }
         },
         tags,

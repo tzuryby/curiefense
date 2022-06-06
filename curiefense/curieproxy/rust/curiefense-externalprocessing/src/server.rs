@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use curiefense::{
     config::{
         flow::{FlowElement, SequenceKey},
@@ -40,7 +41,7 @@ lazy_static! {
 pub struct MyEP {
     handle_replies: bool,
     reqchannel: Sender<CfgRequest>,
-    logsender: Option<Sender<Value>>,
+    logsender: Option<Sender<(Value, DateTime<Utc>)>>,
 }
 
 type CfgRequest = (
@@ -84,7 +85,7 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
     }
 }
 
-async fn logloop(rx: Receiver<Value>, client: Elasticsearch) {
+async fn logloop(rx: Receiver<(Value, DateTime<Utc>)>, client: Elasticsearch) {
     let mut mrx = rx;
     loop {
         match mrx.recv().await {
@@ -92,8 +93,7 @@ async fn logloop(rx: Receiver<Value>, client: Elasticsearch) {
                 error!("should not happen, logging channel closed?");
                 break;
             }
-            Some(mut v) => {
-                let now = chrono::Utc::now();
+            Some((mut v, now)) => {
                 if let Some(hm) = v.as_object_mut() {
                     // might be slow!
                     hm.insert("@timestamp".to_string(), serde_json::to_value(&now).unwrap());
@@ -120,7 +120,11 @@ async fn logloop(rx: Receiver<Value>, client: Elasticsearch) {
 }
 
 impl MyEP {
-    fn new(reqchannel: Sender<CfgRequest>, handle_replies: bool, logsender: Option<Sender<Value>>) -> Self {
+    fn new(
+        reqchannel: Sender<CfgRequest>,
+        handle_replies: bool,
+        logsender: Option<Sender<(Value, DateTime<Utc>)>>,
+    ) -> Self {
         MyEP {
             handle_replies,
             reqchannel,
@@ -148,7 +152,18 @@ impl MyEP {
             Some(ext_proc::processing_request::Request::RequestHeaders(headers)) => {
                 if let Some(hdrmap) = headers.headers {
                     for h in hdrmap.headers {
-                        match h.key.strip_prefix(':') {
+                        let metakey = match h.key.strip_prefix(':') {
+                            None => {
+                                if h.key == "x-request-id" {
+                                    Some(h.key.as_str())
+                                } else {
+                                    None
+                                }
+                            }
+                            Some(m) => Some(m),
+                        };
+
+                        match metakey {
                             None => {
                                 mheaders.insert(h.key, h.value);
                             }
@@ -181,7 +196,7 @@ impl MyEP {
         let mut idata = match add_header(idata, mheaders) {
             Ok(i) => i,
             Err((logs, dec)) => {
-                self.send_action(ProcessingStage::Headers, tx, dec, logs).await;
+                self.send_action(ProcessingStage::Headers, tx, &dec, &logs, None).await;
                 return Ok(());
             }
         };
@@ -194,7 +209,7 @@ impl MyEP {
                         idata = match add_body(idata, bdy.body) {
                             Ok(i) => i,
                             Err((logs, dec)) => {
-                                self.send_action(ProcessingStage::Body, tx, dec, logs).await;
+                                self.send_action(ProcessingStage::Body, tx, &dec, &logs, None).await;
                                 return Ok(());
                             }
                         };
@@ -208,40 +223,42 @@ impl MyEP {
         }
 
         let (dec, logs) = finalize(idata, Some(DynGrasshopper {}), &globalfilters, &flows, None).await;
-        self.send_action(
-            if headers_only {
-                ProcessingStage::Headers
+
+        let stage = if headers_only {
+            ProcessingStage::Headers
+        } else {
+            ProcessingStage::Body
+        };
+        let blocked = self.send_action(stage, tx, &dec, &logs, None).await;
+        if !blocked {
+            stage_pass(stage, tx).await;
+            let code = if self.handle_replies {
+                info!("** handle_replies");
+                let code: Option<u32> = match next_message(msg).await?.request {
+                    Some(ext_proc::processing_request::Request::ResponseHeaders(hdrs)) => hdrs
+                        .headers
+                        .iter()
+                        .flat_map(|hm| hm.headers.iter())
+                        .filter_map(|hv| {
+                            if hv.key == ":status" {
+                                hv.value.parse().ok()
+                            } else {
+                                None
+                            }
+                        })
+                        .next(),
+
+                    something_else => {
+                        error!("Expected a ResponseHeaders, but got {:?}", something_else);
+                        None
+                    }
+                };
+                stage_pass(ProcessingStage::RHeaders, tx).await;
+                code
             } else {
-                ProcessingStage::Body
-            },
-            tx,
-            dec,
-            logs,
-        )
-        .await;
-
-        if self.handle_replies {
-            let code: Option<u32> = match next_message(msg).await?.request {
-                Some(ext_proc::processing_request::Request::ResponseHeaders(hdrs)) => hdrs
-                    .headers
-                    .iter()
-                    .flat_map(|hm| hm.headers.iter())
-                    .filter_map(|hv| {
-                        if hv.key == ":status" {
-                            hv.value.parse().ok()
-                        } else {
-                            None
-                        }
-                    })
-                    .next(),
-
-                something_else => {
-                    error!("Expected a ResponseHeaders, but got {:?}", something_else);
-                    None
-                }
+                Some(0)
             };
-            stage_pass(ProcessingStage::RHeaders, tx).await;
-            debug!("* return code: {:?}", code);
+            self.send_action(ProcessingStage::Reply, tx, &dec, &logs, code).await;
         }
         Ok(())
     }
@@ -250,19 +267,23 @@ impl MyEP {
         &self,
         stage: ProcessingStage,
         tx: &mut Sender<Result<ProcessingResponse, Status>>,
-        action: (Decision, Tags, RequestInfo),
-        logs: Logs,
-    ) {
+        action: &(Decision, Tags, RequestInfo),
+        logs: &Logs,
+        rcode: Option<u32>,
+    ) -> bool {
         let (decision, tags, masked_rinfo) = action;
-        match &decision {
-            Decision::Pass => stage_pass(stage, tx).await,
-            Decision::Action(a) => {
+        let blocked = match &decision.maction {
+            None => {
+                stage_pass(stage, tx).await;
+                false
+            }
+            Some(a) => {
                 if a.block_mode {
                     tx.send(Ok(ProcessingResponse {
                         response: Some(ext_proc::processing_response::Response::ImmediateResponse(
                             ImmediateResponse {
                                 status: Some(HttpStatus { code: a.status as i32 }),
-                                details: format!("{}", a.reason),
+                                details: serde_json::to_string(&decision.reasons).unwrap(),
                                 body: a.content.clone(),
                                 headers: a.headers.clone().map(mutate_headers),
                                 grpc_status: None,
@@ -272,22 +293,28 @@ impl MyEP {
                     }))
                     .await
                     .unwrap();
+                    true
                 } else {
-                    stage_pass(stage, tx).await
+                    stage_pass(stage, tx).await;
+                    false
+                }
+            }
+        };
+
+        if blocked || rcode.is_some() {
+            let (v, now) = jsonlog(decision, Some(masked_rinfo), rcode, tags);
+            for l in logs.to_stringvec() {
+                debug!("{}", l);
+            }
+            info!("CFLOG {}", v);
+            if let Some(tx) = &self.logsender {
+                if let Err(rr) = tx.send((v, now)).await {
+                    error!("Could not log: {}", rr);
                 }
             }
         }
 
-        let v = jsonlog(&decision, masked_rinfo, tags);
-        for l in logs.to_stringvec() {
-            debug!("{}", l);
-        }
-        info!("CFLOG {}", v);
-        if let Some(tx) = &self.logsender {
-            if let Err(rr) = tx.send(v).await {
-                error!("Could not log: {}", rr);
-            }
-        }
+        blocked
     }
 }
 
@@ -321,6 +348,7 @@ enum ProcessingStage {
     Headers,
     Body,
     RHeaders,
+    Reply,
 }
 
 async fn stage_pass(stage: ProcessingStage, tx: &mut Sender<Result<ProcessingResponse, Status>>) {
@@ -334,6 +362,7 @@ async fn stage_pass(stage: ProcessingStage, tx: &mut Sender<Result<ProcessingRes
             ProcessingStage::RHeaders => {
                 processing_response::Response::ResponseHeaders(ext_proc::HeadersResponse { response: None })
             }
+            ProcessingStage::Reply => return,
         },
     )
     .await
@@ -440,7 +469,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _ = spawn(async move { configloop(crx, &opt.configpath, loglevel, opt.trustedhops).await });
 
-    let mut logsender: Option<Sender<Value>> = None;
+    let mut logsender: Option<Sender<(Value, DateTime<Utc>)>> = None;
 
     if let Some(esurl) = opt.elasticsearch {
         let (logtx, logrx) = mpsc::channel(500);

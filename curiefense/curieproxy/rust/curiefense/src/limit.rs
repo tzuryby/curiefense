@@ -4,7 +4,7 @@ use redis::RedisResult;
 
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
-use crate::interface::{stronger_decision, SimpleActionT, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::redis::{redis_async_conn, BanStatus};
 use crate::utils::{select_string, RequestInfo};
 
@@ -27,15 +27,12 @@ async fn limit_react<CNX: redis::aio::ConnectionLike>(
     ban_key: &str,
     ban_status: BanStatus,
 ) -> SimpleDecision {
-    tags.insert(&limit.name);
+    tags.insert(&limit.name, Location::Request);
     let action = extract_bannable_action(cnx, logs, &threshold.action, key, ban_key, ban_status).await;
+    let bl = action.is_blocking();
     SimpleDecision::Action(
         action,
-        serde_json::json!({
-            "initiator": "limit",
-            "limitname": limit.name,
-            "key": key
-        }),
+        vec![BlockReason::limit(limit.name.clone(), key.to_string(), bl)],
     )
 }
 
@@ -130,7 +127,7 @@ pub async fn limit_check(
 
         if is_banned(&mut redis, &ban_key).await {
             logs.debug("is banned!");
-            tags.insert(&limit.name);
+            tags.insert(&limit.name, Location::Request);
             let ban_threshold: &LimitThreshold = limit
                 .thresholds
                 .iter()

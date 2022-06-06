@@ -11,7 +11,7 @@ use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
 use crate::config::raw::ContentType;
 use crate::config::utils::{DataSource, RequestSelector, RequestSelectorCondition, XDataSource};
-use crate::interface::{Decision, Tags};
+use crate::interface::{jsonlog, Decision, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
@@ -208,6 +208,7 @@ pub struct RequestMeta {
     pub authority: Option<String>,
     pub method: String,
     pub path: String,
+    pub requestid: Option<String>,
     /// this field only exists for gradual Lua interop
     /// TODO: remove when complete
     pub extra: HashMap<String, String>,
@@ -217,6 +218,7 @@ impl RequestMeta {
     pub fn from_map(attrs: HashMap<String, String>) -> Result<Self, &'static str> {
         let mut mattrs = attrs;
         let authority = mattrs.remove("authority");
+        let requestid = mattrs.remove("x-request-id");
         let method = mattrs.remove("method").ok_or("missing method field")?;
         let path = mattrs.remove("path").ok_or("missing path field")?;
         Ok(RequestMeta {
@@ -224,6 +226,7 @@ impl RequestMeta {
             method,
             path,
             extra: mattrs,
+            requestid
         })
     }
 }
@@ -247,10 +250,7 @@ impl RequestInfo {
     pub fn into_json(self, tags: Tags) -> serde_json::Value {
         let mut v = self.into_json_notags();
         if let Some(m) = v.as_object_mut() {
-            m.insert(
-                "tags".to_string(),
-                serde_json::to_value(tags).unwrap_or(serde_json::Value::Null),
-            );
+            m.insert("tags".to_string(), tags.to_json());
         }
         v
     }
@@ -291,10 +291,25 @@ pub struct InspectionResult {
 
 impl InspectionResult {
     pub fn into_json(self) -> (String, Option<String>) {
-        // return the request map, but only if we have it !
+        let rmap = jsonlog(
+            &self.decision,
+            self.rinfo.as_ref(),
+            None,
+            &self.tags.unwrap_or_default(),
+        );
+        let resp = json!({
+            "logs": self.logs.to_json(),
+            "request_map": rmap,
+        });
+        (resp.to_string(), self.err)
+    }
+    pub fn into_legacy_json(self) -> (String, Option<String>) {
         let resp = match self.rinfo {
-            None => self.decision.to_json_raw(serde_json::Value::Null, self.logs),
-            Some(rinfo) => self.decision.to_json(rinfo, self.tags.unwrap_or_default(), self.logs),
+            // return the request map, but only if we have it !
+            None => self.decision.to_legacy_json_raw(serde_json::Value::Null, self.logs),
+            Some(rinfo) => self
+                .decision
+                .to_legacy_json(rinfo, self.tags.unwrap_or_default(), self.logs),
         };
         (resp, self.err)
     }

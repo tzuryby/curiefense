@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::config::flow::{FlowElement, SequenceKey};
 use crate::config::utils::RequestSelector;
-use crate::interface::{stronger_decision, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::utils::{check_selector_cond, select_string, RequestInfo};
 
 fn session_sequence_key(ri: &RequestInfo) -> SequenceKey {
@@ -83,6 +83,7 @@ async fn check_flow<CNX: redis::aio::ConnectionLike>(
 }
 
 async fn ban_react<CNX: redis::aio::ConnectionLike>(
+    limit_name: &str,
     logs: &mut Logs,
     cnx: &mut CNX,
     elem: &FlowElement,
@@ -109,15 +110,17 @@ async fn ban_react<CNX: redis::aio::ConnectionLike>(
             },
         )
         .await;
+        let blocking = action.is_blocking();
 
         stronger_decision(
             bad,
             SimpleDecision::Action(
                 action,
-                serde_json::json!({
-                    "initiator": "flow_check",
-                    "name": elem.name,
-                }),
+                vec![BlockReason::limit(
+                    limit_name.to_string(),
+                    redis_key.to_string(),
+                    blocking,
+                )],
             ),
         )
     } else {
@@ -147,12 +150,12 @@ pub async fn flow_check(
                     Some(redis_key) => {
                         match check_flow(&mut cnx, &redis_key, elem.step, elem.timeframe, elem.is_last).await? {
                             FlowResult::LastOk => {
-                                tags.insert(&elem.name);
-                                bad = ban_react(logs, &mut cnx, elem, &redis_key, false, bad).await;
+                                tags.insert(&elem.name, Location::Request);
+                                bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, false, bad).await;
                             }
                             FlowResult::LastBlock => {
-                                tags.insert(&elem.name);
-                                bad = ban_react(logs, &mut cnx, elem, &redis_key, true, bad).await;
+                                tags.insert(&elem.name, Location::Request);
+                                bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, true, bad).await;
                             }
                             FlowResult::NonLast => {}
                         }

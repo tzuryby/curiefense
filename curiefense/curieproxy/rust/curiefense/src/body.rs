@@ -10,13 +10,13 @@
 /// The main function, parse_body, is the only exported function.
 ///
 use multipart::server::Multipart;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::io::Read;
 use xmlparser::{ElementEnd, EntityDefinition, ExternalId, Token};
 
 use crate::config::raw::ContentType;
 use crate::config::utils::DataSource;
-use crate::interface::{Action, ActionType};
+use crate::interface::{Action, ActionType, BlockReason};
 use crate::logs::Logs;
 use crate::requestfields::RequestField;
 use crate::utils::decoders::parse_urlencoded_params_bytes;
@@ -343,38 +343,34 @@ pub fn parse_body(
     }
 }
 
-pub fn body_too_deep(expected: usize, actual: usize) -> Action {
-    Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        status: 403,
-        headers: None,
-        reason: json!({
-            "initiator": "body_max_depth",
-            "expected": expected,
-            "actual": actual
-        }),
-        content: "Access denied".to_string(),
-        extra_tags: None,
-    }
+pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
+    (
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            ban: false,
+            status: 403,
+            headers: None,
+            content: "Access denied".to_string(),
+            extra_tags: None,
+        },
+        BlockReason::body_too_deep(actual, expected),
+    )
 }
 
-pub fn body_too_large(expected: usize, actual: usize) -> Action {
-    Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        status: 403,
-        headers: None,
-        reason: json!({
-            "initiator": "body_max_size",
-            "expected": expected,
-            "actual": actual
-        }),
-        content: "Access denied".to_string(),
-        extra_tags: None,
-    }
+pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
+    (
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            ban: false,
+            status: 403,
+            headers: None,
+            content: "Access denied".to_string(),
+            extra_tags: None,
+        },
+        BlockReason::body_too_large(actual, expected),
+    )
 }
 
 #[cfg(test)]

@@ -8,12 +8,12 @@ use std::net::IpAddr;
 use crate::config::raw::{
     GlobalFilterEntryType, RawGlobalFilterSSection, RawGlobalFilterSSectionEntry, RawGlobalFilterSection, Relation,
 };
-use crate::interface::{SimpleAction, Tags};
+use crate::interface::{RawTags, SimpleAction};
 use crate::logs::Logs;
 
 #[derive(Debug, Clone)]
 pub struct GlobalFilterSection {
-    pub tags: Tags,
+    pub tags: RawTags,
     pub relation: Relation,
     pub sections: Vec<GlobalFilterSSection>,
     pub action: Option<SimpleAction>,
@@ -333,7 +333,7 @@ impl GlobalFilterSection {
                 None => None,
             };
             Ok(GlobalFilterSection {
-                tags: Tags::from_slice(&s.tags),
+                tags: s.tags.iter().cloned().collect(),
                 relation: s.rule.relation,
                 sections: subsections,
                 action,

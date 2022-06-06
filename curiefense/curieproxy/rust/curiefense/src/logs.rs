@@ -129,4 +129,8 @@ impl Logs {
     pub fn extend(&mut self, other: Logs) {
         self.logs.extend(other.logs);
     }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::to_value(&self.logs).unwrap_or_else(|rr| serde_json::to_value(rr.to_string()).unwrap())
+    }
 }

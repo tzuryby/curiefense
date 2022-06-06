@@ -31,6 +31,7 @@ async-std = "1.11"
 futures = "0.3"
 futures-util = "0.3"
 async-graphql-parser = "3.0.38"
+chrono = { version = "0.4", features = ["serde", "clock"] }
 
 [dependencies.hyperscan]
 version = "0.2"
