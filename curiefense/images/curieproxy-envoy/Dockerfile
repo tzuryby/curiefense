@@ -1,6 +1,6 @@
 ARG RUSTBIN_TAG=latest
 FROM curiefense/curiefense-rustbuild-bionic:${RUSTBIN_TAG} AS rustbin
-FROM curiefense/envoy-cf:15d1607b3035c900ea943ac8e1fed6f15598a46b AS envoy-cf
+FROM curiefense/envoy-cf:8218a88a1ae76b7657ae226e5542e6f4058d9921 AS envoy-cf
 FROM envoyproxy/envoy:v1.21.1
 
 RUN apt-get update && \
