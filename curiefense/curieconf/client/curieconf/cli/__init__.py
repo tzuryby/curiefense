@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import datetime
+import traceback
 import io
 import json
 from enum import Enum
@@ -441,6 +442,7 @@ def push(source_path: str, target_url: str, version: str = ""):
         bucket, target_path = cloud.get_bucket(target_url)
     except CloudStorageError:
         typer.echo(f"ERROR: Could not access bucket {target_url}")
+        traceback.print_exc()
         raise typer.Exit(code=1)
     manifest = {}
     for root, dirs, files in os.walk(source_path):
@@ -471,6 +473,7 @@ def pull(
         bucket, manifest_path = cloud.get_bucket(manifest_url)
     except CloudStorageError:
         typer.echo(f"ERROR: Could not access bucket {manifest_url}")
+        traceback.print_exc()
         raise typer.Exit(code=1)
     bucketroot = os.path.dirname(manifest_path)
 
