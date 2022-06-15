@@ -202,14 +202,14 @@ fn inspect_request<GH: Grasshopper>(
         headers,
         mbody,
     };
-    let (dec, tags, masked_rinfo) = inspect_generic_request_map(configpath, grasshopper, raw, &mut logs);
+    let dec = inspect_generic_request_map(configpath, grasshopper, raw, &mut logs);
 
     Ok(InspectionResult {
-        decision: dec,
-        tags: Some(tags),
+        decision: dec.decision,
+        tags: Some(dec.tags),
         logs,
         err: None,
-        rinfo: Some(masked_rinfo),
+        rinfo: Some(dec.rinfo),
     })
 }
 

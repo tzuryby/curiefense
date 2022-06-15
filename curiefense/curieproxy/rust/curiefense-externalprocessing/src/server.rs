@@ -7,9 +7,9 @@ use curiefense::{
     },
     grasshopper::DynGrasshopper,
     incremental::{add_body, add_header, finalize, inspect_init, IData},
-    interface::{jsonlog, Decision, Tags},
+    interface::{jsonlog, AnalyzeResult},
     logs::{LogLevel, Logs},
-    utils::{RequestInfo, RequestMeta},
+    utils::RequestMeta,
 };
 use elasticsearch::{http::transport::Transport, Elasticsearch};
 use lazy_static::lazy_static;
@@ -274,12 +274,11 @@ impl MyEP {
         &self,
         stage: ProcessingStage,
         tx: &mut Sender<Result<ProcessingResponse, Status>>,
-        action: &(Decision, Tags, RequestInfo),
+        result: &AnalyzeResult,
         logs: &Logs,
         rcode: Option<u32>,
     ) -> bool {
-        let (decision, tags, masked_rinfo) = action;
-        let blocked = match &decision.maction {
+        let blocked = match &result.decision.maction {
             None => {
                 stage_pass(stage, tx).await;
                 false
@@ -290,7 +289,7 @@ impl MyEP {
                         response: Some(ext_proc::processing_response::Response::ImmediateResponse(
                             ImmediateResponse {
                                 status: Some(HttpStatus { code: a.status as i32 }),
-                                details: serde_json::to_string(&decision.reasons).unwrap(),
+                                details: serde_json::to_string(&result.decision.reasons).unwrap(),
                                 body: a.content.clone(),
                                 headers: a.headers.clone().map(mutate_headers),
                                 grpc_status: None,
@@ -309,7 +308,7 @@ impl MyEP {
         };
 
         if blocked || rcode.is_some() {
-            let (v, now) = jsonlog(decision, Some(masked_rinfo), rcode, tags);
+            let (v, now) = jsonlog(&result.decision, Some(&result.rinfo), rcode, &result.tags);
             for l in logs.to_stringvec() {
                 debug!("{}", l);
             }

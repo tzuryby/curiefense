@@ -8,7 +8,7 @@ use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::flow_check;
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
-use crate::interface::{Action, ActionType, BlockReason, Decision, Location, SimpleDecision, Tags};
+use crate::interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, SimpleDecision, Tags};
 use crate::limit::limit_check;
 use crate::logs::Logs;
 use crate::utils::{BodyDecodingResult, RequestInfo};
@@ -49,7 +49,7 @@ pub async fn analyze<GH: Grasshopper>(
     globalfilter_dec: SimpleDecision,
     flows: &HashMap<SequenceKey, Vec<FlowElement>>,
     cfrules: CfRulesArg<'_>,
-) -> (Decision, Tags, RequestInfo) {
+) -> AnalyzeResult {
     let mut tags = itags;
     let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
 
@@ -82,22 +82,22 @@ pub async fn analyze<GH: Grasshopper>(
             status: 403,
             ..Action::default()
         };
-        return (
-            Decision::action(action, vec![reason]),
+        return AnalyzeResult {
+            decision: Decision::action(action, vec![reason]),
             tags,
-            masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-        );
+            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+        };
     }
 
-    if let Some(dec) = mgh
+    if let Some(decision) = mgh
         .as_ref()
         .and_then(|gh| challenge_phase02(gh, &reqinfo.rinfo.qinfo.uri, &reqinfo.headers))
     {
-        return (
-            dec,
+        return AnalyzeResult {
+            decision,
             tags,
-            masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-        );
+            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+        };
     }
     logs.debug("challenge phase2 ignored");
 
@@ -108,11 +108,11 @@ pub async fn analyze<GH: Grasshopper>(
         brs.extend(reason);
         let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
         if decision.is_final() {
-            return (
+            return AnalyzeResult {
                 decision,
                 tags,
-                masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-            );
+                rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            };
         }
         // if the decision was not adopted, get the reason vector back
         brs = decision.reasons;
@@ -125,11 +125,11 @@ pub async fn analyze<GH: Grasshopper>(
             brs.extend(curbrs);
             let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, brs);
             if decision.is_final() {
-                return (
+                return AnalyzeResult {
                     decision,
                     tags,
-                    masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                );
+                    rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                };
             }
             // if the decision was not adopted, get the reason vector back
             brs = decision.reasons;
@@ -143,11 +143,11 @@ pub async fn analyze<GH: Grasshopper>(
         brs.extend(curbrs);
         let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
         if decision.is_final() {
-            return (
+            return AnalyzeResult {
                 decision,
                 tags,
-                masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-            );
+                rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            };
         }
         // if the decision was not adopted, get the reason vector back
         brs = decision.reasons;
@@ -161,11 +161,11 @@ pub async fn analyze<GH: Grasshopper>(
         AclResult::Passthrough(dec) => {
             if dec.allowed {
                 logs.debug("ACL passthrough detected");
-                return (
-                    Decision::pass(brs),
+                return AnalyzeResult {
+                    decision: Decision::pass(brs),
                     tags,
-                    masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                );
+                    rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                };
             } else {
                 logs.debug("ACL force block detected");
                 brs.push(dec.r);
@@ -216,11 +216,11 @@ pub async fn analyze<GH: Grasshopper>(
                     (Some(ua), Some(gh)) => {
                         logs.debug("ACL challenge detected: challenged");
                         brs.push(bot_reason);
-                        return (
-                            challenge_phase01(gh, ua, brs),
+                        return AnalyzeResult {
+                            decision: challenge_phase01(gh, ua, brs),
                             tags,
-                            masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                        );
+                            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                        };
                     }
                     (gua, ggh) => {
                         logs.debug(|| {
@@ -243,11 +243,11 @@ pub async fn analyze<GH: Grasshopper>(
     // if the acl is active, and we had a block result, immediately block
     if securitypolicy.acl_active {
         if let Some(cde) = blockcode {
-            return (
-                acl_block(true, cde, brs),
+            return AnalyzeResult {
+                decision: acl_block(true, cde, brs),
                 tags,
-                masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-            );
+                rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            };
         }
     }
 
@@ -266,26 +266,27 @@ pub async fn analyze<GH: Grasshopper>(
     };
     logs.debug("Content Filter checks done");
 
-    (
-        match content_filter_result {
-            Ok(()) => Decision::pass(brs),
-            Err(decision) => {
-                brs.extend(decision.reasons.into_iter().map(|mut reason| {
-                    if !securitypolicy.content_filter_active {
-                        reason.decision.inactive();
-                    }
-                    reason
-                }));
-                match decision.maction {
-                    None => Decision::pass(brs),
-                    Some(mut action) => {
-                        action.block_mode &= securitypolicy.content_filter_active;
-                        Decision::action(action, brs)
-                    }
+    let decision = match content_filter_result {
+        Ok(()) => Decision::pass(brs),
+        Err(decision) => {
+            brs.extend(decision.reasons.into_iter().map(|mut reason| {
+                if !securitypolicy.content_filter_active {
+                    reason.decision.inactive();
+                }
+                reason
+            }));
+            match decision.maction {
+                None => Decision::pass(brs),
+                Some(mut action) => {
+                    action.block_mode &= securitypolicy.content_filter_active;
+                    Decision::action(action, brs)
                 }
             }
-        },
+        }
+    };
+    AnalyzeResult {
+        decision,
         tags,
-        masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-    )
+        rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+    }
 }

@@ -22,11 +22,11 @@ use crate::{
     },
     contentfilter::cf_default_action,
     grasshopper::Grasshopper,
-    interface::{Action, BlockReason, Decision, Location, Tags},
+    interface::{Action, AnalyzeResult, BlockReason, Decision, Location, Tags},
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
     tagging::tag_request,
-    utils::{map_request, RawRequest, RequestInfo, RequestMeta},
+    utils::{map_request, RawRequest, RequestMeta},
 };
 
 pub struct IData {
@@ -66,7 +66,7 @@ pub fn inspect_init(
 
 /// called when the content filter policy is violated
 /// no tags are returned though!
-fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, (Decision, Tags, RequestInfo)) {
+fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeResult) {
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
     let rawrequest = RawRequest {
@@ -82,16 +82,20 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, (Decisio
         0,
         &rawrequest,
     );
-    (logs, (Decision::action(action, vec![br]), Tags::default(), reqinfo))
+    (
+        logs,
+        AnalyzeResult {
+            decision: Decision::action(action, vec![br]),
+            tags: Tags::default(),
+            rinfo: reqinfo,
+        },
+    )
 }
 
 /// incrementally add headers, can exit early if there are too many headers, or they are too large
 ///
 /// other properties are not checked at this point (restrict for example), this early check purely exists as an anti DOS measure
-pub fn add_header(
-    idata: IData,
-    new_headers: HashMap<String, String>,
-) -> Result<IData, (Logs, (Decision, Tags, RequestInfo))> {
+pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
     if dt.secpol.content_filter_active {
         let hdrs = &dt.secpol.content_filter_profile.sections.headers;
@@ -127,7 +131,7 @@ pub fn add_header(
 }
 
 /// TODO, incremental filtering of body based on the security policy (mainly body length)
-pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, (Decision, Tags, RequestInfo))> {
+pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
     let cur_body_size = dt.body.as_ref().map(|v| v.len()).unwrap_or(0);
     let new_size = cur_body_size + new_body.len();
@@ -150,7 +154,7 @@ pub async fn finalize<GH: Grasshopper>(
     globalfilters: &[GlobalFilterSection],
     flows: &HashMap<SequenceKey, Vec<FlowElement>>,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
-) -> ((Decision, Tags, RequestInfo), Logs) {
+) -> (AnalyzeResult, Logs) {
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
     let rawrequest = RawRequest {

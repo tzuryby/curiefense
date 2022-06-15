@@ -30,6 +30,13 @@ pub fn stronger_decision(d1: SimpleDecision, d2: SimpleDecision) -> SimpleDecisi
     }
 }
 
+#[derive(Debug)]
+pub struct AnalyzeResult {
+    pub decision: Decision,
+    pub tags: Tags,
+    pub rinfo: RequestInfo,
+}
+
 #[derive(Debug, Clone)]
 pub struct Decision {
     pub maction: Option<Action>,

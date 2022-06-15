@@ -226,7 +226,7 @@ impl RequestMeta {
             method,
             path,
             extra: mattrs,
-            requestid
+            requestid,
         })
     }
 }

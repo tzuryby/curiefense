@@ -22,8 +22,8 @@ use body::body_too_large;
 use config::{with_config, HSDB};
 use contentfilter::content_filter_check;
 use grasshopper::Grasshopper;
-use interface::Tags;
 use interface::{Action, ActionType, Decision};
+use interface::{AnalyzeResult, Tags};
 use logs::Logs;
 use securitypolicy::match_securitypolicy;
 use simple_executor::{Executor, Progress, Task};
@@ -77,7 +77,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     mgh: Option<GH>,
     raw: RawRequest,
     logs: &mut Logs,
-) -> (Decision, Tags, RequestInfo) {
+) -> AnalyzeResult {
     async_std::task::block_on(inspect_generic_request_map_async(configpath, mgh, raw, logs))
 }
 
@@ -87,7 +87,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     mgh: Option<GH>,
     raw: RawRequest<'_>,
     logs: &mut Logs,
-) -> (Decision, Tags, RequestInfo) {
+) -> AnalyzeResult {
     let mut tags = Tags::default();
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
@@ -163,15 +163,27 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
         }) {
             Some(RequestMappingResult::Res(x)) => x,
             Some(RequestMappingResult::BodyTooLarge((action, br), rinfo)) => {
-                return (Decision::action(action, vec![br]), tags, rinfo);
+                return AnalyzeResult {
+                    decision: Decision::action(action, vec![br]),
+                    tags,
+                    rinfo,
+                };
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
-                return (Decision::pass(Vec::new()), tags, map_request(logs, &[], &[], 0, &raw));
+                return AnalyzeResult {
+                    decision: Decision::pass(Vec::new()),
+                    tags,
+                    rinfo: map_request(logs, &[], &[], 0, &raw),
+                };
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
-                return (Decision::pass(Vec::new()), tags, map_request(logs, &[], &[], 0, &raw));
+                return AnalyzeResult {
+                    decision: Decision::pass(Vec::new()),
+                    tags,
+                    rinfo: map_request(logs, &[], &[], 0, &raw),
+                };
             }
         };
 

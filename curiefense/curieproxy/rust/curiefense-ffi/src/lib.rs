@@ -1,10 +1,10 @@
 use core::ffi::c_void;
 use curiefense::grasshopper::{DummyGrasshopper, Grasshopper};
 use curiefense::inspect_generic_request_map_async;
-use curiefense::interface::{jsonlog, Decision, Tags};
+use curiefense::interface::{jsonlog, AnalyzeResult};
 use curiefense::logs::{LogLevel, Logs};
 use curiefense::simple_executor::{new_executor_and_spawner, Executor, Progress, TaskCB};
-use curiefense::utils::{RawRequest, RequestInfo, RequestMeta};
+use curiefense::utils::{RawRequest, RequestMeta};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_uchar};
@@ -65,10 +65,8 @@ pub enum CFResult {
 
 #[derive(Debug)]
 pub struct CFDecision {
-    decision: Decision,
-    tags: Tags,
+    result: AnalyzeResult,
     logs: Logs,
-    reqinfo: RequestInfo,
 }
 
 /// # Safety
@@ -79,7 +77,7 @@ pub unsafe extern "C" fn curiefense_cfr_is_blocking(ptr: *const CFResult) -> boo
     match ptr.as_ref() {
         None => false,
         Some(CFResult::RR(_)) => false,
-        Some(CFResult::OK(r)) => r.decision.maction.is_some(),
+        Some(CFResult::OK(r)) => r.result.decision.maction.is_some(),
     }
 }
 
@@ -91,7 +89,7 @@ pub unsafe extern "C" fn curiefense_cfr_block_status(ptr: *const CFResult) -> u3
     match ptr.as_ref() {
         None => 0,
         Some(CFResult::RR(_)) => 0,
-        Some(CFResult::OK(r)) => r.decision.maction.as_ref().map(|a| a.status).unwrap_or(0),
+        Some(CFResult::OK(r)) => r.result.decision.maction.as_ref().map(|a| a.status).unwrap_or(0),
     }
 }
 
@@ -103,7 +101,7 @@ pub unsafe extern "C" fn curiefense_cfr_block_contentlength(ptr: *const CFResult
     match ptr.as_ref() {
         None => 0,
         Some(CFResult::RR(_)) => 0,
-        Some(CFResult::OK(r)) => r.decision.maction.as_ref().map(|d| d.content.len()).unwrap_or(0),
+        Some(CFResult::OK(r)) => r.result.decision.maction.as_ref().map(|d| d.content.len()).unwrap_or(0),
     }
 }
 
@@ -116,7 +114,7 @@ pub unsafe extern "C" fn curiefense_cfr_block_content(ptr: *const CFResult, tgt:
     match ptr.as_ref() {
         None => (),
         Some(CFResult::RR(_)) => (),
-        Some(CFResult::OK(r)) => match &r.decision.maction {
+        Some(CFResult::OK(r)) => match &r.result.decision.maction {
             Some(a) => std::ptr::copy_nonoverlapping(a.content.as_ptr(), tgt, a.content.len()),
             None => (),
         },
@@ -134,7 +132,9 @@ pub unsafe extern "C" fn curiefense_cfr_log(ptr: *mut CFResult, ln: *mut usize) 
     }
     let cfr = Box::from_raw(ptr);
     let out: String = match *cfr {
-        CFResult::OK(dec) => jsonlog(&dec.decision, Some(&dec.reqinfo), None, &dec.tags).0.to_string(),
+        CFResult::OK(dec) => jsonlog(&dec.result.decision, Some(&dec.result.rinfo), None, &dec.result.tags)
+            .0
+            .to_string(),
         CFResult::RR(rr) => rr,
     };
     *ln = out.len();
@@ -215,13 +215,8 @@ pub async fn inspect_wrapper<GH: Grasshopper>(
     mgh: Option<GH>,
 ) -> CFDecision {
     let mut mlogs = logs;
-    let (decision, tags, reqinfo) = inspect_generic_request_map_async(&configpath, mgh, raw, &mut mlogs).await;
-    CFDecision {
-        decision,
-        tags,
-        logs: mlogs,
-        reqinfo,
-    }
+    let result = inspect_generic_request_map_async(&configpath, mgh, raw, &mut mlogs).await;
+    CFDecision { result, logs: mlogs }
 }
 
 /// # Safety
