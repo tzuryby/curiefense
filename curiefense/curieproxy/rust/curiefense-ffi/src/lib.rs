@@ -132,9 +132,15 @@ pub unsafe extern "C" fn curiefense_cfr_log(ptr: *mut CFResult, ln: *mut usize) 
     }
     let cfr = Box::from_raw(ptr);
     let out: String = match *cfr {
-        CFResult::OK(dec) => jsonlog(&dec.result.decision, Some(&dec.result.rinfo), None, &dec.result.tags)
-            .0
-            .to_string(),
+        CFResult::OK(dec) => jsonlog(
+            &dec.result.decision,
+            Some(&dec.result.rinfo),
+            None,
+            &dec.result.tags,
+            &dec.result.stats,
+        )
+        .0
+        .to_string(),
         CFResult::RR(rr) => rr,
     };
     *ln = out.len();

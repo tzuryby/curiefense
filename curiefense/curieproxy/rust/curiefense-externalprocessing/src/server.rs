@@ -308,7 +308,13 @@ impl MyEP {
         };
 
         if blocked || rcode.is_some() {
-            let (v, now) = jsonlog(&result.decision, Some(&result.rinfo), rcode, &result.tags);
+            let (v, now) = jsonlog(
+                &result.decision,
+                Some(&result.rinfo),
+                rcode,
+                &result.tags,
+                &result.stats,
+            );
             for l in logs.to_stringvec() {
                 debug!("{}", l);
             }

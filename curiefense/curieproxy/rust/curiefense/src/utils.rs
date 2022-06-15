@@ -11,6 +11,7 @@ use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
 use crate::config::raw::ContentType;
 use crate::config::utils::{DataSource, RequestSelector, RequestSelectorCondition, XDataSource};
+use crate::interface::stats::Stats;
 use crate::interface::{jsonlog, Decision, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
@@ -290,12 +291,13 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub fn into_json(self) -> (String, Option<String>) {
+    pub fn into_json_legacy(self) -> (String, Option<String>) {
         let rmap = jsonlog(
             &self.decision,
             self.rinfo.as_ref(),
             None,
             &self.tags.unwrap_or_default(),
+            &Stats::default(),
         );
         let resp = json!({
             "logs": self.logs.to_json(),

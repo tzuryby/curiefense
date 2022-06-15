@@ -106,12 +106,46 @@ impl Decision {
     }
 }
 
+struct Counters<'t, A> {
+    stats: &'t Stats,
+    greasons: &'t HashMap<InitiatorKind, Vec<A>>,
+}
+
+impl<'t, A> Serialize for Counters<'t, A> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut map: <S as serde::Serializer>::SerializeMap = serializer.serialize_map(None)?;
+        map.serialize_entry("processing_stage", &self.stats.processing_stage)?;
+        map.serialize_entry("acl_active", if self.stats.acl_active { &1 } else { &0 })?;
+        map.serialize_entry(
+            "content_filter_active",
+            if self.stats.content_filter_active { &1 } else { &0 },
+        )?;
+        map.serialize_entry("globalfilters_total", &self.stats.globalfilters_total)?;
+        map.serialize_entry("globalfilters_matched", &self.stats.globalfilters_matched)?;
+        map.serialize_entry("flow_elements", &self.stats.flow_elements)?;
+        map.serialize_entry("flow_checked", &self.stats.flow_checked)?;
+        map.serialize_entry("flow_matched", &self.stats.flow_matched)?;
+        map.serialize_entry("limit_total", &self.stats.limit_total)?;
+        map.serialize_entry("limit_matched", &self.stats.limit_matched)?;
+        map.serialize_entry("rules_total", &self.stats.rules_total)?;
+        map.serialize_entry("rules_matches", &self.stats.rules_matches)?;
+        for (k, v) in self.greasons {
+            map.serialize_entry(k, &v.len())?;
+        }
+        map.end()
+    }
+}
+
 // helper function that reproduces the envoy log format
 pub fn jsonlog(
     dec: &Decision,
     mrinfo: Option<&RequestInfo>,
     rcode: Option<u32>,
     tags: &Tags,
+    stats: &Stats,
 ) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
     let now = chrono::Utc::now();
     let mut tgs = tags.clone();
@@ -123,6 +157,11 @@ pub fn jsonlog(
         }
     }
     let greasons = BlockReason::regroup(&dec.reasons);
+    let counters = Counters {
+        stats,
+        greasons: &greasons,
+    };
+    let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
     let val = match mrinfo {
         Some(info) => serde_json::json!({
             "timestamp": now,
@@ -136,12 +175,16 @@ pub fn jsonlog(
             "uri": info.rinfo.qinfo.uri,
             "response_code": rcode,
 
-            "decoding_triggers": greasons.get(&InitiatorKind::Decoding),
-            "acl_triggers": greasons.get(&InitiatorKind::Acl),
-            "rate_limit_triggers": greasons.get(&InitiatorKind::RateLimit),
-            "flow_control_triggers": greasons.get(&InitiatorKind::FlowControl),
-            "global_filter_triggers": greasons.get(&InitiatorKind::GlobalFilter),
-            "content_filter_triggers": greasons.get(&InitiatorKind::ContentFilter),
+            "trigger_counters": counters,
+            "decoding_triggers": get_trigger(&InitiatorKind::Decoding),
+            "acl_triggers": get_trigger(&InitiatorKind::Acl),
+            "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
+            "flow_control_triggers": get_trigger(&InitiatorKind::FlowControl),
+            "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
+            "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
+            "proxy": {
+                "location": info.rinfo.geoip.location
+            },
             "profiling": {},
             "biometrics": {},
         }),

@@ -12,23 +12,23 @@ pub struct BStageContentFilter;
 
 #[derive(Debug, Default)]
 pub struct Stats {
-    processing_stage: usize,
+    pub processing_stage: usize,
     // stage secpol
-    acl_active: bool,
-    content_filter_active: bool,
+    pub acl_active: bool,
+    pub content_filter_active: bool,
     // stage mapped
-    globalfilters_total: usize,
-    globalfilters_matched: usize,
+    pub globalfilters_total: usize,
+    pub globalfilters_matched: usize,
     // stage flow
-    flow_elements: usize,
-    flow_checked: usize,
-    flow_matched: usize,
+    pub flow_elements: usize,
+    pub flow_checked: usize,
+    pub flow_matched: usize,
     // stage limit
-    limit_total: usize,
-    limit_matched: usize,
+    pub limit_total: usize,
+    pub limit_matched: usize,
     // stage content filter
-    rules_total: usize,
-    rules_matches: usize,
+    pub rules_total: usize,
+    pub rules_matches: usize,
 }
 
 // the builder uses a phantom data structure to make sure we did not forget to update the stats from a previous stage
