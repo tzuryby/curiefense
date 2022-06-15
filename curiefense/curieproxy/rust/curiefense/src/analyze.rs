@@ -8,6 +8,7 @@ use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::flow_check;
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
+use crate::interface::stats::{BStageMapped, StatsCollect};
 use crate::interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, SimpleDecision, Tags};
 use crate::limit::limit_check;
 use crate::logs::Logs;
@@ -40,6 +41,7 @@ pub enum CfRulesArg<'t> {
 #[allow(clippy::too_many_arguments)]
 pub async fn analyze<GH: Grasshopper>(
     logs: &mut Logs,
+    stats: StatsCollect<BStageMapped>,
     mgh: Option<GH>,
     itags: Tags,
     secpolname: &str,
@@ -86,6 +88,7 @@ pub async fn analyze<GH: Grasshopper>(
             decision: Decision::action(action, vec![reason]),
             tags,
             rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            stats: stats.mapped_stage_build(),
         };
     }
 
@@ -97,6 +100,7 @@ pub async fn analyze<GH: Grasshopper>(
             decision,
             tags,
             rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            stats: stats.mapped_stage_build(),
         };
     }
     logs.debug("challenge phase2 ignored");
@@ -112,15 +116,17 @@ pub async fn analyze<GH: Grasshopper>(
                 decision,
                 tags,
                 rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                stats: stats.mapped_stage_build(),
             };
         }
         // if the decision was not adopted, get the reason vector back
         brs = decision.reasons;
     }
 
-    match flow_check(logs, flows, &reqinfo, &mut tags).await {
+    let (flow_check_result, stats) = flow_check(logs, stats, flows, &reqinfo, &mut tags).await;
+    match flow_check_result {
         Err(rr) => logs.error(|| rr.to_string()),
-        Ok(SimpleDecision::Pass) => {}
+        Ok(SimpleDecision::Pass) => (),
         Ok(SimpleDecision::Action(a, curbrs)) => {
             brs.extend(curbrs);
             let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, brs);
@@ -129,6 +135,7 @@ pub async fn analyze<GH: Grasshopper>(
                     decision,
                     tags,
                     rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                    stats: stats.flow_stage_build(),
                 };
             }
             // if the decision was not adopted, get the reason vector back
@@ -138,8 +145,16 @@ pub async fn analyze<GH: Grasshopper>(
     logs.debug("flow checks done");
 
     // limit checks
-    let limit_check = limit_check(logs, &securitypolicy.name, &reqinfo, &securitypolicy.limits, &mut tags);
-    if let SimpleDecision::Action(action, curbrs) = limit_check.await {
+    let (limit_check, stats) = limit_check(
+        logs,
+        stats,
+        &securitypolicy.name,
+        &reqinfo,
+        &securitypolicy.limits,
+        &mut tags,
+    )
+    .await;
+    if let SimpleDecision::Action(action, curbrs) = limit_check {
         brs.extend(curbrs);
         let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
         if decision.is_final() {
@@ -147,6 +162,7 @@ pub async fn analyze<GH: Grasshopper>(
                 decision,
                 tags,
                 rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                stats: stats.limit_stage_build(),
             };
         }
         // if the decision was not adopted, get the reason vector back
@@ -155,6 +171,7 @@ pub async fn analyze<GH: Grasshopper>(
     logs.debug(|| format!("limit checks done ({} limits)", securitypolicy.limits.len()));
 
     let acl_result = check_acl(&tags, &securitypolicy.acl_profile);
+    let stats = stats.acl();
     logs.debug(|| format!("ACL result: {:?}", acl_result));
     // store the check_acl result here
     let blockcode: Option<i32> = match acl_result {
@@ -165,6 +182,7 @@ pub async fn analyze<GH: Grasshopper>(
                     decision: Decision::pass(brs),
                     tags,
                     rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                    stats: stats.acl_stage_build(),
                 };
             } else {
                 logs.debug("ACL force block detected");
@@ -220,6 +238,7 @@ pub async fn analyze<GH: Grasshopper>(
                             decision: challenge_phase01(gh, ua, brs),
                             tags,
                             rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                            stats: stats.acl_stage_build(),
                         };
                     }
                     (gua, ggh) => {
@@ -247,22 +266,31 @@ pub async fn analyze<GH: Grasshopper>(
                 decision: acl_block(true, cde, brs),
                 tags,
                 rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                stats: stats.acl_stage_build(),
             };
         }
     }
 
-    let mut cfcheck =
-        |mrls| content_filter_check(logs, &mut tags, &reqinfo, &securitypolicy.content_filter_profile, mrls);
+    let mut cfcheck = |stats, mrls| {
+        content_filter_check(
+            logs,
+            stats,
+            &mut tags,
+            &reqinfo,
+            &securitypolicy.content_filter_profile,
+            mrls,
+        )
+    };
     // otherwise, run content_filter_check
-    let content_filter_result = match cfrules {
+    let (content_filter_result, stats) = match cfrules {
         CfRulesArg::Global => match HSDB.read() {
-            Ok(rd) => cfcheck(rd.get(&securitypolicy.content_filter_profile.id)),
+            Ok(rd) => cfcheck(stats, rd.get(&securitypolicy.content_filter_profile.id)),
             Err(rr) => {
                 logs.error(|| format!("Could not get lock on HSDB: {}", rr));
-                Ok(())
+                (Ok(()), stats.no_content_filter())
             }
         },
-        CfRulesArg::Get(r) => cfcheck(r),
+        CfRulesArg::Get(r) => cfcheck(stats, r),
     };
     logs.debug("Content Filter checks done");
 
@@ -288,5 +316,6 @@ pub async fn analyze<GH: Grasshopper>(
         decision,
         tags,
         rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+        stats: stats.cf_stage_build(),
     }
 }

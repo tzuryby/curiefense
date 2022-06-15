@@ -2,6 +2,7 @@ use crate::config::globalfilter::{
     GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterSSection, GlobalFilterSection, PairEntry, SingleEntry,
 };
 use crate::config::raw::Relation;
+use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
 use crate::interface::{BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
@@ -139,10 +140,11 @@ fn check_subsection(rinfo: &RequestInfo, sub: &GlobalFilterSSection) -> MatchRes
 }
 
 pub fn tag_request(
+    stats: StatsCollect<BStageSecpol>,
     is_human: bool,
     globalfilters: &[GlobalFilterSection],
     rinfo: &RequestInfo,
-) -> (Tags, SimpleDecision) {
+) -> (Tags, SimpleDecision, StatsCollect<BStageMapped>) {
     let mut tags = Tags::default();
     if is_human {
         tags.insert("human", Location::Request);
@@ -189,9 +191,11 @@ pub fn tag_request(
             tags.insert_qualified("geo-asn", &sasn, Location::Request);
         }
     }
+    let mut matched = 0;
     for psection in globalfilters {
         let mtch = check_relation(rinfo, psection.relation, &psection.sections, check_subsection);
         if mtch.matching {
+            matched += 1;
             let rtags = psection.tags.clone().with_locs(&mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
@@ -201,12 +205,13 @@ pub fn tag_request(
                     return (
                         tags.clone(),
                         SimpleDecision::Action(a.clone(), vec![BlockReason::acl(tags, false)]),
+                        stats.mapped(globalfilters.len(), matched),
                     );
                 }
             }
         }
     }
-    (tags, SimpleDecision::Pass)
+    (tags, SimpleDecision::Pass, stats.mapped(globalfilters.len(), matched))
 }
 
 #[cfg(test)]

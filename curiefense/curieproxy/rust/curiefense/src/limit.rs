@@ -1,3 +1,4 @@
+use crate::interface::stats::{BStageFlow, BStageLimit, StatsCollect};
 use crate::logs::Logs;
 use crate::redis::{extract_bannable_action, get_ban_key, is_banned};
 use redis::RedisResult;
@@ -88,15 +89,16 @@ fn limit_match(tags: &Tags, elem: &Limit) -> bool {
 
 pub async fn limit_check(
     logs: &mut Logs,
+    stats: StatsCollect<BStageFlow>,
     security_policy_name: &str,
     reqinfo: &RequestInfo,
     limits: &[Limit],
     tags: &mut Tags,
-) -> SimpleDecision {
+) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     // early return to avoid redis connection
     if limits.is_empty() {
         logs.debug("no limits to check");
-        return SimpleDecision::Pass;
+        return (SimpleDecision::Pass, stats.no_limit());
     }
 
     // we connect once for all limit tests
@@ -104,17 +106,19 @@ pub async fn limit_check(
         Ok(c) => c,
         Err(rr) => {
             logs.error(|| format!("Could not connect to the redis server {}", rr));
-            return SimpleDecision::Pass;
+            return (SimpleDecision::Pass, stats.no_limit());
         }
     };
 
     let mut out = SimpleDecision::Pass;
 
+    let mut matched = 0;
     for limit in limits {
         if !limit_match(tags, limit) {
             logs.debug(|| format!("limit {} excluded", limit.name));
             continue;
         }
+        matched += 1;
 
         let key = match build_key(security_policy_name, reqinfo, tags, limit) {
             // if we can't build the key, it usually means that a header is missing.
@@ -184,5 +188,5 @@ pub async fn limit_check(
             }
         }
     }
-    out
+    (out, stats.limit(limits.len(), matched))
 }

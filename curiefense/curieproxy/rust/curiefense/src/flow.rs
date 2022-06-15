@@ -1,3 +1,4 @@
+use crate::interface::stats::{BStageFlow, BStageMapped, StatsCollect};
 use crate::redis::{extract_bannable_action, get_ban_key, is_banned, BanStatus};
 use crate::Logs;
 use std::collections::HashMap;
@@ -130,40 +131,49 @@ async fn ban_react<CNX: redis::aio::ConnectionLike>(
 
 pub async fn flow_check(
     logs: &mut Logs,
+    stats: StatsCollect<BStageMapped>,
     flows: &HashMap<SequenceKey, Vec<FlowElement>>,
     reqinfo: &RequestInfo,
     tags: &mut Tags,
-) -> anyhow::Result<SimpleDecision> {
+) -> (anyhow::Result<SimpleDecision>, StatsCollect<BStageFlow>) {
     let sequence_key = session_sequence_key(reqinfo);
     match flows.get(&sequence_key) {
-        None => Ok(SimpleDecision::Pass),
+        None => (Ok(SimpleDecision::Pass), stats.no_flow(flows.len())),
         Some(elems) => {
             let mut bad = SimpleDecision::Pass;
             // do not establish the connection if unneeded
-            let mut cnx = crate::redis::redis_async_conn().await?;
+            let mut cnx = match crate::redis::redis_async_conn().await {
+                Ok(x) => x,
+                Err(rr) => return (Err(rr), stats.no_flow(flows.len())),
+            };
+            let mut flow_checked = 0;
+            let mut flow_matched = 0;
             for elem in elems.iter() {
+                flow_checked += 1;
                 if !flow_match(reqinfo, tags, elem) {
                     continue;
                 }
+                flow_matched += 1;
                 logs.debug(|| format!("Testing flow control {} (step {})", elem.name, elem.step));
                 match build_redis_key(reqinfo, tags, &elem.key, &elem.id, &elem.name) {
                     Some(redis_key) => {
-                        match check_flow(&mut cnx, &redis_key, elem.step, elem.timeframe, elem.is_last).await? {
-                            FlowResult::LastOk => {
+                        match check_flow(&mut cnx, &redis_key, elem.step, elem.timeframe, elem.is_last).await {
+                            Ok(FlowResult::LastOk) => {
                                 tags.insert(&elem.name, Location::Request);
                                 bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, false, bad).await;
                             }
-                            FlowResult::LastBlock => {
+                            Ok(FlowResult::LastBlock) => {
                                 tags.insert(&elem.name, Location::Request);
                                 bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, true, bad).await;
                             }
-                            FlowResult::NonLast => {}
+                            Ok(FlowResult::NonLast) => {}
+                            Err(rr) => return (Err(rr), stats.flow(flows.len(), flow_checked, flow_matched)),
                         }
                     }
                     None => logs.warning(|| format!("Could not fetch key in flow control {}", elem.name)),
                 }
             }
-            Ok(bad)
+            (Ok(bad), stats.flow(flows.len(), flow_checked, flow_matched))
         }
     }
 }

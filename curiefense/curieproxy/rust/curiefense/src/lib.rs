@@ -30,6 +30,7 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::interface::stats::{Stats, StatsCollect};
 use crate::interface::{BlockReason, Location};
 
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
@@ -106,7 +107,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let ((nm, securitypolicy), (ntags, globalfilter_dec), flows, reqinfo, is_human) =
+    let ((nm, securitypolicy), (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
             let mmapinfo =
                 match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs).map(|(nm, um)| (nm, um.clone()));
@@ -155,7 +156,9 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                         false
                     };
 
-                    let ntags = tag_request(is_human, &cfg.globalfilters, &reqinfo);
+                    let stats = StatsCollect::new().secpol(&secpolicy);
+
+                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
                     RequestMappingResult::Res(((nm, secpolicy), ntags, nflows, reqinfo, is_human))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
@@ -167,6 +170,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                     decision: Decision::action(action, vec![br]),
                     tags,
                     rinfo,
+                    stats: Stats::default(),
                 };
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
@@ -175,6 +179,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo: map_request(logs, &[], &[], 0, &raw),
+                    stats: Stats::default(),
                 };
             }
             None => {
@@ -183,6 +188,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo: map_request(logs, &[], &[], 0, &raw),
+                    stats: Stats::default(),
                 };
             }
         };
@@ -191,6 +197,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
 
     analyze::analyze(
         logs,
+        stats,
         mgh,
         tags,
         &nm,
@@ -234,11 +241,19 @@ pub fn content_filter_check_generic_request_map(
 
     let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.max_body_depth, raw);
 
-    let waf_result = match HSDB.read() {
-        Ok(rd) => content_filter_check(logs, &mut tags, &reqinfo, &waf_profile, rd.get(content_filter_id)),
+    let stats = StatsCollect::new().content_filter_only();
+    let (waf_result, _stats) = match HSDB.read() {
+        Ok(rd) => content_filter_check(
+            logs,
+            stats,
+            &mut tags,
+            &reqinfo,
+            &waf_profile,
+            rd.get(content_filter_id),
+        ),
         Err(rr) => {
             logs.error(|| format!("Could not get lock on HSDB: {}", rr));
-            Ok(())
+            (Ok(()), stats.no_content_filter())
         }
     };
     logs.debug("Content Filter checks done");

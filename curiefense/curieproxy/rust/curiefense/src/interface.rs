@@ -1,5 +1,6 @@
-use crate::config::contentfilter::SectionIdx;
 /// this file contains all the data type that are used when interfacing with a proxy
+use self::stats::Stats;
+use crate::config::contentfilter::SectionIdx;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
@@ -9,6 +10,8 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+
+pub mod stats;
 
 #[derive(Debug, Clone)]
 pub enum SimpleDecision {
@@ -35,6 +38,7 @@ pub struct AnalyzeResult {
     pub decision: Decision,
     pub tags: Tags,
     pub rinfo: RequestInfo,
+    pub stats: Stats,
 }
 
 #[derive(Debug, Clone)]

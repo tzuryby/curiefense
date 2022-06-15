@@ -22,7 +22,10 @@ use crate::{
     },
     contentfilter::cf_default_action,
     grasshopper::Grasshopper,
-    interface::{Action, AnalyzeResult, BlockReason, Decision, Location, Tags},
+    interface::{
+        stats::{BStageSecpol, Stats, StatsCollect},
+        Action, AnalyzeResult, BlockReason, Decision, Location, Tags,
+    },
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
     tagging::tag_request,
@@ -36,6 +39,7 @@ pub struct IData {
     secpol: SecurityPolicy,
     body: Option<Vec<u8>>,
     trusted_hops: u32,
+    stats: StatsCollect<BStageSecpol>,
 }
 
 pub fn inspect_init(
@@ -60,6 +64,7 @@ pub fn inspect_init(
             secpol: secpol.clone(),
             body: None,
             trusted_hops,
+            stats: StatsCollect::new().secpol(secpol),
         }),
     }
 }
@@ -88,6 +93,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
             decision: Decision::action(action, vec![br]),
             tags: Tags::default(),
             rinfo: reqinfo,
+            stats: Stats::default(),
         },
     )
 }
@@ -178,10 +184,11 @@ pub async fn finalize<GH: Grasshopper>(
         false
     };
 
-    let (mut tags, globalfilter_dec) = tag_request(is_human, globalfilters, &reqinfo);
+    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo);
     tags.insert("all", Location::Request);
     let dec = analyze(
         &mut logs,
+        stats,
         mgh,
         tags,
         &secpolicy.name,

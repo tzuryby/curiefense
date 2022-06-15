@@ -8,6 +8,7 @@ use crate::config::contentfilter::{
     SectionIdx,
 };
 use crate::config::utils::XDataSource;
+use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
 use crate::interface::{Action, ActionType, BDecision, BlockReason, Decision, Initiator, Location, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
@@ -77,23 +78,24 @@ fn block_on(reasons: Vec<BlockReason>) -> Result<(), Decision> {
 /// Runs the Content Filter part of curiefense
 pub fn content_filter_check(
     logs: &mut Logs,
+    stats: StatsCollect<BStageAcl>,
     tags: &mut Tags,
     rinfo: &RequestInfo,
     profile: &ContentFilterProfile,
     mhsdb: Option<&ContentFilterRules>,
-) -> Result<(), Decision> {
+) -> (Result<(), Decision>, StatsCollect<BStageContentFilter>) {
     use SectionIdx::*;
     let mut omit = Default::default();
 
     // directly exit if omitted profile
     if tags.has_intersection(&profile.ignore) {
         logs.debug("content filter bypass because of global ignore");
-        return Ok(());
+        return (Ok(()), stats.no_content_filter());
     }
 
     // check section profiles
     for idx in &[Path, Headers, Cookies, Args] {
-        section_check(
+        if let Err(reason) = section_check(
             logs,
             tags,
             *idx,
@@ -101,8 +103,12 @@ pub fn content_filter_check(
             get_section(*idx, rinfo),
             profile.ignore_alphanum,
             &mut omit,
-        )
-        .map_err(|reason| Decision::action(cf_default_action(true), vec![reason]))?;
+        ) {
+            return (
+                Err(Decision::action(cf_default_action(true), vec![reason])),
+                stats.no_content_filter(),
+            );
+        }
     }
 
     let kept = profile.active.union(&profile.report).cloned().collect::<HashSet<_>>();
@@ -123,15 +129,18 @@ pub fn content_filter_check(
     }
 
     let iblock = injection_check(tags, &hca_keys, &omit, test_xss, test_sqli);
-    block_on(iblock)?;
+    if let Err(rr) = block_on(iblock) {
+        return (Err(rr), stats.no_content_filter());
+    }
 
     let mut specific_tags = Tags::default();
 
     // finally, hyperscan check
     match mhsdb {
         Some(hsdb) => {
-            match hyperscan(
+            let (scanresult, stats) = hyperscan(
                 logs,
+                stats,
                 tags,
                 &mut specific_tags,
                 hca_keys,
@@ -141,44 +150,23 @@ pub fn content_filter_check(
                 &profile.report,
                 &profile.ignore,
                 &omit.exclusions,
-            ) {
+            );
+            match scanresult {
                 Err(rr) => {
                     logs.error(|| rr.to_string());
-                    Ok(())
+                    (Ok(()), stats)
                 }
                 Ok(reasons) => {
                     tags.extend(specific_tags);
-                    block_on(reasons)
+                    (block_on(reasons), stats)
                 }
             }
         }
         None => {
             logs.warning(||format!("no hsdb found for profile {}, it probably means that no rules were matched by the active/report/ignore", profile.id));
-            Ok(())
+            (Ok(()), stats.no_content_filter())
         }
     }
-
-    /*
-    let sactive = specific_tags.intersect(&profile.active);
-    let sreport = specific_tags.intersect(&profile.report);
-
-    if !sactive.is_empty() {
-        return Err(block(sactive));
-    }
-    if !sreport.is_empty() {
-        return Err(monitor(sreport));
-    }
-
-    let active = tags.intersect(&profile.active);
-    if !active.is_empty() {
-        return Err(block::Block(active));
-    }
-
-    let report = tags.intersect(&profile.report);
-    if !report.is_empty() {
-        return Err(monitor(report));
-    }
-    */
 }
 
 /// checks a section (headers, args, cookies) against the policy
@@ -306,6 +294,7 @@ fn injection_check(
 #[allow(clippy::too_many_arguments)]
 fn hyperscan(
     logs: &mut Logs,
+    stats: StatsCollect<BStageAcl>,
     tags: &mut Tags,
     specific_tags: &mut Tags,
     hca_keys: HashMap<String, (SectionIdx, String)>,
@@ -315,29 +304,36 @@ fn hyperscan(
     report: &HashSet<String>,
     global_ignore: &HashSet<String>,
     exclusions: &Section<HashMap<String, HashSet<String>>>,
-) -> anyhow::Result<Vec<BlockReason>> {
-    let scratch = sigs.db.alloc_scratch()?;
+) -> (anyhow::Result<Vec<BlockReason>>, StatsCollect<BStageContentFilter>) {
+    let scratch = match sigs.db.alloc_scratch() {
+        Err(rr) => return (Err(rr), stats.no_content_filter()),
+        Ok(s) => s,
+    };
     // TODO: use `intersperse` when this stabilizes
     let to_scan = hca_keys.keys().cloned().collect::<Vec<_>>().join("\n");
     let mut found = false;
-    sigs.db.scan(&[to_scan], &scratch, |_, _, _, _| {
+    if let Err(rr) = sigs.db.scan(&[to_scan], &scratch, |_, _, _, _| {
         found = true;
         Matching::Continue
-    })?;
+    }) {
+        return (Err(rr), stats.no_content_filter());
+    }
     logs.debug(|| format!("matching content filter signatures: {}", found));
 
     if !found {
-        return Ok(Vec::new());
+        return (Ok(Vec::new()), stats.cf_no_match(sigs.ids.len()));
     }
 
     let mut founds: HashSet<(&str, Location, BDecision)> = HashSet::new();
 
+    let mut matches = 0;
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
-        sigs.db.scan(&[k.as_bytes()], &scratch, |id, _, _, _| {
+        let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, _, _, _| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),
                 Some(sig) => {
+                    matches += 1;
                     logs.debug(|| format!("signature matched {:?}", sig));
 
                     // new specific tags are singleton hashsets, but we use the Tags structure to make sure
@@ -369,18 +365,24 @@ fn hyperscan(
                 }
             }
             Matching::Continue
-        })?;
+        });
+        if let Err(rr) = scanr {
+            return (Err(rr), stats.cf_matches(sigs.ids.len(), matches));
+        }
     }
-    Ok(founds
-        .into_iter()
-        .map(|(sigid, location, decision)| BlockReason {
-            initiator: Initiator::ContentFilter {
-                ruleid: sigid.to_string(),
-            },
-            location: std::iter::once(location).collect(),
-            decision,
-        })
-        .collect())
+    (
+        Ok(founds
+            .into_iter()
+            .map(|(sigid, location, decision)| BlockReason {
+                initiator: Initiator::ContentFilter {
+                    ruleid: sigid.to_string(),
+                },
+                location: std::iter::once(location).collect(),
+                decision,
+            })
+            .collect()),
+        stats.cf_matches(sigs.ids.len(), matches),
+    )
 }
 
 fn mask_section(masking_seed: &[u8], sec: &mut RequestField, section: &ContentFilterSection) -> HashSet<XDataSource> {
