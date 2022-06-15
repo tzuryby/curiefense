@@ -49,7 +49,7 @@
               - server
               processing_mode:
                 request_header_mode: "SEND"
-                response_header_mode: "SKIP"
+                response_header_mode: "SEND"
                 request_body_mode: "STREAMED"
                 response_body_mode: "NONE"
                 request_trailer_mode: "SKIP"
@@ -120,7 +120,7 @@
               - server
               processing_mode:
                 request_header_mode: "SEND"
-                response_header_mode: "SKIP"
+                response_header_mode: "SEND"
                 request_body_mode: "STREAMED"
                 response_body_mode: "NONE"
                 request_trailer_mode: "SKIP"

@@ -231,29 +231,36 @@ impl MyEP {
         };
         let blocked = self.send_action(stage, tx, &dec, &logs, None).await;
         if !blocked {
-            stage_pass(stage, tx).await;
             let code = if self.handle_replies {
                 info!("** handle_replies");
-                let code: Option<u32> = match next_message(msg).await?.request {
-                    Some(ext_proc::processing_request::Request::ResponseHeaders(hdrs)) => hdrs
-                        .headers
-                        .iter()
-                        .flat_map(|hm| hm.headers.iter())
-                        .filter_map(|hv| {
-                            if hv.key == ":status" {
-                                hv.value.parse().ok()
-                            } else {
-                                None
-                            }
-                        })
-                        .next(),
+                let code: Option<u32> = match next_message(msg).await {
+                    Ok(nmsg) => match nmsg.request {
+                        Some(ext_proc::processing_request::Request::ResponseHeaders(hdrs)) => {
+                            stage_pass(ProcessingStage::RHeaders, tx).await;
 
-                    something_else => {
-                        error!("Expected a ResponseHeaders, but got {:?}", something_else);
-                        None
+                            hdrs.headers
+                                .iter()
+                                .flat_map(|hm| hm.headers.iter())
+                                .filter_map(|hv| {
+                                    if hv.key == ":status" {
+                                        hv.value.parse().ok()
+                                    } else {
+                                        Some(0)
+                                    }
+                                })
+                                .next()
+                        }
+
+                        something_else => {
+                            error!("Expected a ResponseHeaders, but got {:?}", something_else);
+                            Some(0)
+                        }
+                    },
+                    Err(rr) => {
+                        error!("Expected a ResponseHeaders, but got an error: {}", rr);
+                        Some(0)
                     }
                 };
-                stage_pass(ProcessingStage::RHeaders, tx).await;
                 code
             } else {
                 Some(0)
