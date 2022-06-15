@@ -66,7 +66,7 @@ echo "-- Install curieconfctl --"
 rm -rf "$BASEDIR/venv"
 python3 -m venv "$BASEDIR/venv"
 source "$BASEDIR/venv/bin/activate"
-pip install requests pytest pytest-html wheel
+pip install --no-cache-dir -r "$BASEDIR/curiefense/e2e/requirements.txt"
 
 pip install --no-cache-dir -r "$BASEDIR/curiefense/curiefense/images/confserver/init/requirements.txt"
 

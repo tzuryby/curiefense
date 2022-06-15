@@ -41,7 +41,7 @@ jobs:
 
             python3 -m venv "$BASEDIR/venv"
             source "$BASEDIR/venv/bin/activate"
-            pip install -U requests pytest pytest-html wheel
+            pip install --no-cache-dir -r "$BASEDIR/e2e/requirements.txt"
 
             pushd "curiefense/curieconf/utils"
             pip install -e .
