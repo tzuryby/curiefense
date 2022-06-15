@@ -519,7 +519,8 @@ impl Location {
 pub enum Initiator {
     Acl(Vec<String>),
     ContentFilter { ruleid: String },
-    Limit { name: String, key: String },
+    Limit { id: String, name: String, key: String },
+    Flow { id: String, name: String, key: String },
     BodyTooDeep { actual: usize, expected: usize },
     BodyMissing,
     BodyMalformed(String),
@@ -549,7 +550,8 @@ impl Initiator {
         match self {
             Initiator::Acl(_) => Acl,
             Initiator::ContentFilter { ruleid: _ } => ContentFilter,
-            Initiator::Limit { name: _, key: _ } => RateLimit,
+            Initiator::Limit { id: _, name: _, key: _ } => RateLimit,
+            Initiator::Flow { id: _, name: _, key: _ } => FlowControl,
             Initiator::BodyTooDeep { actual: _, expected: _ } => Decoding,
             Initiator::BodyMissing => Decoding,
             Initiator::BodyMalformed(_) => Decoding,
@@ -575,9 +577,13 @@ impl Initiator {
                 map.serialize_entry("type", "signature")?;
                 map.serialize_entry("rule", ruleid)?;
             }
-            Initiator::Limit { name, key } => {
-                map.serialize_entry("limit_name", name)?;
-                map.serialize_entry("limit_key", key)?;
+            Initiator::Flow { id, name, key: _ } => {
+                map.serialize_entry("id", id)?;
+                map.serialize_entry("name", name)?;
+            }
+            Initiator::Limit { id, name, key: _ } => {
+                map.serialize_entry("id", id)?;
+                map.serialize_entry("name", name)?;
             }
             Initiator::BodyTooDeep { actual, expected } => {
                 map.serialize_entry("type", "body_too_deep")?;
@@ -677,8 +683,12 @@ impl Serialize for BlockReason {
 }
 
 impl BlockReason {
-    pub fn limit(name: String, key: String, is_blocking: bool) -> Self {
-        BlockReason::nodetails(Initiator::Limit { name, key }, is_blocking)
+    pub fn limit(id: String, name: String, key: String, is_blocking: bool) -> Self {
+        BlockReason::nodetails(Initiator::Limit { id, name, key }, is_blocking)
+    }
+
+    pub fn flow(id: String, name: String, key: String, is_blocking: bool) -> Self {
+        BlockReason::nodetails(Initiator::Flow { id, name, key }, is_blocking)
     }
 
     pub fn phase01_unknown(reason: &str) -> Self {

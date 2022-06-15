@@ -84,7 +84,6 @@ async fn check_flow<CNX: redis::aio::ConnectionLike>(
 }
 
 async fn ban_react<CNX: redis::aio::ConnectionLike>(
-    limit_name: &str,
     logs: &mut Logs,
     cnx: &mut CNX,
     elem: &FlowElement,
@@ -117,8 +116,9 @@ async fn ban_react<CNX: redis::aio::ConnectionLike>(
             bad,
             SimpleDecision::Action(
                 action,
-                vec![BlockReason::limit(
-                    limit_name.to_string(),
+                vec![BlockReason::flow(
+                    elem.id.to_string(),
+                    elem.name.to_string(),
                     redis_key.to_string(),
                     blocking,
                 )],
@@ -160,11 +160,11 @@ pub async fn flow_check(
                         match check_flow(&mut cnx, &redis_key, elem.step, elem.timeframe, elem.is_last).await {
                             Ok(FlowResult::LastOk) => {
                                 tags.insert(&elem.name, Location::Request);
-                                bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, false, bad).await;
+                                bad = ban_react(logs, &mut cnx, elem, &redis_key, false, bad).await;
                             }
                             Ok(FlowResult::LastBlock) => {
                                 tags.insert(&elem.name, Location::Request);
-                                bad = ban_react(&elem.name, logs, &mut cnx, elem, &redis_key, true, bad).await;
+                                bad = ban_react(logs, &mut cnx, elem, &redis_key, true, bad).await;
                             }
                             Ok(FlowResult::NonLast) => {}
                             Err(rr) => return (Err(rr), stats.flow(flows.len(), flow_checked, flow_matched)),

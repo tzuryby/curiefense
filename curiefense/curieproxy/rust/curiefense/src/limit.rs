@@ -33,7 +33,12 @@ async fn limit_react<CNX: redis::aio::ConnectionLike>(
     let bl = action.is_blocking();
     SimpleDecision::Action(
         action,
-        vec![BlockReason::limit(limit.name.clone(), key.to_string(), bl)],
+        vec![BlockReason::limit(
+            limit.id.clone(),
+            limit.name.clone(),
+            key.to_string(),
+            bl,
+        )],
     )
 }
 
