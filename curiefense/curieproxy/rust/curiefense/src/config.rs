@@ -22,6 +22,8 @@ use hostmap::{HostMap, SecurityPolicy};
 use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
 use utils::Matching;
 
+use self::raw::RawManifest;
+
 lazy_static! {
     pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::empty());
     pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = RwLock::new(HashMap::new());
@@ -64,6 +66,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    pub revision: String,
     pub securitypolicies: Vec<Matching<HostMap>>,
     pub globalfilters: Vec<GlobalFilterSection>,
     pub default: Option<HostMap>,
@@ -144,6 +147,7 @@ impl Config {
 
     fn resolve(
         logs: &mut Logs,
+        revision: String,
         last_mod: SystemTime,
         rawmaps: Vec<RawHostMap>,
         rawlimits: Vec<RawLimit>,
@@ -207,6 +211,7 @@ impl Config {
         let flows = flow_resolve(logs, rawflows);
 
         Config {
+            revision,
             securitypolicies,
             globalfilters,
             default,
@@ -256,6 +261,24 @@ impl Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
+        let mmanifest: Result<RawManifest, String> = PathBuf::from(basepath)
+            .parent()
+            .ok_or_else(|| "could not get parent directory?".to_string())
+            .and_then(|x| {
+                let mut pth = x.to_owned();
+                pth.push("manifest.json");
+                std::fs::File::open(pth).map_err(|rr| rr.to_string())
+            })
+            .and_then(|file| serde_json::from_reader(file).map_err(|rr| rr.to_string()));
+
+        let revision = match mmanifest {
+            Err(rr) => {
+                logs.error(move || rr);
+                "unknown".to_string()
+            },
+            Ok(manifest) => manifest.meta.version,
+        };
+
         let securitypolicy = Config::load_config_file(logs, &bjson, "securitypolicy.json");
         let globalfilters = Config::load_config_file(logs, &bjson, "globalfilter-lists.json");
         let limits = Config::load_config_file(logs, &bjson, "limits.json");
@@ -275,6 +298,7 @@ impl Config {
 
         let config = Config::resolve(
             logs,
+            revision,
             last_mod,
             securitypolicy,
             limits,
@@ -304,6 +328,7 @@ impl Config {
 
     pub fn empty() -> Config {
         Config {
+            revision: "dummy".to_string(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             last_mod: SystemTime::UNIX_EPOCH,

@@ -12,6 +12,7 @@ pub struct BStageContentFilter;
 
 #[derive(Debug, Default)]
 pub struct Stats {
+    pub revision: String,
     pub processing_stage: usize,
     // stage secpol
     pub acl_active: bool,
@@ -39,9 +40,23 @@ pub struct StatsCollect<A> {
 }
 
 impl StatsCollect<BStageInit> {
-    pub fn new() -> Self {
+    pub fn new(revision: String) -> Self {
         StatsCollect {
-            stats: Stats::default(),
+            stats: Stats {
+                revision,
+                processing_stage: 0,
+                acl_active: false,
+                content_filter_active: false,
+                globalfilters_total: 0,
+                globalfilters_matched: 0,
+                flow_elements: 0,
+                flow_checked: 0,
+                flow_matched: 0,
+                limit_total: 0,
+                limit_matched: 0,
+                rules_total: 0,
+                rules_matches: 0,
+            },
             phantom: PhantomData,
         }
     }
@@ -64,12 +79,6 @@ impl StatsCollect<BStageInit> {
             stats,
             phantom: PhantomData,
         }
-    }
-}
-
-impl Default for StatsCollect<BStageInit> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

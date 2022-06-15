@@ -384,3 +384,14 @@ pub struct RawFlowStep {
     #[serde(default)]
     pub args: HashMap<String, String>,
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawManifest {
+    pub meta: RawMetaManifest,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawMetaManifest {
+    pub id: String,
+    pub version: String,
+}

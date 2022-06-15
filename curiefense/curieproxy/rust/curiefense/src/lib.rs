@@ -156,7 +156,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                         false
                     };
 
-                    let stats = StatsCollect::new().secpol(&secpolicy);
+                    let stats = StatsCollect::new(cfg.revision.clone()).secpol(&secpolicy);
 
                     let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
                     RequestMappingResult::Res(((nm, secpolicy), ntags, nflows, reqinfo, is_human))
@@ -220,10 +220,13 @@ pub fn content_filter_check_generic_request_map(
 ) -> (Decision, RequestInfo, Tags) {
     let mut tags = Tags::default();
     logs.debug("Content Filter inspection starts");
-    let waf_profile = match with_config(configpath, logs, |_slogs, cfg| {
-        cfg.content_filter_profiles.get(content_filter_id).cloned()
+    let (revision, waf_profile) = match with_config(configpath, logs, |_slogs, cfg| {
+        (
+            cfg.revision.clone(),
+            cfg.content_filter_profiles.get(content_filter_id).cloned(),
+        )
     }) {
-        Some(Some(prof)) => prof,
+        Some((revision, Some(prof))) => (revision, prof),
         _ => {
             logs.error("Content Filter profile not found");
             return (Decision::pass(Vec::new()), map_request(logs, &[], &[], 25, raw), tags);
@@ -241,7 +244,7 @@ pub fn content_filter_check_generic_request_map(
 
     let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.max_body_depth, raw);
 
-    let stats = StatsCollect::new().content_filter_only();
+    let stats = StatsCollect::new(revision).content_filter_only();
     let (waf_result, _stats) = match HSDB.read() {
         Ok(rd) => content_filter_check(
             logs,

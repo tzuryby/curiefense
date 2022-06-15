@@ -81,7 +81,7 @@ impl CheapString for &str {
 
 impl<F> CheapString for F
 where
-    F: Fn() -> String,
+    F: FnOnce() -> String,
 {
     fn c_to_string(self) -> String {
         self()

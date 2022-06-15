@@ -166,7 +166,7 @@ pub fn jsonlog(
         Some(info) => serde_json::json!({
             "timestamp": now,
             "request_id": info.rinfo.meta.requestid,
-            "config_revision": "TODO",
+            "config_revision": stats.revision,
             "args": info.rinfo.qinfo.args.to_json(),
             "authority": info.rinfo.meta.authority,
             "cookies": info.cookies.to_json(),

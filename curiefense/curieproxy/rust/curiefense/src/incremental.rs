@@ -64,7 +64,7 @@ pub fn inspect_init(
             secpol: secpol.clone(),
             body: None,
             trusted_hops,
-            stats: StatsCollect::new().secpol(secpol),
+            stats: StatsCollect::new(config.revision.clone()).secpol(secpol),
         }),
     }
 }
@@ -230,6 +230,7 @@ mod test {
 
     fn empty_config(cf: ContentFilterProfile) -> Config {
         Config {
+            revision: "dummy".to_string(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             default: Some(HostMap {
