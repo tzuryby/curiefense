@@ -273,9 +273,9 @@ impl Config {
 
         let revision = match mmanifest {
             Err(rr) => {
-                logs.error(move || rr);
+                logs.error(move || format!("When loading manifest.json: {}", rr));
                 "unknown".to_string()
-            },
+            }
             Ok(manifest) => manifest.meta.version,
         };
 
