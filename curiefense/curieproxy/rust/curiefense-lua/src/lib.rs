@@ -241,9 +241,10 @@ mod tests {
         let cfg = with_config("../../cf-config", &mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                2 => {
+                3 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD"));
-                    assert!(logs.logs[1].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[1].message.to_string().contains("manifest.json"));
+                    assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
                 }
                 10 => {
                     assert!(logs.logs[0]

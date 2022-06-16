@@ -204,7 +204,7 @@ impl GeoIp {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, arbitrary::Arbitrary)]
 pub struct RequestMeta {
     pub authority: Option<String>,
     pub method: String,

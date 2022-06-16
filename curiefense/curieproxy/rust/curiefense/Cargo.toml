@@ -32,6 +32,7 @@ futures = "0.3"
 futures-util = "0.3"
 async-graphql-parser = "3.0.38"
 chrono = { version = "0.4", features = ["serde", "clock"] }
+arbitrary = { version = "1", features = ["derive"] }
 
 [dependencies.hyperscan]
 version = "0.2"

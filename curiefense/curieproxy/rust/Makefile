@@ -16,6 +16,11 @@ ctarget/target: ctarget
 ctarget/target/release/libcuriefense_lua.so: container ctarget/registry ctarget/target $(RSOURCES)
 	docker run --rm -v `pwd`:/home/builder/rust -v `pwd`/ctarget/registry:/home/builder/.cargo/registry  -w /home/builder/rust  -t curiefense/rustbuild:latest /home/builder/.cargo/bin/cargo build --release --target-dir ctarget/target
 
+fuzz:
+	docker run --rm -v `pwd`:/home/builder/rust -v `pwd`/ctarget/registry:/home/builder/.cargo/registry \
+			-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/master/config:/cf-config/current/config \
+			-w /home/builder/rust/curiefense  -t curiefense/rustfuzz:latest /home/builder/.cargo/bin/cargo +nightly fuzz run fuzz_target_1
+
 ctarget/target/debug/libcuriefense_lua.so: container ctarget/registry ctarget/target $(RSOURCES)
 	docker run --rm -v `pwd`:/home/builder/rust -v `pwd`/ctarget/registry:/home/builder/.cargo/registry  -w /home/builder/rust  -t curiefense/rustbuild:latest /home/builder/.cargo/bin/cargo build --target-dir ctarget/target
 
@@ -32,6 +37,9 @@ target/release/libcuriefense_lua.so: Cargo.toml curiefense/Cargo.toml curiefense
 
 container:
 	tar c Dockerfile static |  docker build -t curiefense/rustbuild -f Dockerfile -
+
+fuzzcontainer:
+	tar c Dockerfile.fuzz static |  docker build -t curiefense/rustfuzz -f Dockerfile.fuzz -
 
 test: ctarget/target/debug/libcuriefense_lua.so test-nodeps
 	echo DONE
