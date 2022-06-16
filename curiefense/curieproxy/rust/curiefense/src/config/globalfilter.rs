@@ -68,6 +68,7 @@ pub enum GlobalFilterEntryE {
     Asn(u32),
     Company(SingleEntry),
     Authority(SingleEntry),
+    Tag(SingleEntry),
 }
 
 /// tries to aggregate ip ranges
@@ -297,6 +298,15 @@ impl GlobalFilterSection {
                 GlobalFilterEntryType::Asn => single(|rawasn| Ok(GlobalFilterEntryE::Asn(rawasn.parse()?)), val),
                 GlobalFilterEntryType::Company => single_re(logs, GlobalFilterEntryE::Company, val),
                 GlobalFilterEntryType::Authority => single_re(logs, GlobalFilterEntryE::Authority, val),
+                GlobalFilterEntryType::Tag => single(
+                    |s| {
+                        Ok(GlobalFilterEntryE::Tag(SingleEntry {
+                            exact: s.to_string(),
+                            re: None,
+                        }))
+                    },
+                    val,
+                ),
             }
         }
         fn convert_subsection(logs: &mut Logs, ss: RawGlobalFilterSSection) -> anyhow::Result<GlobalFilterSSection> {

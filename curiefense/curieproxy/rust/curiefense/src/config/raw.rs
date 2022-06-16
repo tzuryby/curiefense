@@ -69,6 +69,7 @@ pub enum GlobalFilterEntryType {
     Ip,
     Company,
     Authority,
+    Tag,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements

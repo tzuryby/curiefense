@@ -534,6 +534,35 @@
       }
    },
    {
+      "id": "49aea8a8d98b",
+      "name": "tgb",
+      "source": "self-managed",
+      "mdate": "2021-07-01T09:50:58.505Z",
+      "description": "Check action",
+      "active": true,
+      "action": {
+         "type": "default"
+      },
+      "tags": [
+         "tagbyiptag"
+      ],
+      "rule": {
+         "relation": "OR",
+         "sections": [
+            {
+               "relation": "OR",
+               "entries": [
+                  [
+                     "tag",
+                     "ip:82-13-14-15",
+                     null
+                  ]
+               ]
+            }
+         ]
+      }
+   },
+   {
       "id": "region_match",
       "name": "region match",
       "source": "self-managed",

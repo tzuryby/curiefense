@@ -14,9 +14,9 @@ struct MatchResult {
     matching: bool,
 }
 
-fn check_relation<A, F>(rinfo: &RequestInfo, rel: Relation, elems: &[A], checker: F) -> MatchResult
+fn check_relation<A, F>(rinfo: &RequestInfo, tags: &Tags, rel: Relation, elems: &[A], checker: F) -> MatchResult
 where
-    F: Fn(&RequestInfo, &A) -> MatchResult,
+    F: Fn(&RequestInfo, &Tags, &A) -> MatchResult,
 {
     let mut matched = HashSet::new();
     let mut matching = match rel {
@@ -24,7 +24,7 @@ where
         Relation::Or => false,
     };
     for sub in elems {
-        let mtch = checker(rinfo, sub);
+        let mtch = checker(rinfo, tags, sub);
         matched.extend(mtch.matched);
         matching = match rel {
             Relation::And => matching && mtch.matching,
@@ -55,7 +55,7 @@ fn check_single(pr: &SingleEntry, s: &str, loc: Location) -> Option<HashSet<Loca
     }
 }
 
-fn check_entry(rinfo: &RequestInfo, sub: &GlobalFilterEntry) -> MatchResult {
+fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> MatchResult {
     fn bool(loc: Location, b: bool) -> Option<HashSet<Location>> {
         if b {
             Some(std::iter::once(loc).collect())
@@ -122,6 +122,7 @@ fn check_entry(rinfo: &RequestInfo, sub: &GlobalFilterEntry) -> MatchResult {
             .as_ref()
             .and_then(|ccmp| check_single(cmp, ccmp.as_str(), Location::Ip)),
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
+        GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
     };
     match r {
         Some(matched) => MatchResult {
@@ -135,8 +136,8 @@ fn check_entry(rinfo: &RequestInfo, sub: &GlobalFilterEntry) -> MatchResult {
     }
 }
 
-fn check_subsection(rinfo: &RequestInfo, sub: &GlobalFilterSSection) -> MatchResult {
-    check_relation(rinfo, sub.relation, &sub.entries, check_entry)
+fn check_subsection(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterSSection) -> MatchResult {
+    check_relation(rinfo, tags, sub.relation, &sub.entries, check_entry)
 }
 
 pub fn tag_request(
@@ -194,7 +195,7 @@ pub fn tag_request(
     }
     let mut matched = 0;
     for psection in globalfilters {
-        let mtch = check_relation(rinfo, psection.relation, &psection.sections, check_subsection);
+        let mtch = check_relation(rinfo, &tags, psection.relation, &psection.sections, check_subsection);
         if mtch.matching {
             matched += 1;
             let rtags = psection.tags.clone().with_locs(&mtch.matched);
@@ -269,7 +270,7 @@ mod tests {
     }
 
     fn t_check_entry(negated: bool, entry: GlobalFilterEntryE) -> MatchResult {
-        check_entry(&mk_rinfo(), &GlobalFilterEntry { negated, entry })
+        check_entry(&mk_rinfo(), &Tags::default(), &GlobalFilterEntry { negated, entry })
     }
 
     fn single_re(input: &str) -> SingleEntry {
@@ -359,14 +360,15 @@ mod tests {
         let entries = mk_globalfilterentries(input);
         let ssection = GlobalFilterSSection { entries, relation: rel };
         let optimized = optimize(&ssection);
+        let tags = Tags::default();
 
         let mut ri = mk_rinfo();
         for (ip, expected) in samples {
             ri.rinfo.geoip.ip = Some(ip.parse().unwrap());
             println!("UN {} {:?}", ip, ssection);
-            assert_eq!(check_subsection(&ri, &ssection).matching, *expected);
+            assert_eq!(check_subsection(&ri, &tags, &ssection).matching, *expected);
             println!("OP {} {:?}", ip, optimized);
-            assert_eq!(check_subsection(&ri, &optimized).matching, *expected);
+            assert_eq!(check_subsection(&ri, &tags, &optimized).matching, *expected);
         }
     }
 
