@@ -7,7 +7,7 @@ use curiefense::{
     },
     grasshopper::DynGrasshopper,
     incremental::{add_body, add_header, finalize, inspect_init, IData},
-    interface::{jsonlog, AnalyzeResult},
+    interface::{jsonlog, AnalyzeResult, Location},
     logs::{LogLevel, Logs},
     utils::RequestMeta,
 };
@@ -222,7 +222,7 @@ impl MyEP {
             }
         }
 
-        let (dec, logs) = finalize(idata, Some(DynGrasshopper {}), &globalfilters, &flows, None).await;
+        let (mut dec, logs) = finalize(idata, Some(DynGrasshopper {}), &globalfilters, &flows, None).await;
 
         let stage = if headers_only {
             ProcessingStage::Headers
@@ -232,7 +232,6 @@ impl MyEP {
         let blocked = self.send_action(stage, tx, &dec, &logs, None).await;
         if !blocked {
             let code = if self.handle_replies {
-                info!("** handle_replies");
                 let code: Option<u32> = match next_message(msg).await {
                     Ok(nmsg) => match nmsg.request {
                         Some(ext_proc::processing_request::Request::ResponseHeaders(hdrs)) => {
@@ -265,6 +264,12 @@ impl MyEP {
             } else {
                 Some(0)
             };
+            if let Some(cde) = code {
+                dec.tags
+                    .insert_qualified("status", &format!("{}", cde), Location::Request);
+                dec.tags
+                    .insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
+            }
             self.send_action(ProcessingStage::Reply, tx, &dec, &logs, code).await;
         }
         Ok(())
