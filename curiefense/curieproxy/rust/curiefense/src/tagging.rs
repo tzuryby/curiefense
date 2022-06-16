@@ -151,6 +151,7 @@ pub fn tag_request(
     } else {
         tags.insert("bot", Location::Request);
     }
+    tags.insert_qualified("host", &rinfo.rinfo.host, Location::Request);
     tags.insert_qualified("ip", &rinfo.rinfo.geoip.ipstr, Location::Request);
     tags.insert_qualified(
         "geo-continent-name",

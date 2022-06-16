@@ -2,6 +2,7 @@
   {
     "response": {
       "tags": [
+        "host:localhost:30081",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",

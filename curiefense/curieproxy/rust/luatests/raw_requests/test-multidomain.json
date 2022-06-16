@@ -2,6 +2,7 @@
   {
     "response": {
       "tags": [
+        "host:dummydomain-com",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -41,6 +42,7 @@
   {
     "response": {
       "tags": [
+        "host:specific-dummydomain-com",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
