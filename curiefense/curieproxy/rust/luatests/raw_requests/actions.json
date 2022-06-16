@@ -13,6 +13,9 @@
       "block_mode": true,
       "status": 503,
       "tags": [
+        "cookies:0",
+        "headers:2",
+        "args:0",
         "host:localhost:30081",
         "geo-city:buford",
         "geo-continent-name:north-america",

@@ -24,6 +24,9 @@ def make_request(st: Set[str], b64: bool = False) -> Tuple[Any, str]:
         "response": {
             "tags": [
                 "host:localhost:30081",
+                "cookies:0",
+                "headers:2",
+                "args:%d" % (len(st) * (2 if b64 else 1)),
                 "geo-city:nil",
                 "geo-continent-name:north-america",
                 "geo-continent-code:na",

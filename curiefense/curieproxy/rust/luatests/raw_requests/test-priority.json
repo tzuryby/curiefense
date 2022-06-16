@@ -3,6 +3,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:1",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -37,6 +40,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:1",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -71,6 +77,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:1",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -113,6 +122,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:1",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -155,6 +167,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -197,6 +212,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -239,6 +257,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",

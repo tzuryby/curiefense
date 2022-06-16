@@ -3,6 +3,9 @@
     "response": {
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:1",
+        "args:0",
         "geo-continent-code:eu",
         "geo-city:paris",
         "geo-continent-name:europe",

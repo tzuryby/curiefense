@@ -3,6 +3,9 @@
     "response": {
       "tags": [
         "host:dummydomain-com",
+        "cookies:0",
+        "headers:2",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -43,6 +46,9 @@
     "response": {
       "tags": [
         "host:specific-dummydomain-com",
+        "cookies:0",
+        "headers:3",
+        "args:0",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",

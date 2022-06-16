@@ -15,6 +15,9 @@
       "status": 247,
       "tags": [
         "host:www-collision-com",
+        "cookies:0",
+        "headers:3",
+        "args:0",
         "geo-continent-code:eu",
         "geo-continent-name:europe",
         "geo-city:polminhac",

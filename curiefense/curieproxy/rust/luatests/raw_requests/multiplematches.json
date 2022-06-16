@@ -25,6 +25,9 @@
       ],
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:2",
+        "args:1",
         "all",
         "ip:1-3-4-5",
         "sante",

@@ -37,6 +37,9 @@
       ],
       "tags": [
         "host:localhost:30081",
+        "cookies:0",
+        "headers:3",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
@@ -98,6 +101,9 @@
       ],
       "tags": [
         "host:localhost:30081",
+        "cookies:1",
+        "headers:2",
+        "args:2",
         "geo-city:nil",
         "geo-continent-name:north-america",
         "geo-continent-code:na",
