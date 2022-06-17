@@ -128,7 +128,11 @@ pub fn content_filter_check(
         hca_keys.extend(section_content);
     }
 
-    let iblock = injection_check(tags, &hca_keys, &omit, test_xss, test_sqli);
+    let iblock = if cfg!(fuzzing) {
+        Vec::new()
+    } else {
+        injection_check(tags, &hca_keys, &omit, test_xss, test_sqli)
+    };
     if let Err(rr) = block_on(iblock) {
         return (Err(rr), stats.no_content_filter());
     }
