@@ -15,6 +15,6 @@ LOGLEVEL="${EXTPROC_LOG_LEVEL:-debug}"
 
 while true
 do
-	/usr/local/bin/cf-externalprocessing --handle-replies --loglevel "$LOGLEVEL" --configpath /cf-config/current/config --trustedhops "$XFF" --elasticsearch http://elasticsearch:9200/
+	/usr/local/bin/cf-externalprocessing --handle-replies --loglevel "$LOGLEVEL" --configpath /cf-config/current/config --trustedhops "$XFF" $ELASTICSEARCH
 	sleep 1
 done

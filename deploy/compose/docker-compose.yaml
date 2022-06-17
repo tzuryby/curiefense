@@ -65,6 +65,7 @@ services:
     environment:
       - XFF_TRUSTED_HOPS
       - EXTPROC_LOG_LEVEL
+      - ELASTICSEARCH
     networks:
       curiemesh:
         aliases:
