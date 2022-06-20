@@ -54,6 +54,7 @@ pub struct Stats {
 
     // stage content filter
     pub content_filter_total: usize,
+    pub content_filter_triggered: usize,
     pub content_filter_active: usize,
 }
 
@@ -84,6 +85,7 @@ impl StatsCollect<BStageInit> {
                 acl_active: 0,
 
                 content_filter_total: 0,
+                content_filter_triggered: 0,
                 content_filter_active: 0,
             },
             phantom: PhantomData,
@@ -215,11 +217,12 @@ impl StatsCollect<BStageAcl> {
         }
     }
 
-    pub fn cf_matches(self, total: usize, active: usize) -> StatsCollect<BStageContentFilter> {
+    pub fn cf_matches(self, total: usize, triggered: usize, active: usize) -> StatsCollect<BStageContentFilter> {
         let mut stats = self.stats;
         stats.processing_stage = 6;
         stats.content_filter_total = total;
         stats.content_filter_active = active;
+        stats.content_filter_triggered = triggered;
         StatsCollect {
             stats,
             phantom: PhantomData,

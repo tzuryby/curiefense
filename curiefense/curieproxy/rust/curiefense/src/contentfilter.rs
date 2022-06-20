@@ -331,13 +331,13 @@ fn hyperscan(
     let mut founds: HashSet<(&str, Location, BDecision, u8)> = HashSet::new();
 
     let mut matches = 0;
+    let mut nactive = 0;
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
         let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, _, _, _| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),
                 Some(sig) => {
-                    matches += 1;
                     logs.debug(|| format!("signature matched {:?}", sig));
 
                     // new specific tags are singleton hashsets, but we use the Tags structure to make sure
@@ -352,14 +352,17 @@ fn hyperscan(
                         && !new_tags.has_intersection(global_ignore)
                         && !new_specific_tags.has_intersection(global_ignore)
                     {
+                        matches += 1;
                         let location = Location::from_value(sid, &name, &k);
                         tags.merge(new_tags.with_loc(&location));
                         specific_tags.merge(new_specific_tags.with_loc(&location));
                         let decision = if specific_tags.has_intersection(active) {
+                            nactive += 1;
                             BDecision::Blocking
                         } else if specific_tags.has_intersection(report) {
                             BDecision::Monitor
                         } else if tags.has_intersection(active) {
+                            nactive += 1;
                             BDecision::Blocking
                         } else {
                             BDecision::Monitor
@@ -371,7 +374,7 @@ fn hyperscan(
             Matching::Continue
         });
         if let Err(rr) = scanr {
-            return (Err(rr), stats.cf_matches(sigs.ids.len(), matches));
+            return (Err(rr), stats.cf_matches(sigs.ids.len(), matches, nactive));
         }
     }
     (
@@ -386,7 +389,7 @@ fn hyperscan(
                 decision,
             })
             .collect()),
-        stats.cf_matches(sigs.ids.len(), matches),
+        stats.cf_matches(sigs.ids.len(), matches, nactive),
     )
 }
 

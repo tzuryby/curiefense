@@ -134,8 +134,8 @@ pub fn jsonlog(
                 "acl_active": stats.secpol.acl_enabled,
                 "cf_active": stats.secpol.content_filter_enabled,
                 "cf_rules": stats.content_filter_total,
-                "limits": stats.secpol.limit_amount,
-                "global_filters": stats.secpol.globalfilters_amount
+                "rate_limit_rules": stats.secpol.limit_amount,
+                "global_filters_active": stats.secpol.globalfilters_amount
             },
             "args": info.rinfo.qinfo.args.to_json(),
             "authority": info.rinfo.meta.authority,
@@ -149,13 +149,15 @@ pub fn jsonlog(
 
             "processing_stage": stats.processing_stage,
             "trigger_counters": {
-                "global_filters_active": stats.globalfilters_active,
-                "global_filters": stats.globalfilters_total,
-                "flow_active": stats.flow_active,
-                "flow": stats.flow_total,
-                "limit_active": stats.limit_active,
-                "limit": stats.limit_total,
+                "acl": 1,
                 "acl_active": stats.acl_active,
+                "global_filters": stats.globalfilters_total,
+                "global_filters_active": stats.globalfilters_active,
+                "flow_control": stats.flow_total,
+                "flow_control_active": stats.flow_active,
+                "rate_limit": stats.limit_total,
+                "rate_limit_active": stats.limit_active,
+                "content_filters": stats.content_filter_triggered,
                 "content_filters_active": stats.content_filter_active,
             },
             "acl_triggers": get_trigger(&InitiatorKind::Acl),
