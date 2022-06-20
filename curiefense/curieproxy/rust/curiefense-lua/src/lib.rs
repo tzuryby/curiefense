@@ -2,6 +2,7 @@ use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
 use curiefense::utils::RequestMeta;
 use mlua::prelude::*;
+use mlua::FromLua;
 use std::collections::HashMap;
 
 use curiefense::content_filter_check_generic_request_map;
@@ -93,19 +94,52 @@ fn inspect_content_filter(
 /// * headers
 /// * (opt) body
 /// * ip addr
-/// * (opt) grasshopper
-#[allow(clippy::type_complexity)]
-#[allow(clippy::unnecessary_wraps)]
 fn lua_inspect_request(
-    _lua: &Lua,
+    lua: &Lua,
     args: (
-        HashMap<String, String>, // meta
-        HashMap<String, String>, // headers
-        Option<LuaString>,       // maybe body
-        String,                  // ip
+        LuaValue, // meta
+        LuaValue, // headers
+        LuaValue, // optional body
+        LuaValue, // ip
     ),
 ) -> LuaResult<(String, Option<String>)> {
-    let (meta, headers, lua_body, str_ip) = args;
+    let (vmeta, vheaders, vlua_body, vstr_ip) = args;
+    let meta = match FromLua::from_lua(vmeta, lua) {
+        Err(rr) => {
+            return Ok((
+                "null".to_string(),
+                Some(format!("Could not convert the meta argument: {}", rr)),
+            ))
+        }
+        Ok(m) => m,
+    };
+    let headers = match FromLua::from_lua(vheaders, lua) {
+        Err(rr) => {
+            return Ok((
+                "null".to_string(),
+                Some(format!("Could not convert the headers argument: {}", rr)),
+            ))
+        }
+        Ok(h) => h,
+    };
+    let lua_body: Option<LuaString> = match FromLua::from_lua(vlua_body, lua) {
+        Err(rr) => {
+            return Ok((
+                "null".to_string(),
+                Some(format!("Could not convert the body argument: {}", rr)),
+            ))
+        }
+        Ok(b) => b,
+    };
+    let str_ip = match FromLua::from_lua(vstr_ip, lua) {
+        Err(rr) => {
+            return Ok((
+                "null".to_string(),
+                Some(format!("Could not convert the ip argument: {}", rr)),
+            ))
+        }
+        Ok(i) => i,
+    };
     let grasshopper = DynGrasshopper {};
     let res = inspect_request(
         "/cf-config/current/config",
