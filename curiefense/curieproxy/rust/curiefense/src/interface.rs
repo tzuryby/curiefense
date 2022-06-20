@@ -106,39 +106,6 @@ impl Decision {
     }
 }
 
-struct Counters<'t, A> {
-    stats: &'t Stats,
-    greasons: &'t HashMap<InitiatorKind, Vec<A>>,
-}
-
-impl<'t, A> Serialize for Counters<'t, A> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut map: <S as serde::Serializer>::SerializeMap = serializer.serialize_map(None)?;
-        map.serialize_entry("processing_stage", &self.stats.processing_stage)?;
-        map.serialize_entry("acl_active", if self.stats.acl_active { &1 } else { &0 })?;
-        map.serialize_entry(
-            "content_filter_active",
-            if self.stats.content_filter_active { &1 } else { &0 },
-        )?;
-        map.serialize_entry("globalfilters_total", &self.stats.globalfilters_total)?;
-        map.serialize_entry("globalfilters_matched", &self.stats.globalfilters_matched)?;
-        map.serialize_entry("flow_elements", &self.stats.flow_elements)?;
-        map.serialize_entry("flow_checked", &self.stats.flow_checked)?;
-        map.serialize_entry("flow_matched", &self.stats.flow_matched)?;
-        map.serialize_entry("limit_total", &self.stats.limit_total)?;
-        map.serialize_entry("limit_matched", &self.stats.limit_matched)?;
-        map.serialize_entry("rules_total", &self.stats.rules_total)?;
-        map.serialize_entry("rules_matches", &self.stats.rules_matches)?;
-        for (k, v) in self.greasons {
-            map.serialize_entry(k, &v.len())?;
-        }
-        map.end()
-    }
-}
-
 // helper function that reproduces the envoy log format
 pub fn jsonlog(
     dec: &Decision,
@@ -157,16 +124,19 @@ pub fn jsonlog(
         }
     }
     let greasons = BlockReason::regroup(&dec.reasons);
-    let counters = Counters {
-        stats,
-        greasons: &greasons,
-    };
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
     let val = match mrinfo {
         Some(info) => serde_json::json!({
             "timestamp": now,
             "request_id": info.rinfo.meta.requestid,
-            "config_revision": stats.revision,
+            "security_config": {
+                "revision": stats.revision,
+                "acl_active": stats.secpol.acl_enabled,
+                "cf_active": stats.secpol.content_filter_enabled,
+                "cf_rules": stats.content_filter_total,
+                "limits": stats.secpol.limit_amount,
+                "global_filters": stats.secpol.globalfilters_amount
+            },
             "args": info.rinfo.qinfo.args.to_json(),
             "authority": info.rinfo.meta.authority,
             "cookies": info.cookies.to_json(),
@@ -177,7 +147,17 @@ pub fn jsonlog(
             "method": info.rinfo.meta.method,
             "response_code": rcode,
 
-            "trigger_counters": counters,
+            "processing_stage": stats.processing_stage,
+            "trigger_counters": {
+                "global_filters_active": stats.globalfilters_active,
+                "global_filters": stats.globalfilters_total,
+                "flow_active": stats.flow_active,
+                "flow": stats.flow_total,
+                "limit_active": stats.limit_active,
+                "limit": stats.limit_total,
+                "acl_active": stats.acl_active,
+                "content_filters_active": stats.content_filter_active,
+            },
             "acl_triggers": get_trigger(&InitiatorKind::Acl),
             "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
             "flow_control_triggers": get_trigger(&InitiatorKind::FlowControl),
@@ -520,9 +500,21 @@ impl Location {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AclStage {
+    EnforceDeny,
+    Bypass,
+    AllowBot,
+    DenyBot,
+    Allow,
+    Deny,
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Initiator {
-    Acl(Vec<String>),
+    GlobalFilter { id: String },
+    Acl { tags: Vec<String>, stage: AclStage },
     ContentFilter { ruleid: String, risk_level: u8 },
     Limit { id: String, name: String, key: String },
     Flow { id: String, name: String, key: String },
@@ -552,7 +544,8 @@ impl Initiator {
     pub fn to_kind(&self) -> InitiatorKind {
         use InitiatorKind::*;
         match self {
-            Initiator::Acl(_) => Acl,
+            Initiator::GlobalFilter { id: _ } => GlobalFilter,
+            Initiator::Acl { tags: _, stage: _ } => Acl,
             Initiator::ContentFilter {
                 ruleid: _,
                 risk_level: _,
@@ -577,8 +570,12 @@ impl Initiator {
         map: &mut <S as serde::Serializer>::SerializeMap,
     ) -> Result<(), S::Error> {
         match self {
-            Initiator::Acl(tags) => {
-                map.serialize_entry("matched_tags", tags)?;
+            Initiator::GlobalFilter { id } => {
+                map.serialize_entry("id", id)?;
+            }
+            Initiator::Acl { tags, stage } => {
+                map.serialize_entry("tags", tags)?;
+                map.serialize_entry("type", stage)?;
             }
             Initiator::ContentFilter { ruleid, risk_level } => {
                 map.serialize_entry("type", "signature")?;
@@ -691,6 +688,10 @@ impl Serialize for BlockReason {
 }
 
 impl BlockReason {
+    pub fn global_filter(id: String) -> Self {
+        BlockReason::nodetails(Initiator::GlobalFilter { id }, true)
+    }
+
     pub fn limit(id: String, name: String, key: String, is_blocking: bool) -> Self {
         BlockReason::nodetails(Initiator::Limit { id, name, key }, is_blocking)
     }
@@ -778,18 +779,22 @@ impl BlockReason {
             decision: BDecision::Blocking,
         }
     }
-    pub fn acl(tags: Tags, allowed: bool) -> Self {
+    pub fn acl(tags: Tags, stage: AclStage) -> Self {
         let mut tagv = Vec::new();
         let mut location = HashSet::new();
         for (k, v) in tags.0.into_iter() {
             tagv.push(k);
             location.extend(v);
         }
+        let decision = match stage {
+            AclStage::Allow | AclStage::Bypass | AclStage::AllowBot => BDecision::Monitor,
+            AclStage::Deny | AclStage::EnforceDeny | AclStage::DenyBot => BDecision::Blocking,
+        };
 
         BlockReason {
-            initiator: Initiator::Acl(tagv),
+            initiator: Initiator::Acl { tags: tagv, stage },
             location,
-            decision: BDecision::from_blocking(!allowed),
+            decision,
         }
     }
 

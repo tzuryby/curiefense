@@ -13,6 +13,7 @@ use crate::logs::Logs;
 
 #[derive(Debug, Clone)]
 pub struct GlobalFilterSection {
+    pub id: String,
     pub tags: RawTags,
     pub relation: Relation,
     pub sections: Vec<GlobalFilterSSection>,
@@ -343,6 +344,7 @@ impl GlobalFilterSection {
                 None => None,
             };
             Ok(GlobalFilterSection {
+                id: s.id,
                 tags: s.tags.iter().cloned().collect(),
                 relation: s.rule.relation,
                 sections: subsections,

@@ -18,21 +18,12 @@
           "initiator": "acl",
           "active": true,
           "section": "uri",
-          "value": "deny",
-          "matched_tags": [
-            "deny"
-          ],
-          "name": "deny"
-        },
-        {
-          "initiator": "acl",
-          "active": true,
-          "section": "uri",
           "value": "denybot",
-          "matched_tags": [
+          "tags": [
             "denybot"
           ],
-          "name": "denybot"
+          "name": "denybot",
+          "type": "deny_bot"
         }
       ],
       "tags": [
@@ -83,20 +74,11 @@
           "active": true,
           "section": "uri",
           "value": "deny",
-          "matched_tags": [
+          "tags": [
             "deny"
           ],
-          "name": "deny"
-        },
-        {
-          "initiator": "acl",
-          "active": true,
-          "section": "uri",
-          "value": "denybot",
-          "matched_tags": [
-            "denybot"
-          ],
-          "name": "denybot"
+          "name": "deny",
+          "type": "deny"
         }
       ],
       "tags": [

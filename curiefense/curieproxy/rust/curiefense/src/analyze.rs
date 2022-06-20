@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::acl::{check_acl, AclDecision, AclResult, BotHuman};
+use crate::acl::check_acl;
 use crate::config::contentfilter::ContentFilterRules;
 use crate::config::flow::{FlowElement, SequenceKey};
 use crate::config::hostmap::SecurityPolicy;
@@ -9,12 +9,14 @@ use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::flow_check;
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
-use crate::interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, SimpleDecision, Tags};
+use crate::interface::{
+    AclStage, Action, ActionType, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
+};
 use crate::limit::limit_check;
 use crate::logs::Logs;
 use crate::utils::{BodyDecodingResult, RequestInfo};
 
-fn acl_block(blocking: bool, _code: i32, reasons: Vec<BlockReason>) -> Decision {
+fn acl_block(blocking: bool, reasons: Vec<BlockReason>) -> Decision {
     Decision::action(
         Action {
             atype: if blocking {
@@ -171,76 +173,34 @@ pub async fn analyze<GH: Grasshopper>(
     logs.debug(|| format!("limit checks done ({} limits)", securitypolicy.limits.len()));
 
     let acl_result = check_acl(&tags, &securitypolicy.acl_profile);
-    let stats = stats.acl();
     logs.debug(|| format!("ACL result: {:?}", acl_result));
-    // store the check_acl result here
-    let blockcode: Option<i32> = match acl_result {
-        AclResult::Passthrough(dec) => {
-            if dec.allowed {
-                logs.debug("ACL passthrough detected");
-                return AnalyzeResult {
-                    decision: Decision::pass(brs),
-                    tags,
-                    rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                    stats: stats.acl_stage_build(),
-                };
-            } else {
-                logs.debug("ACL force block detected");
-                brs.push(dec.r);
-                Some(0)
-            }
+
+    let acl_decision = acl_result.decision(is_human);
+    logs.debug(|| format!("ACL decision: {:?}", acl_decision));
+    let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });
+    if let Some(decision) = acl_decision {
+        let bypass = decision.stage == AclStage::Bypass;
+        let mut br = BlockReason::acl(decision.tags, decision.stage);
+        logs.debug(|| format!("ACL br: {:?}", br));
+        if !securitypolicy.acl_active {
+            br.decision.inactive();
         }
-        // bot blocked, human blocked
-        // effect would be identical to the following case except for logging purpose
-        AclResult::Match(BotHuman {
-            bot: Some(AclDecision {
-                allowed: false,
-                r: bot_reason,
-            }),
-            human: Some(AclDecision {
-                allowed: false,
-                r: human_reason,
-            }),
-        }) => {
-            logs.debug("ACL human block detected");
-            brs.push(human_reason);
-            brs.push(bot_reason);
-            Some(5)
+        let blocking = br.decision == BDecision::Blocking;
+        brs.push(br);
+
+        if securitypolicy.acl_active && bypass {
+            return AnalyzeResult {
+                decision: Decision::pass(brs),
+                tags,
+                rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                stats: stats.acl_stage_build(),
+            };
         }
-        // human blocked, always block, even if it is a bot
-        AclResult::Match(BotHuman {
-            bot: _,
-            human: Some(AclDecision {
-                allowed: false,
-                r: human_reason,
-            }),
-        }) => {
-            logs.debug("ACL human block detected");
-            brs.push(human_reason);
-            Some(5)
-        }
-        // robot blocked, should be challenged
-        AclResult::Match(BotHuman {
-            bot: Some(AclDecision {
-                allowed: false,
-                r: bot_reason,
-            }),
-            human: _,
-        }) => {
-            if is_human {
-                None
-            } else {
+
+        if blocking {
+            let decision = if decision.challenge {
                 match (reqinfo.headers.get("user-agent"), &mgh) {
-                    (Some(ua), Some(gh)) => {
-                        logs.debug("ACL challenge detected: challenged");
-                        brs.push(bot_reason);
-                        return AnalyzeResult {
-                            decision: challenge_phase01(gh, ua, brs),
-                            tags,
-                            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                            stats: stats.acl_stage_build(),
-                        };
-                    }
+                    (Some(ua), Some(gh)) => challenge_phase01(gh, ua, brs),
                     (gua, ggh) => {
                         logs.debug(|| {
                             format!(
@@ -249,21 +209,14 @@ pub async fn analyze<GH: Grasshopper>(
                                 ggh.is_some()
                             )
                         });
-                        brs.push(bot_reason);
-                        Some(3)
+                        acl_block(true, brs)
                     }
                 }
-            }
-        }
-        _ => None,
-    };
-    logs.debug(|| format!("ACL checks done {:?}", blockcode));
-
-    // if the acl is active, and we had a block result, immediately block
-    if securitypolicy.acl_active {
-        if let Some(cde) = blockcode {
+            } else {
+                acl_block(true, brs)
+            };
             return AnalyzeResult {
-                decision: acl_block(true, cde, brs),
+                decision,
                 tags,
                 rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
                 stats: stats.acl_stage_build(),

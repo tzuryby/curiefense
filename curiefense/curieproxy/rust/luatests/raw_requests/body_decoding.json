@@ -20,10 +20,11 @@
           "active": true,
           "section": "uri",
           "value": "deny",
-          "matched_tags": [
+          "tags": [
             "deny"
           ],
-          "name": "deny"
+          "name": "deny",
+          "type": "deny"
         }
       ],
       "tags": [
@@ -168,10 +169,11 @@
           "active": true,
           "section": "uri",
           "value": "deny",
-          "matched_tags": [
+          "tags": [
             "deny"
           ],
-          "name": "deny1"
+          "name": "deny1",
+          "type": "deny"
         }
       ],
       "tags": [
@@ -412,10 +414,11 @@
           "active": true,
           "section": "uri",
           "value": "deny",
-          "matched_tags": [
+          "tags": [
             "deny"
           ],
-          "name": "deny"
+          "name": "deny",
+          "type": "deny"
         }
       ],
       "tags": [
@@ -465,10 +468,11 @@
           "active": true,
           "section": "uri",
           "value": "deny",
-          "matched_tags": [
+          "tags": [
             "deny"
           ],
-          "name": "deny1"
+          "name": "deny1",
+          "type": "deny"
         }
       ],
       "tags": [

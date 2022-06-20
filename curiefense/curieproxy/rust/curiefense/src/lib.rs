@@ -30,7 +30,7 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
-use crate::interface::stats::{Stats, StatsCollect};
+use crate::interface::stats::{SecpolStats, Stats, StatsCollect};
 use crate::interface::{BlockReason, Location};
 
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
@@ -156,7 +156,8 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                         false
                     };
 
-                    let stats = StatsCollect::new(cfg.revision.clone()).secpol(&secpolicy);
+                    let stats = StatsCollect::new(cfg.revision.clone())
+                        .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
 
                     let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
                     RequestMappingResult::Res(((nm, secpolicy), ntags, nflows, reqinfo, is_human))

@@ -138,13 +138,13 @@ pub async fn flow_check(
 ) -> (anyhow::Result<SimpleDecision>, StatsCollect<BStageFlow>) {
     let sequence_key = session_sequence_key(reqinfo);
     match flows.get(&sequence_key) {
-        None => (Ok(SimpleDecision::Pass), stats.no_flow(flows.len())),
+        None => (Ok(SimpleDecision::Pass), stats.no_flow()),
         Some(elems) => {
             let mut bad = SimpleDecision::Pass;
             // do not establish the connection if unneeded
             let mut cnx = match crate::redis::redis_async_conn().await {
                 Ok(x) => x,
-                Err(rr) => return (Err(rr), stats.no_flow(flows.len())),
+                Err(rr) => return (Err(rr), stats.no_flow()),
             };
             let mut flow_checked = 0;
             let mut flow_matched = 0;
@@ -167,13 +167,13 @@ pub async fn flow_check(
                                 bad = ban_react(logs, &mut cnx, elem, &redis_key, true, bad).await;
                             }
                             Ok(FlowResult::NonLast) => {}
-                            Err(rr) => return (Err(rr), stats.flow(flows.len(), flow_checked, flow_matched)),
+                            Err(rr) => return (Err(rr), stats.flow(flow_checked, flow_matched)),
                         }
                     }
                     None => logs.warning(|| format!("Could not fetch key in flow control {}", elem.name)),
                 }
             }
-            (Ok(bad), stats.flow(flows.len(), flow_checked, flow_matched))
+            (Ok(bad), stats.flow(flow_checked, flow_matched))
         }
     }
 }

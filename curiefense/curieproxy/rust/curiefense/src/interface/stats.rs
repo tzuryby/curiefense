@@ -11,25 +11,50 @@ pub struct BStageAcl;
 pub struct BStageContentFilter;
 
 #[derive(Debug, Default)]
+pub struct SecpolStats {
+    // stage secpol
+    pub acl_enabled: bool,
+    pub content_filter_enabled: bool,
+    pub limit_amount: usize,
+    pub globalfilters_amount: usize,
+}
+
+impl SecpolStats {
+    pub fn build(policy: &SecurityPolicy, globalfilters_amount: usize) -> Self {
+        SecpolStats {
+            acl_enabled: policy.acl_active,
+            content_filter_enabled: policy.content_filter_active,
+            limit_amount: policy.limits.len(),
+            globalfilters_amount,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct Stats {
     pub revision: String,
     pub processing_stage: usize,
-    // stage secpol
-    pub acl_active: bool,
-    pub content_filter_active: bool,
+
+    pub secpol: SecpolStats,
+
     // stage mapped
+    pub globalfilters_active: usize,
     pub globalfilters_total: usize,
-    pub globalfilters_matched: usize,
+
     // stage flow
-    pub flow_elements: usize,
-    pub flow_checked: usize,
-    pub flow_matched: usize,
+    pub flow_active: usize,
+    pub flow_total: usize,
+
     // stage limit
+    pub limit_active: usize,
     pub limit_total: usize,
-    pub limit_matched: usize,
+
+    // stage acl
+    pub acl_active: usize,
+
     // stage content filter
-    pub rules_total: usize,
-    pub rules_matches: usize,
+    pub content_filter_total: usize,
+    pub content_filter_active: usize,
 }
 
 // the builder uses a phantom data structure to make sure we did not forget to update the stats from a previous stage
@@ -45,27 +70,30 @@ impl StatsCollect<BStageInit> {
             stats: Stats {
                 revision,
                 processing_stage: 0,
-                acl_active: false,
-                content_filter_active: false,
+                secpol: SecpolStats::default(),
+
+                globalfilters_active: 0,
                 globalfilters_total: 0,
-                globalfilters_matched: 0,
-                flow_elements: 0,
-                flow_checked: 0,
-                flow_matched: 0,
+
+                flow_active: 0,
+                flow_total: 0,
+
+                limit_active: 0,
                 limit_total: 0,
-                limit_matched: 0,
-                rules_total: 0,
-                rules_matches: 0,
+
+                acl_active: 0,
+
+                content_filter_total: 0,
+                content_filter_active: 0,
             },
             phantom: PhantomData,
         }
     }
 
-    pub fn secpol(self, pol: &SecurityPolicy) -> StatsCollect<BStageSecpol> {
+    pub fn secpol(self, secpol: SecpolStats) -> StatsCollect<BStageSecpol> {
         let mut stats = self.stats;
         stats.processing_stage = 1;
-        stats.acl_active = pol.acl_active;
-        stats.content_filter_active = pol.content_filter_active;
+        stats.secpol = secpol;
         StatsCollect {
             stats,
             phantom: PhantomData,
@@ -83,11 +111,11 @@ impl StatsCollect<BStageInit> {
 }
 
 impl StatsCollect<BStageSecpol> {
-    pub fn mapped(self, globalfilters_total: usize, globalfilters_matched: usize) -> StatsCollect<BStageMapped> {
+    pub fn mapped(self, globalfilters_total: usize, globalfilters_active: usize) -> StatsCollect<BStageMapped> {
         let mut stats = self.stats;
         stats.processing_stage = 2;
         stats.globalfilters_total = globalfilters_total;
-        stats.globalfilters_matched = globalfilters_matched;
+        stats.globalfilters_active = globalfilters_active;
         StatsCollect {
             stats,
             phantom: PhantomData,
@@ -100,22 +128,20 @@ impl StatsCollect<BStageMapped> {
         self.stats
     }
 
-    pub fn no_flow(self, flow_elements: usize) -> StatsCollect<BStageFlow> {
+    pub fn no_flow(self) -> StatsCollect<BStageFlow> {
         let mut stats = self.stats;
         stats.processing_stage = 3;
-        stats.flow_elements = flow_elements;
         StatsCollect {
             stats,
             phantom: PhantomData,
         }
     }
 
-    pub fn flow(self, flow_elements: usize, flow_checked: usize, flow_matched: usize) -> StatsCollect<BStageFlow> {
+    pub fn flow(self, flow_total: usize, flow_active: usize) -> StatsCollect<BStageFlow> {
         let mut stats = self.stats;
         stats.processing_stage = 3;
-        stats.flow_elements = flow_elements;
-        stats.flow_checked = flow_checked;
-        stats.flow_matched = flow_matched;
+        stats.flow_total = flow_total;
+        stats.flow_active = flow_active;
         StatsCollect {
             stats,
             phantom: PhantomData,
@@ -137,11 +163,11 @@ impl StatsCollect<BStageFlow> {
         }
     }
 
-    pub fn limit(self, total: usize, matched: usize) -> StatsCollect<BStageLimit> {
+    pub fn limit(self, limit_total: usize, limit_active: usize) -> StatsCollect<BStageLimit> {
         let mut stats = self.stats;
         stats.processing_stage = 4;
-        stats.limit_total = total;
-        stats.limit_matched = matched;
+        stats.limit_total = limit_total;
+        stats.limit_active = limit_active;
         StatsCollect {
             stats,
             phantom: PhantomData,
@@ -154,9 +180,10 @@ impl StatsCollect<BStageLimit> {
         self.stats
     }
 
-    pub fn acl(self) -> StatsCollect<BStageAcl> {
+    pub fn acl(self, acl_active: usize) -> StatsCollect<BStageAcl> {
         let mut stats = self.stats;
         stats.processing_stage = 5;
+        stats.acl_active = acl_active;
         StatsCollect {
             stats,
             phantom: PhantomData,
@@ -181,18 +208,18 @@ impl StatsCollect<BStageAcl> {
     pub fn cf_no_match(self, total: usize) -> StatsCollect<BStageContentFilter> {
         let mut stats = self.stats;
         stats.processing_stage = 6;
-        stats.rules_total = total;
+        stats.content_filter_total = total;
         StatsCollect {
             stats,
             phantom: PhantomData,
         }
     }
 
-    pub fn cf_matches(self, total: usize, matches: usize) -> StatsCollect<BStageContentFilter> {
+    pub fn cf_matches(self, total: usize, active: usize) -> StatsCollect<BStageContentFilter> {
         let mut stats = self.stats;
         stats.processing_stage = 6;
-        stats.rules_total = total;
-        stats.rules_matches = matches;
+        stats.content_filter_total = total;
+        stats.content_filter_active = active;
         StatsCollect {
             stats,
             phantom: PhantomData,

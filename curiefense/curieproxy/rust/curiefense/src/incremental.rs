@@ -23,7 +23,7 @@ use crate::{
     contentfilter::cf_default_action,
     grasshopper::Grasshopper,
     interface::{
-        stats::{BStageSecpol, Stats, StatsCollect},
+        stats::{BStageSecpol, SecpolStats, Stats, StatsCollect},
         Action, AnalyzeResult, BlockReason, Decision, Location, Tags,
     },
     logs::{LogLevel, Logs},
@@ -64,7 +64,8 @@ pub fn inspect_init(
             secpol: secpol.clone(),
             body: None,
             trusted_hops,
-            stats: StatsCollect::new(config.revision.clone()).secpol(secpol),
+            stats: StatsCollect::new(config.revision.clone())
+                .secpol(SecpolStats::build(secpol, config.globalfilters.len())),
         }),
     }
 }
