@@ -328,7 +328,7 @@ fn hyperscan(
         return (Ok(Vec::new()), stats.cf_no_match(sigs.ids.len()));
     }
 
-    let mut founds: HashSet<(&str, Location, BDecision)> = HashSet::new();
+    let mut founds: HashSet<(&str, Location, BDecision, u8)> = HashSet::new();
 
     let mut matches = 0;
     // something matched! but what?
@@ -364,7 +364,7 @@ fn hyperscan(
                         } else {
                             BDecision::Monitor
                         };
-                        founds.insert((&sig.id, location, decision));
+                        founds.insert((&sig.id, location, decision, sig.risk));
                     }
                 }
             }
@@ -377,9 +377,10 @@ fn hyperscan(
     (
         Ok(founds
             .into_iter()
-            .map(|(sigid, location, decision)| BlockReason {
+            .map(|(sigid, location, decision, risk_level)| BlockReason {
                 initiator: Initiator::ContentFilter {
                     ruleid: sigid.to_string(),
+                    risk_level,
                 },
                 location: std::iter::once(location).collect(),
                 decision,

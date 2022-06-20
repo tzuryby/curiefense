@@ -68,7 +68,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -116,7 +116,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -217,7 +217,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -264,7 +264,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -312,7 +312,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -360,7 +360,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -513,7 +513,7 @@
       "status": 403,
       "triggers": [
         {
-          "initiator": "decoding",
+          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_missing"

@@ -173,10 +173,11 @@ pub fn jsonlog(
             "headers": info.headers.to_json(),
             "tags": tgs.to_json(),
             "uri": info.rinfo.qinfo.uri,
+            "ip": info.rinfo.geoip.ip,
+            "method": info.rinfo.meta.method,
             "response_code": rcode,
 
             "trigger_counters": counters,
-            "decoding_triggers": get_trigger(&InitiatorKind::Decoding),
             "acl_triggers": get_trigger(&InitiatorKind::Acl),
             "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
             "flow_control_triggers": get_trigger(&InitiatorKind::FlowControl),
@@ -522,7 +523,7 @@ impl Location {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Initiator {
     Acl(Vec<String>),
-    ContentFilter { ruleid: String },
+    ContentFilter { ruleid: String, risk_level: u8 },
     Limit { id: String, name: String, key: String },
     Flow { id: String, name: String, key: String },
     BodyTooDeep { actual: usize, expected: usize },
@@ -540,7 +541,6 @@ pub enum Initiator {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InitiatorKind {
-    Decoding,
     Acl,
     RateLimit,
     FlowControl,
@@ -553,12 +553,15 @@ impl Initiator {
         use InitiatorKind::*;
         match self {
             Initiator::Acl(_) => Acl,
-            Initiator::ContentFilter { ruleid: _ } => ContentFilter,
+            Initiator::ContentFilter {
+                ruleid: _,
+                risk_level: _,
+            } => ContentFilter,
             Initiator::Limit { id: _, name: _, key: _ } => RateLimit,
             Initiator::Flow { id: _, name: _, key: _ } => FlowControl,
-            Initiator::BodyTooDeep { actual: _, expected: _ } => Decoding,
-            Initiator::BodyMissing => Decoding,
-            Initiator::BodyMalformed(_) => Decoding,
+            Initiator::BodyTooDeep { actual: _, expected: _ } => ContentFilter,
+            Initiator::BodyMissing => ContentFilter,
+            Initiator::BodyMalformed(_) => ContentFilter,
             Initiator::Phase01Fail(_) => Acl,
             Initiator::Phase02 => Acl,
             Initiator::Sqli(_) => ContentFilter,
@@ -577,9 +580,10 @@ impl Initiator {
             Initiator::Acl(tags) => {
                 map.serialize_entry("matched_tags", tags)?;
             }
-            Initiator::ContentFilter { ruleid } => {
+            Initiator::ContentFilter { ruleid, risk_level } => {
                 map.serialize_entry("type", "signature")?;
-                map.serialize_entry("rule", ruleid)?;
+                map.serialize_entry("ruleid", ruleid)?;
+                map.serialize_entry("risk_level", risk_level)?;
             }
             Initiator::Flow { id, name, key: _ } => {
                 map.serialize_entry("id", id)?;

@@ -20,7 +20,8 @@
           "value": "xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_",
           "type": "signature",
           "name": "arg",
-          "rule": "100016"
+          "ruleid": "100016",
+          "risk_level": 5
         }
       ],
       "tags": [
