@@ -15,7 +15,7 @@ LOGLEVEL="${EXTPROC_LOG_LEVEL:-debug}"
 
 while true
 do
-	# shellcheck disable=SC2046
+	# shellcheck disable=SC2086
 	/usr/local/bin/cf-externalprocessing --handle-replies --loglevel "$LOGLEVEL" --configpath /cf-config/current/config --trustedhops "$XFF" $ELASTICSEARCH
 	sleep 1
 done
