@@ -246,7 +246,7 @@ mod tests {
                     assert!(logs.logs[1].message.to_string().contains("manifest.json"));
                     assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
                 }
-                10 => {
+                11 => {
                     assert!(logs.logs[0]
                         .message
                         .to_string()
