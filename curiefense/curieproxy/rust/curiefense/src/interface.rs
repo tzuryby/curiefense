@@ -256,7 +256,7 @@ impl Tags {
         self.0.contains_key(s)
     }
 
-    pub fn get(&self, s:&str) -> Option<&HashSet<Location>> {
+    pub fn get(&self, s: &str) -> Option<&HashSet<Location>> {
         self.0.get(s)
     }
 

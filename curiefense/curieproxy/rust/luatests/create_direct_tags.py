@@ -15,7 +15,10 @@ def make_request(st: Set[str], b64: bool = False) -> Tuple[Any, str]:
     r = {
         "name": name,
         "headers": {
-            ":path": "/direct?" + urlencode([(x, base64.b64encode(x.encode("utf-8")) if b64 else x) for x in st]),
+            ":path": "/direct?"
+            + urlencode(
+                [(x, base64.b64encode(x.encode("utf-8")) if b64 else x) for x in st]
+            ),
             ":method": "GET",
             "x-forwarded-for": "23.129.64.253",
             "user-agent": "dummy",
