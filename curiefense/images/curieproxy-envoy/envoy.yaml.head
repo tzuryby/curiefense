@@ -34,10 +34,6 @@ static_resources:
                   prefix: "/"
                 route:
                   cluster: target_site_a
-                metadata:
-                  filter_metadata:
-                    envoy.filters.http.lua:
-                      xff_trusted_hops: XFF_TRUSTED
           http_filters:
           - name: envoy.filters.http.ext_proc
             typed_config:
@@ -96,10 +92,6 @@ static_resources:
                   prefix: "/"
                 route:
                   cluster: target_site_b
-                metadata:
-                  filter_metadata:
-                    envoy.filters.http.lua:
-                      xff_trusted_hops: XFF_TRUSTED
           http_filters:
           - name: envoy.filters.http.ext_proc
             typed_config:
