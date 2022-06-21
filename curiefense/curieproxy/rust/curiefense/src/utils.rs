@@ -288,6 +288,7 @@ pub struct InspectionResult {
     pub tags: Option<Tags>,
     pub err: Option<String>,
     pub logs: Logs,
+    pub stats: Stats,
 }
 
 impl InspectionResult {
@@ -311,7 +312,7 @@ impl InspectionResult {
             None => self.decision.to_legacy_json_raw(serde_json::Value::Null, self.logs),
             Some(rinfo) => self
                 .decision
-                .to_legacy_json(rinfo, self.tags.unwrap_or_default(), self.logs),
+                .to_legacy_json(rinfo, self.tags.unwrap_or_default(), self.logs, &self.stats),
         };
         (resp, self.err)
     }

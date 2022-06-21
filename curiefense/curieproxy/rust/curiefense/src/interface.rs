@@ -74,15 +74,8 @@ impl Decision {
             None => "pass",
             Some(_) => "custom_response",
         };
-        let mut response =
+        let response =
             serde_json::to_value(&self.maction).unwrap_or_else(|rr| serde_json::Value::String(rr.to_string()));
-        if let Some(h) = response.as_object_mut() {
-            h.insert(
-                "triggers".into(),
-                serde_json::to_value(self.reasons.iter().map(LegacyBlockReason).collect::<Vec<_>>())
-                    .unwrap_or_else(|rr| serde_json::Value::String(rr.to_string())),
-            );
-        }
         let j = serde_json::json!({
             "request_map": request_map,
             "action": action_desc,
@@ -92,16 +85,8 @@ impl Decision {
         serde_json::to_string(&j).unwrap_or_else(|_| "{}".to_string())
     }
 
-    pub fn to_legacy_json(&self, rinfo: RequestInfo, tags: Tags, logs: Logs) -> String {
-        let mut tgs = tags;
-        if let Some(a) = &self.maction {
-            if let Some(extra) = &a.extra_tags {
-                for t in extra {
-                    tgs.insert(t, Location::Request);
-                }
-            }
-        }
-        let request_map = rinfo.into_json(tgs);
+    pub fn to_legacy_json(&self, rinfo: RequestInfo, tags: Tags, logs: Logs, stats: &Stats) -> String {
+        let (request_map, _) = jsonlog(self, Some(&rinfo), None, &tags, stats);
         self.to_legacy_json_raw(request_map, logs)
     }
 }

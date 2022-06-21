@@ -12,9 +12,8 @@
       "action": "custom_response",
       "block_mode": false,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "uri",
           "value": "xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_",

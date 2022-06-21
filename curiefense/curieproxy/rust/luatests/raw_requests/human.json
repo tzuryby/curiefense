@@ -13,9 +13,8 @@
       "action": "custom_response",
       "status": 403,
       "block_mode": true,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "denybot",
@@ -68,9 +67,8 @@
       "action": "custom_response",
       "status": 403,
       "block_mode": true,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "deny",

@@ -176,12 +176,10 @@ pub async fn analyze<GH: Grasshopper>(
     logs.debug(|| format!("ACL result: {:?}", acl_result));
 
     let acl_decision = acl_result.decision(is_human);
-    logs.debug(|| format!("ACL decision: {:?}", acl_decision));
     let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });
     if let Some(decision) = acl_decision {
         let bypass = decision.stage == AclStage::Bypass;
         let mut br = BlockReason::acl(decision.tags, decision.stage);
-        logs.debug(|| format!("ACL br: {:?}", br));
         if !securitypolicy.acl_active {
             br.decision.inactive();
         }

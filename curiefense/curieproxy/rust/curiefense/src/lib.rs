@@ -218,7 +218,7 @@ pub fn content_filter_check_generic_request_map(
     raw: &RawRequest,
     content_filter_id: &str,
     logs: &mut Logs,
-) -> (Decision, RequestInfo, Tags) {
+) -> (Decision, RequestInfo, Tags, Stats) {
     let mut tags = Tags::default();
     logs.debug("Content Filter inspection starts");
     let (revision, waf_profile) = match with_config(configpath, logs, |_slogs, cfg| {
@@ -230,23 +230,33 @@ pub fn content_filter_check_generic_request_map(
         Some((revision, Some(prof))) => (revision, prof),
         _ => {
             logs.error("Content Filter profile not found");
-            return (Decision::pass(Vec::new()), map_request(logs, &[], &[], 25, raw), tags);
+            return (
+                Decision::pass(Vec::new()),
+                map_request(logs, &[], &[], 25, raw),
+                tags,
+                Stats::default(),
+            );
         }
     };
 
+    let stats = StatsCollect::new(revision).content_filter_only();
     if let Some(body) = raw.mbody {
         if body.len() > waf_profile.max_body_size {
             logs.error("body too large, exiting early");
             let reqinfo = map_request(logs, &waf_profile.decoding, &[], 0, raw);
             let (a, br) = body_too_large(waf_profile.max_body_size, body.len());
-            return (Decision::action(a, vec![br]), reqinfo, tags);
+            return (
+                Decision::action(a, vec![br]),
+                reqinfo,
+                tags,
+                stats.no_content_filter().cf_stage_build(),
+            );
         }
     }
 
     let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.max_body_depth, raw);
 
-    let stats = StatsCollect::new(revision).content_filter_only();
-    let (waf_result, _stats) = match HSDB.read() {
+    let (waf_result, stats) = match HSDB.read() {
         Ok(rd) => content_filter_check(
             logs,
             stats,
@@ -269,5 +279,6 @@ pub fn content_filter_check_generic_request_map(
         },
         reqinfo,
         tags,
+        stats.cf_stage_build(),
     )
 }

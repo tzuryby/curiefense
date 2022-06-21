@@ -69,13 +69,12 @@ function session_rust_envoy.inspect(handle)
         handle:logDebug("decision " .. response)
         utils.log_envoy_messages(handle, response_table["logs"])
         request_map = response_table["request_map"]
-        request_map.handle = handle
         if response_table["action"] == "custom_response" then
-            custom_response(request_map, response_table["response"])
+            custom_response(handle, request_map, response_table["response"])
         end
     end
 
-    log_request(request_map)
+    log_request(handle, request_map)
 
 end
 

@@ -14,9 +14,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "deny",
@@ -67,9 +66,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -115,9 +113,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -163,9 +160,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "deny",
@@ -217,9 +213,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -264,9 +259,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -312,9 +306,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -360,9 +353,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_malformed"
@@ -408,9 +400,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "deny",
@@ -462,9 +453,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "acl_triggers": [
         {
-          "initiator": "acl",
           "active": true,
           "section": "uri",
           "value": "deny",
@@ -515,9 +505,8 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "triggers": [
+      "content_filter_triggers": [
         {
-          "initiator": "content_filter",
           "active": true,
           "section": "body",
           "type": "body_missing"

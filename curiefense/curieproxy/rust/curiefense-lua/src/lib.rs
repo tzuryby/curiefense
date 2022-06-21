@@ -71,7 +71,7 @@ fn inspect_content_filter(
         mbody,
     };
 
-    let (dec, reqinfo, tags) =
+    let (dec, reqinfo, tags, stats) =
         content_filter_check_generic_request_map(configpath, &raw, &content_filter_id, &mut logs);
 
     Ok(InspectionResult {
@@ -80,6 +80,7 @@ fn inspect_content_filter(
         logs,
         err: None,
         rinfo: Some(reqinfo),
+        stats,
     })
 }
 
@@ -244,6 +245,7 @@ fn inspect_request<GH: Grasshopper>(
         logs,
         err: None,
         rinfo: Some(dec.rinfo),
+        stats: dec.stats,
     })
 }
 

@@ -173,19 +173,24 @@ local function test_raw_request(request_path)
           ", but got " .. cjson.encode(r.response.block_mode))
         good = false
       end
-      if raw_request_map.response.triggers then
-        local actual = r.response.triggers
-        local expected = raw_request_map.response.triggers
+      for _, trigger_name in pairs({ "acl_triggers", "rate_limit_triggers", "flow_control_triggers", "global_filter_triggers", "content_filter_triggers"}) do
+        local expected = raw_request_map.response[trigger_name]
+        if expected then
+          local actual = r.request_map[trigger_name]
 
-        if equals(actual, expected) == false then
-          local jactual = cjson.encode(actual)
-          local jexpected = cjson.encode(expected)
-          print("Expected triggers:")
-          print("  " ..  jexpected)
-          print("but got:")
-          print("  " .. jactual)
-          good = false
+          if equals(actual, expected) == false then
+            local jactual = cjson.encode(actual)
+            local jexpected = cjson.encode(expected)
+            print("Expected " .. trigger_name .. ":")
+            print("  " ..  jexpected)
+            print("but got:")
+            print("  " .. jactual)
+            good = false
+          end
         end
+      end
+      if raw_request_map.response.triggers then
+        error("bad trigger format in " .. raw_request_map.name)
       end
     end
 
@@ -263,7 +268,7 @@ local function test_masking(request_path)
     local secret = raw_request_map["secret"]
     local response = run_inspect_request(raw_request_map)
     local r = cjson.decode(response)
-    for _, section in pairs({"args", "headers", "cookies", "path"}) do
+    for _, section in pairs({"args", "headers", "cookies"}) do
       for k, value in pairs(r.request_map[section]) do
         local p = string.find(value, secret)
         if p ~= nil then
