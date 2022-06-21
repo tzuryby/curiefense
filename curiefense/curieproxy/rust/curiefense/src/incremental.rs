@@ -137,13 +137,12 @@ pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<
     Ok(dt)
 }
 
-/// TODO, incremental filtering of body based on the security policy (mainly body length)
 pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
     let cur_body_size = dt.body.as_ref().map(|v| v.len()).unwrap_or(0);
     let new_size = cur_body_size + new_body.len();
     let max_size = dt.secpol.content_filter_profile.max_body_size;
-    if new_size > max_size {
+    if dt.secpol.content_filter_active && new_size > max_size {
         let (a, br) = body_too_large(max_size, new_size);
         return Err(early_block(dt, a, br));
     }
