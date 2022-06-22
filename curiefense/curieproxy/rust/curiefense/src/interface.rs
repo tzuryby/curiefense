@@ -86,7 +86,13 @@ impl Decision {
     }
 
     pub fn to_legacy_json(&self, rinfo: RequestInfo, tags: Tags, logs: Logs, stats: &Stats) -> String {
-        let (request_map, _) = jsonlog(self, Some(&rinfo), None, &tags, stats);
+        let (request_map, _) = jsonlog(
+            self,
+            Some(&rinfo),
+            self.maction.as_ref().map(|a| a.status),
+            &tags,
+            stats,
+        );
         self.to_legacy_json_raw(request_map, logs)
     }
 }

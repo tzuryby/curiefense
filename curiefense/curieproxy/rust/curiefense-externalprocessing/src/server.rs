@@ -313,10 +313,11 @@ impl MyEP {
         };
 
         if blocked || rcode.is_some() {
+            let block_code = rcode.or_else(|| result.decision.maction.as_ref().map(|a| a.status));
             let (v, now) = jsonlog(
                 &result.decision,
                 Some(&result.rinfo),
-                rcode,
+                block_code,
                 &result.tags,
                 &result.stats,
             );
