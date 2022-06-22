@@ -163,6 +163,14 @@ impl ContentFilterRules {
     }
 }
 
+const fn nonzero(value: usize) -> usize {
+    if value == 0 {
+        usize::MAX
+    } else {
+        value
+    }
+}
+
 fn mk_entry_match(em: RawContentFilterEntryMatch) -> anyhow::Result<(String, ContentFilterEntryMatch)> {
     let reg = match em.reg {
         None => None,
@@ -199,8 +207,8 @@ fn mk_section(props: RawContentFilterProperties) -> anyhow::Result<ContentFilter
         })
         .collect();
     Ok(ContentFilterSection {
-        max_count: props.max_count.0,
-        max_length: props.max_length.0,
+        max_count: nonzero(props.max_count.0),
+        max_length: nonzero(props.max_length.0),
         names: mnames?,
         regex: mregex?,
     })
@@ -221,6 +229,8 @@ fn convert_entry(entry: RawContentFilterProfile) -> anyhow::Result<(String, Cont
     if entry.decoding.unicode {
         decoding.push(Transformation::UnicodeDecode)
     }
+    let max_body_size = nonzero(entry.max_body_size.unwrap_or(usize::MAX));
+    let max_body_depth = nonzero(entry.max_body_depth.unwrap_or(usize::MAX));
     Ok((
         entry.id.clone(),
         ContentFilterProfile {
@@ -239,8 +249,8 @@ fn convert_entry(entry: RawContentFilterProfile) -> anyhow::Result<(String, Cont
             ignore: entry.ignore.into_iter().collect(),
             report: entry.report.into_iter().collect(),
             content_type: entry.content_type,
-            max_body_size: entry.max_body_size.unwrap_or(usize::MAX),
-            max_body_depth: entry.max_body_depth.unwrap_or(usize::MAX),
+            max_body_size,
+            max_body_depth,
         },
     ))
 }
