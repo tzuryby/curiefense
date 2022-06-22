@@ -26,7 +26,6 @@ sed -e "s/TARGET_ADDRESS_A/$TADDRA/" -e "s/TARGET_PORT_A/$TPORTA/" -e "s/TARGET_
 while true
 do
 	# shellcheck disable=SC2086
-    /usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS #--concurrency 1 NO concurrency PICKS THE NUM OF CORES
+    /usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS
 	sleep 1
 done
-

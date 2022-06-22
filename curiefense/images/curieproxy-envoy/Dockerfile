@@ -5,7 +5,7 @@ FROM envoyproxy/envoy:v1.21.1
 
 RUN apt-get update && \
     apt-get -qq -y --no-install-recommends install jq luarocks libpcre2-dev libgeoip-dev \
-    python gcc g++ make unzip libhyperscan4 libhyperscan-dev && \
+    python gcc g++ make unzip libhyperscan4 libhyperscan-dev curl && \
     luarocks install lrexlib-pcre2 && \
     luarocks install lua-cjson && \
     luarocks install lua-resty-string && \
@@ -20,6 +20,8 @@ RUN apt-get update && \
     gcc g++ make unzip libhyperscan-dev && apt-get autoremove --purge -y && \
     rm -rf /var/lib/apt/lists/*
 
+RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.2.3-amd64.deb && dpkg -i filebeat-8.2.3-amd64.deb && rm filebeat-8.2.3-amd64.deb
+
 # Overwrite stripped envoy with full symbol
 COPY --from=envoy-cf /envoy /usr/local/bin/envoy
 
@@ -32,5 +34,8 @@ COPY curieproxy/envoy.yaml.* /etc/envoy/
 
 RUN mkdir /cf-config && chmod a+rwxt /cf-config
 COPY curieproxy/rust/static/libgrasshopper.so /usr/lib/
+COPY filebeat/filebeat-stdin.yml /etc/filebeat.yml
+COPY filebeat/ilm.json /usr/share/filebeat/
+RUN chmod go-w /etc/filebeat.yml
 
 ENTRYPOINT ["/start_curiefense.sh"]
