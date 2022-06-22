@@ -173,7 +173,13 @@ local function test_raw_request(request_path)
           ", but got " .. cjson.encode(r.response.block_mode))
         good = false
       end
-      for _, trigger_name in pairs({ "acl_triggers", "rate_limit_triggers", "flow_control_triggers", "global_filter_triggers", "content_filter_triggers"}) do
+      for _, trigger_name in pairs({
+         "acl_triggers",
+         "rate_limit_triggers",
+         "flow_control_triggers",
+         "global_filter_triggers",
+         "content_filter_triggers"
+      }) do
         local expected = raw_request_map.response[trigger_name]
         if expected then
           local actual = r.request_map[trigger_name]

@@ -60,7 +60,7 @@ function nativeutils.map_fn (T, fn)
     return ret
 end
 
-function nativeutils.nginx_custom_response(handle, request_map, action_params)
+function nativeutils.nginx_custom_response(handle, action_params)
     if not action_params then action_params = {} end
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end

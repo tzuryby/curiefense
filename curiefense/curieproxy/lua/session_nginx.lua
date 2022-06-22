@@ -61,24 +61,9 @@ function session_rust_nginx.inspect(handle)
         handle.ctx.response = response_table
         handle.log(handle.DEBUG, "decision: " .. response)
         utils.log_nginx_messages(handle, response_table["logs"])
-        local request_map = response_table["request_map"]
         if response_table["action"] == "custom_response" then
-            custom_response(handle, request_map, response_table["response"])
+            custom_response(handle, response_table["response"])
         end
-    end
-end
-
-local function parse_ip_port(ipport)
-    if ipport == nil then
-        return nil, nil
-    end
-    local s, _ = string.find(ipport, ":")
-    if s == nil then
-      return ipport, nil
-    else
-      local port_part = string.sub(ipport,s+1)
-      local host_part = string.sub(ipport, 1, s-1)
-      return host_part, tonumber(port_part) or port_part
     end
 end
 
