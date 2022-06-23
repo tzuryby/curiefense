@@ -4,12 +4,14 @@ use async_graphql_parser::{
     Positioned,
 };
 
-use crate::{config::utils::DataSource, requestfields::RequestField};
+use crate::{interface::Location, requestfields::RequestField};
 
 fn insert_directive(args: &mut RequestField, prefix: String, dir: Directive) {
     for (n, v) in dir.arguments {
         let prefix = prefix.clone() + "-" + &dir.name.node + "-" + &n.node;
-        args.add(prefix, DataSource::FromBody, v.node.to_string());
+        let value = v.node.to_string();
+        let loc = Location::BodyArgumentValue(prefix.clone(), value.clone());
+        args.add(prefix, loc, value);
     }
 }
 
@@ -48,23 +50,15 @@ fn insert_selection(max_depth: usize, args: &mut RequestField, prefix: String, s
             let nprefix = prefix.to_string() + "-" + &field.name.node;
             if let Some(alias) = field.alias {
                 traced = true;
-                args.add(
-                    nprefix.to_string() + "-alias",
-                    DataSource::FromBody,
-                    alias.node.to_string(),
-                );
+                args.add(nprefix.to_string() + "-alias", Location::Body, alias.node.to_string());
             }
             for (k, v) in field.arguments {
                 traced = true;
-                args.add(
-                    nprefix.to_string() + "-" + &k.node,
-                    DataSource::FromBody,
-                    v.node.to_string(),
-                );
+                args.add(nprefix.to_string() + "-" + &k.node, Location::Body, v.node.to_string());
             }
             traced |= insert_dirsels(max_depth, args, &nprefix, field.directives, Some(field.selection_set))?;
             if !traced {
-                args.add(prefix.clone(), DataSource::FromBody, field.name.node.to_string());
+                args.add(prefix.clone(), Location::Body, field.name.node.to_string());
             }
         }
         Selection::FragmentSpread(fsp) => {
@@ -73,7 +67,7 @@ fn insert_selection(max_depth: usize, args: &mut RequestField, prefix: String, s
             if !traced {
                 args.add(
                     prefix.to_string() + "-frag",
-                    DataSource::FromBody,
+                    Location::Body,
                     frag.fragment_name.node.to_string(),
                 );
             }
@@ -105,7 +99,7 @@ fn insert_operation(
         let vardef = pvardef.node;
         let varprefix = prefix.clone() + "-" + &vardef.name.node;
         if let Some(cval) = vardef.default_value {
-            args.add(varprefix.clone() + "-defvalue", DataSource::FromBody, cval.to_string());
+            args.add(varprefix.clone() + "-defvalue", Location::Body, cval.to_string());
         }
         insert_dirsels(max_depth, args, &varprefix, vardef.directives, None)?;
     }

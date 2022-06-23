@@ -10,9 +10,9 @@ pub mod decoders;
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
 use crate::config::raw::ContentType;
-use crate::config::utils::{DataSource, RequestSelector, RequestSelectorCondition, XDataSource};
+use crate::config::utils::{RequestSelector, RequestSelectorCondition};
 use crate::interface::stats::Stats;
-use crate::interface::{jsonlog, Decision, Tags};
+use crate::interface::{jsonlog, Decision, Location, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
@@ -27,7 +27,8 @@ pub fn cookie_map(cookies: &mut RequestField, cookie: &str) {
         }
     }
     for (k, v) in cookie.split("; ").map(to_kv) {
-        cookies.add(k, DataSource::X(XDataSource::CookieHeader), v);
+        let loc = Location::CookieValue(k.clone(), v.clone());
+        cookies.add(k, loc, v);
     }
 }
 
@@ -44,7 +45,8 @@ pub fn map_headers(dec: &[Transformation], rawheaders: &HashMap<String, String>)
         if lk == "cookie" {
             cookie_map(&mut cookies, v);
         } else {
-            headers.add(lk, DataSource::Root, v.clone());
+            let loc = Location::HeaderValue(lk.clone(), v.clone());
+            headers.add(lk, loc, v.clone());
         }
     }
 
@@ -54,7 +56,7 @@ pub fn map_headers(dec: &[Transformation], rawheaders: &HashMap<String, String>)
 /// parses query parameters, such as
 fn parse_query_params(dec: &[Transformation], query: &str) -> RequestField {
     let mut rf = RequestField::new(dec);
-    parse_urlencoded_params(&mut rf, query);
+    parse_urlencoded_params(&mut rf, query, Location::UriArgumentValue);
     rf
 }
 
@@ -92,7 +94,7 @@ fn map_args(
             // if the body could not be parsed, store it in an argument, as if it was text
             args.add(
                 "RAW_BODY".to_string(),
-                DataSource::Root,
+                Location::Body,
                 String::from_utf8_lossy(body).to_string(),
             );
             BodyDecodingResult::DecodingFailed(rr)
@@ -103,13 +105,12 @@ fn map_args(
         BodyDecodingResult::NoBody
     };
     logs.debug("body parsed");
-    let mut path_as_map =
-        RequestField::singleton(dec, "path".to_string(), DataSource::X(XDataSource::Uri), qpath.clone());
+    let mut path_as_map = RequestField::singleton(dec, "path".to_string(), Location::Path, qpath.clone());
     for (i, p) in qpath.split('/').enumerate() {
         if !p.is_empty() {
-            path_as_map.add(format!("part{}", i), DataSource::X(XDataSource::Uri), p.to_string());
+            path_as_map.add(format!("part{}", i), Location::Pathpart(i), p.to_string());
             if let DecodingResult::Changed(n) = urldecode_str(p) {
-                path_as_map.add(format!("part{}:urldecoded", i), DataSource::X(XDataSource::Uri), n);
+                path_as_map.add(format!("part{}:urldecoded", i), Location::Pathpart(i), n);
             }
         }
     }
@@ -544,11 +545,31 @@ mod tests {
         let expected_args: RequestField = RequestField::from_iterator(
             &[],
             [
-                ("xa ", DataSource::X(XDataSource::Uri), "12"),
-                ("bbbb", DataSource::X(XDataSource::Uri), "12("),
-                ("cccc", DataSource::X(XDataSource::Uri), ""),
-                ("b64", DataSource::X(XDataSource::Uri), "YXJndW1lbnQ="),
-                ("b64:decoded", DataSource::DecodedFrom("b64".into()), "argument"),
+                (
+                    "xa ",
+                    Location::UriArgumentValue("xa ".to_string(), "12".to_string()),
+                    "12",
+                ),
+                (
+                    "bbbb",
+                    Location::UriArgumentValue("bbbb".to_string(), "12%28".to_string()),
+                    "12(",
+                ),
+                (
+                    "cccc",
+                    Location::UriArgumentValue("cccc".to_string(), "".to_string()),
+                    "",
+                ),
+                (
+                    "b64",
+                    Location::UriArgumentValue("b64".to_string(), "YXJndW1lbnQ%3D".to_string()),
+                    "YXJndW1lbnQ=",
+                ),
+                (
+                    "b64:decoded",
+                    Location::UriArgumentValue("b64".to_string(), "YXJndW1lbnQ%3D".to_string()),
+                    "argument",
+                ),
             ]
             .iter()
             .map(|(k, ds, v)| (k.to_string(), ds.clone(), v.to_string())),

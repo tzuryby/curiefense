@@ -7,11 +7,10 @@ use crate::config::contentfilter::{
     rule_tags, ContentFilterEntryMatch, ContentFilterProfile, ContentFilterRules, ContentFilterSection, Section,
     SectionIdx,
 };
-use crate::config::utils::XDataSource;
 use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
 use crate::interface::{Action, ActionType, BDecision, BlockReason, Decision, Initiator, Location, Tags};
 use crate::requestfields::RequestField;
-use crate::utils::RequestInfo;
+use crate::utils::{masker, RequestInfo};
 use crate::Logs;
 
 lazy_static! {
@@ -394,7 +393,7 @@ fn hyperscan(
     )
 }
 
-fn mask_section(masking_seed: &[u8], sec: &mut RequestField, section: &ContentFilterSection) -> HashSet<XDataSource> {
+fn mask_section(masking_seed: &[u8], sec: &mut RequestField, section: &ContentFilterSection) -> HashSet<Location> {
     let to_mask: Vec<String> = sec
         .iter()
         .filter(|&(name, _)| {
@@ -433,22 +432,32 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
         &mut ri.headers,
         profile.sections.get(SectionIdx::Headers),
     ));
-    for x in to_mask {
-        match x {
-            // for now, do not mask the Uri
-            XDataSource::Uri => (),
-            XDataSource::CookieHeader => {
-                ri.headers.mask(masking_seed, "cookie");
+
+    for extra_mask in to_mask {
+        use Location::*;
+        match extra_mask {
+            UriArgumentValue(_, v) => {
+                let target = masker(masking_seed, &v);
+                let npath = ri.rinfo.meta.path.replace(&v, &target);
+                ri.rinfo.meta.path = npath;
+                let nquery = ri.rinfo.qinfo.query.replace(&v, &target);
+                ri.rinfo.qinfo.query = nquery;
             }
+            Body => {
+                ri.rinfo.qinfo.args.mask(masking_seed, "RAW_BODY");
+            }
+            _ => (),
         }
     }
+
     ri
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::config::utils::DataSource;
+    use crate::interface::jsonlog;
+    use crate::interface::stats::Stats;
     use crate::utils::{map_request, RequestMeta};
     use crate::{Logs, RawRequest};
 
@@ -456,7 +465,7 @@ mod test {
         let meta = RequestMeta {
             authority: Some("myhost".to_string()),
             method: "GET".to_string(),
-            path: "/foo?arg1=avalue1&arg2=avalue2".to_string(),
+            path: "/foo?arg1=avalue1&arg2=a%20value2".to_string(),
             extra: HashMap::default(),
             requestid: None,
         };
@@ -493,6 +502,15 @@ mod test {
         }
     }
 
+    fn masksecret() -> ContentFilterEntryMatch {
+        ContentFilterEntryMatch {
+            restrict: false,
+            mask: true,
+            exclusions: HashSet::default(),
+            reg: Some(crate::config::utils::Matching::from_str("SECRET", "SECRET".to_string()).unwrap()),
+        }
+    }
+
     #[test]
     fn masking_all_args_re() {
         let rinfo = test_request_info();
@@ -506,12 +524,36 @@ mod test {
             RequestField::raw_create(
                 &[],
                 &[
-                    ("arg1", &DataSource::X(XDataSource::Uri), "MASKED{fac00299}"),
-                    ("arg2", &DataSource::X(XDataSource::Uri), "MASKED{7ce2d8de}")
+                    (
+                        "arg1",
+                        &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
+                        "MASKED{fac00299}"
+                    ),
+                    (
+                        "arg2",
+                        &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
+                        "MASKED{62111533}"
+                    )
                 ]
             ),
             masked.rinfo.qinfo.args
         );
+        assert_eq!(
+            "/foo?arg1=MASKED{fac00299}&arg2=MASKED{fd07346e}",
+            masked.rinfo.meta.path
+        );
+        assert_eq!("arg1=MASKED{fac00299}&arg2=MASKED{fd07346e}", masked.rinfo.qinfo.query);
+        let (logged, _) = jsonlog(
+            &Decision::pass(Vec::new()),
+            Some(&masked),
+            None,
+            &Tags::default(),
+            &Stats::default(),
+        );
+        let log_string = logged.to_string();
+        if log_string.contains("avalue1") || log_string.contains("a value2") || log_string.contains("a%20value2") {
+            panic!("log lacks masking: {}", log_string)
+        }
     }
 
     #[test]
@@ -527,8 +569,16 @@ mod test {
             RequestField::raw_create(
                 &[],
                 &[
-                    ("arg1", &DataSource::X(XDataSource::Uri), "MASKED{fac00299}"),
-                    ("arg2", &DataSource::X(XDataSource::Uri), "avalue2")
+                    (
+                        "arg1",
+                        &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
+                        "MASKED{fac00299}"
+                    ),
+                    (
+                        "arg2",
+                        &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
+                        "a value2"
+                    )
                 ]
             ),
             masked.rinfo.qinfo.args
@@ -548,8 +598,16 @@ mod test {
             RequestField::raw_create(
                 &[],
                 &[
-                    ("arg1", &DataSource::X(XDataSource::Uri), "MASKED{fac00299}"),
-                    ("arg2", &DataSource::X(XDataSource::Uri), "avalue2")
+                    (
+                        "arg1",
+                        &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
+                        "MASKED{fac00299}"
+                    ),
+                    (
+                        "arg2",
+                        &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
+                        "a value2"
+                    )
                 ]
             ),
             masked.rinfo.qinfo.args
@@ -569,11 +627,75 @@ mod test {
             RequestField::raw_create(
                 &[],
                 &[
-                    ("arg1", &DataSource::X(XDataSource::Uri), "MASKED{fac00299}"),
-                    ("arg2", &DataSource::X(XDataSource::Uri), "MASKED{7ce2d8de}")
+                    (
+                        "arg1",
+                        &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
+                        "MASKED{fac00299}"
+                    ),
+                    (
+                        "arg2",
+                        &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
+                        "MASKED{62111533}"
+                    )
                 ]
             ),
             masked.rinfo.qinfo.args
         );
+    }
+
+    #[test]
+    fn complex_parent_masking() {
+        let meta = RequestMeta {
+            authority: Some("myhost".to_string()),
+            method: "GET".to_string(),
+            path: "/foo/pth/ddd?arg1=SECRETa1&arg2=U0VDUkVUYTI%3D".to_string(),
+            extra: HashMap::default(),
+            requestid: None,
+        };
+        let mut logs = Logs::default();
+        let headers = [
+            ("h1", "SECRETh1"),
+            ("h2", "U0VDUkVUaDI="),
+            ("content-type", "application/json"),
+            ("cookie", "COOK=U0VDUkVUCg=="),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let raw_request = RawRequest {
+            ipstr: "1.2.3.4".into(),
+            mbody: Some(b"{\"arg1\": [\"SECRETb\"], \"arg2\": [\"U0VDUkVUYjI=\"]}"),
+            headers,
+            meta,
+        };
+        let rinfo = map_request(
+            &mut logs,
+            &[crate::config::contentfilter::Transformation::Base64Decode],
+            &[crate::config::raw::ContentType::Json],
+            50,
+            &raw_request,
+        );
+
+        let mut profile = ContentFilterProfile::default_from_seed("test");
+        let asection = profile.sections.at(SectionIdx::Args);
+        asection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
+        let hsection = profile.sections.at(SectionIdx::Headers);
+        hsection.regex = vec![(regex::Regex::new("^h.*").unwrap(), masksecret())];
+        let csection = profile.sections.at(SectionIdx::Cookies);
+        csection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
+
+        let masked = masking(b"test", rinfo, &profile);
+
+        let (logged, _) = jsonlog(
+            &Decision::pass(Vec::new()),
+            Some(&masked),
+            None,
+            &Tags::default(),
+            &Stats::default(),
+        );
+        let log_string = logged.to_string();
+        if log_string.contains("SECRET") {
+            panic!("SECRET found in {}", log_string);
+        }
     }
 }

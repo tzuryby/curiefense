@@ -133,7 +133,7 @@ pub fn jsonlog(
             "cookies": info.cookies.to_json(),
             "headers": info.headers.to_json(),
             "tags": tgs.to_json(),
-            "uri": info.rinfo.qinfo.uri,
+            "uri": info.rinfo.meta.path,
             "ip": info.rinfo.geoip.ip,
             "method": info.rinfo.meta.method,
             "response_code": rcode,
@@ -491,6 +491,22 @@ impl Location {
         }
         Ok(())
     }
+}
+
+/// computes all parents
+pub fn all_parents(locs: HashSet<Location>) -> HashSet<Location> {
+    let mut out = locs.clone();
+    let mut to_compute = locs;
+    loop {
+        let to_compute_prime = to_compute.iter().filter_map(|l| l.parent()).collect::<HashSet<_>>();
+        let diff = to_compute_prime.difference(&out).cloned().collect::<HashSet<_>>();
+        if diff.is_empty() {
+            break;
+        }
+        out.extend(diff.clone());
+        to_compute = diff;
+    }
+    out
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Hash, PartialEq, Eq)]

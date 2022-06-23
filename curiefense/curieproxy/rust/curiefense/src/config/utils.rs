@@ -18,20 +18,6 @@ pub enum RequestSelector {
     Tags,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-pub enum XDataSource {
-    CookieHeader,
-    Uri,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DataSource {
-    Root,
-    DecodedFrom(String),
-    FromBody,
-    X(XDataSource),
-}
-
 #[derive(Debug, Clone)]
 pub enum RequestSelectorCondition {
     N(RequestSelector, Regex),
