@@ -76,7 +76,18 @@
       ],
       "action": "custom_response",
       "block_mode": false,
-      "status": 403
+      "status": 403,
+      "content_filter_triggers": [
+        {
+          "ruleid": "100016",
+          "section": "headers",
+          "value": "***xp_cmdshell***xp_makecab***",
+          "type": "signature",
+          "risk_level": 5,
+          "name": "malicious",
+          "active": true
+        }
+      ]
     },
     "name": "sqli (header)",
     "headers": {
@@ -85,7 +96,7 @@
       ":path": "\/test\/",
       ":method": "GET",
       ":authority": "localhost:30081",
-      "malicious": "xp_cmdshell"
+      "malicious": "***xp_cmdshell***xp_makecab***"
     }
   },
   {

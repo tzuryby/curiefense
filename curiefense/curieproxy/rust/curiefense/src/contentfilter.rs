@@ -334,11 +334,12 @@ fn hyperscan(
     let mut nactive = 0;
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
-        let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, _, _, _| {
+        // for some reason, from is always set to 0 in my tests, so we can't accurately capture substrings
+        let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, from, to, _flags| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),
                 Some(sig) => {
-                    logs.debug(|| format!("signature matched {:?}", sig));
+                    logs.debug(|| format!("signature matched [{}..{}] {:?}", from, to, sig));
 
                     // new specific tags are singleton hashsets, but we use the Tags structure to make sure
                     // they are properly converted
