@@ -37,6 +37,7 @@ async fn limit_react<CNX: redis::aio::ConnectionLike>(
             limit.id.clone(),
             limit.name.clone(),
             key.to_string(),
+            threshold.limit,
             bl,
         )],
     )

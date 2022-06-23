@@ -522,12 +522,32 @@ pub enum AclStage {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Initiator {
-    GlobalFilter { id: String },
-    Acl { tags: Vec<String>, stage: AclStage },
-    ContentFilter { ruleid: String, risk_level: u8 },
-    Limit { id: String, name: String, key: String },
-    Flow { id: String, name: String, key: String },
-    BodyTooDeep { actual: usize, expected: usize },
+    GlobalFilter {
+        id: String,
+    },
+    Acl {
+        tags: Vec<String>,
+        stage: AclStage,
+    },
+    ContentFilter {
+        ruleid: String,
+        risk_level: u8,
+    },
+    Limit {
+        id: String,
+        name: String,
+        key: String,
+        threshold: u64,
+    },
+    Flow {
+        id: String,
+        name: String,
+        key: String,
+    },
+    BodyTooDeep {
+        actual: usize,
+        expected: usize,
+    },
     BodyMissing,
     BodyMalformed(String),
     Phase01Fail(String),
@@ -535,8 +555,14 @@ pub enum Initiator {
     Sqli(String),
     Xss,
     Restricted,
-    TooManyEntries { actual: usize, expected: usize },
-    EntryTooLarge { actual: usize, expected: usize },
+    TooManyEntries {
+        actual: usize,
+        expected: usize,
+    },
+    EntryTooLarge {
+        actual: usize,
+        expected: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize)]
@@ -559,7 +585,12 @@ impl Initiator {
                 ruleid: _,
                 risk_level: _,
             } => ContentFilter,
-            Initiator::Limit { id: _, name: _, key: _ } => RateLimit,
+            Initiator::Limit {
+                id: _,
+                name: _,
+                key: _,
+                threshold: _,
+            } => RateLimit,
             Initiator::Flow { id: _, name: _, key: _ } => FlowControl,
             Initiator::BodyTooDeep { actual: _, expected: _ } => ContentFilter,
             Initiator::BodyMissing => ContentFilter,
@@ -595,9 +626,16 @@ impl Initiator {
                 map.serialize_entry("id", id)?;
                 map.serialize_entry("name", name)?;
             }
-            Initiator::Limit { id, name, key: _ } => {
+            Initiator::Limit {
+                id,
+                name,
+                key: _,
+                threshold,
+            } => {
                 map.serialize_entry("id", id)?;
                 map.serialize_entry("name", name)?;
+                map.serialize_entry("threshold", threshold)?;
+                map.serialize_entry("counter", &(threshold + 1))?;
             }
             Initiator::BodyTooDeep { actual, expected } => {
                 map.serialize_entry("type", "body_too_deep")?;
@@ -701,8 +739,16 @@ impl BlockReason {
         BlockReason::nodetails(Initiator::GlobalFilter { id }, true)
     }
 
-    pub fn limit(id: String, name: String, key: String, is_blocking: bool) -> Self {
-        BlockReason::nodetails(Initiator::Limit { id, name, key }, is_blocking)
+    pub fn limit(id: String, name: String, key: String, threshold: u64, is_blocking: bool) -> Self {
+        BlockReason::nodetails(
+            Initiator::Limit {
+                id,
+                name,
+                key,
+                threshold,
+            },
+            is_blocking,
+        )
     }
 
     pub fn flow(id: String, name: String, key: String, is_blocking: bool) -> Self {
