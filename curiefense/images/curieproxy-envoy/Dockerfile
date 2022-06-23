@@ -20,7 +20,7 @@ RUN apt-get update && \
     gcc g++ make unzip libhyperscan-dev && apt-get autoremove --purge -y && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-8.2.3-amd64.deb && dpkg -i filebeat-8.2.3-amd64.deb && rm filebeat-8.2.3-amd64.deb
+RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.13.3-amd64.deb && dpkg -i filebeat-7.13.3-amd64.deb && rm filebeat-7.13.3-amd64.deb
 
 # Overwrite stripped envoy with full symbol
 COPY --from=envoy-cf /envoy /usr/local/bin/envoy
@@ -35,7 +35,6 @@ COPY curieproxy/envoy.yaml.* /etc/envoy/
 RUN mkdir /cf-config && chmod a+rwxt /cf-config
 COPY curieproxy/rust/static/libgrasshopper.so /usr/lib/
 COPY filebeat/filebeat-stdin.yml /etc/filebeat.yml
-COPY filebeat/ilm.json /usr/share/filebeat/
 RUN chmod go-w /etc/filebeat.yml
 
 ENTRYPOINT ["/start_curiefense.sh"]
