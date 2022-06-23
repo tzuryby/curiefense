@@ -128,7 +128,7 @@ pub fn jsonlog(
                 "rate_limit_rules": stats.secpol.limit_amount,
                 "global_filters_active": stats.secpol.globalfilters_amount
             },
-            "args": info.rinfo.qinfo.args.to_json(),
+            "arguments": info.rinfo.qinfo.args.to_json(),
             "authority": info.rinfo.meta.authority,
             "cookies": info.cookies.to_json(),
             "headers": info.headers.to_json(),
