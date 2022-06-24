@@ -209,7 +209,10 @@ pub fn tag_request(
                 } else {
                     return (
                         tags.clone(),
-                        SimpleDecision::Action(a.clone(), vec![BlockReason::global_filter(psection.id.clone())]),
+                        SimpleDecision::Action(
+                            a.clone(),
+                            vec![BlockReason::global_filter(psection.id.clone(), psection.name.clone())],
+                        ),
                         stats.mapped(globalfilters.len(), matched),
                     );
                 }

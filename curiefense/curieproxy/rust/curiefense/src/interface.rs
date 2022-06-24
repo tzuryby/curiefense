@@ -114,6 +114,7 @@ pub fn jsonlog(
             }
         }
     }
+    let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
 
@@ -172,6 +173,7 @@ pub fn jsonlog(
             "proxy": {
                 "location": info.rinfo.geoip.location
             },
+            "reason": block_reason_desc,
             "profiling": {},
             "biometrics": {},
         }),
@@ -359,6 +361,31 @@ pub enum Location {
     CookieValue(String, String),
 }
 
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Location::*;
+        match self {
+            Request => write!(f, "request"),
+            Attributes => write!(f, "attributes"),
+            Ip => write!(f, "ip"),
+            Uri => write!(f, "uri"),
+            Path => write!(f, "path"),
+            Pathpart(p) => write!(f, "path part {}", p),
+            UriArgument(a) => write!(f, "URI argument {}", a),
+            UriArgumentValue(a, v) => write!(f, "URI argument {}={}", a, v),
+            Body => write!(f, "body"),
+            BodyArgument(a) => write!(f, "body argument {}", a),
+            BodyArgumentValue(a, v) => write!(f, "body argument {}={}", a, v),
+            Headers => write!(f, "headers"),
+            Header(h) => write!(f, "header {}", h),
+            HeaderValue(h, v) => write!(f, "header {}={}", h, v),
+            Cookies => write!(f, "cookies"),
+            Cookie(c) => write!(f, "cookie {}", c),
+            CookieValue(c, v) => write!(f, "cookie {}={}", c, v),
+        }
+    }
+}
+
 impl Serialize for Location {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -537,6 +564,7 @@ pub enum AclStage {
 pub enum Initiator {
     GlobalFilter {
         id: String,
+        name: String,
     },
     Acl {
         tags: Vec<String>,
@@ -578,6 +606,36 @@ pub enum Initiator {
     },
 }
 
+impl std::fmt::Display for Initiator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Initiator::*;
+        match self {
+            GlobalFilter { id, name } => write!(f, "global filter {}[{}]", name, id),
+            Acl { tags, stage } => write!(f, "acl {:?} {:?}", stage, tags),
+            ContentFilter { ruleid, risk_level } => write!(f, "content filter {}[lvl{}]", ruleid, risk_level),
+            Limit {
+                id,
+                name,
+                key: _,
+                threshold,
+            } => write!(f, "rate limit {}[{}] threshold={}", name, id, threshold),
+            Flow { id, name, key: _ } => write!(f, "flow control {}[{}]", name, id),
+            BodyTooDeep { actual: _, expected } => write!(f, "body too deep threshhold={}", expected),
+            BodyMissing => write!(f, "body is missing"),
+            BodyMalformed(r) => write!(f, "body is malformed: {}", r),
+            Phase01Fail(r) => write!(f, "grasshopper phase 1 error: {}", r),
+            Phase02 => write!(f, "grasshopper phase 2"),
+            Sqli(fp) => write!(f, "sql injection {}", fp),
+            Xss => write!(f, "xss"),
+            Restricted => write!(f, "restricted parameter"),
+            TooManyEntries { actual, expected } => {
+                write!(f, "too many entries, entries={} threshold={}", actual, expected)
+            }
+            EntryTooLarge { actual, expected } => write!(f, "too large, size={} threshold={}", actual, expected),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InitiatorKind {
@@ -592,7 +650,7 @@ impl Initiator {
     pub fn to_kind(&self) -> InitiatorKind {
         use InitiatorKind::*;
         match self {
-            Initiator::GlobalFilter { id: _ } => GlobalFilter,
+            Initiator::GlobalFilter { id: _, name: _ } => GlobalFilter,
             Initiator::Acl { tags: _, stage: _ } => Acl,
             Initiator::ContentFilter {
                 ruleid: _,
@@ -623,8 +681,9 @@ impl Initiator {
         map: &mut <S as serde::Serializer>::SerializeMap,
     ) -> Result<(), S::Error> {
         match self {
-            Initiator::GlobalFilter { id } => {
+            Initiator::GlobalFilter { id, name } => {
                 map.serialize_entry("id", id)?;
+                map.serialize_entry("name", name)?;
             }
             Initiator::Acl { tags, stage } => {
                 map.serialize_entry("tags", tags)?;
@@ -700,6 +759,16 @@ pub enum BDecision {
     Blocking,
 }
 
+impl std::fmt::Display for BDecision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BDecision::Monitor => write!(f, "monitor"),
+            BDecision::InitiatorInactive => write!(f, "inactive"),
+            BDecision::Blocking => write!(f, "blocking"),
+        }
+    }
+}
+
 impl BDecision {
     pub fn from_blocking(blocking: bool) -> Self {
         if blocking {
@@ -747,9 +816,31 @@ impl Serialize for BlockReason {
     }
 }
 
+impl std::fmt::Display for BlockReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {} - [", self.decision, self.initiator)?;
+        let mut comma = false;
+        for l in &self.location {
+            if comma {
+                write!(f, ", ")?;
+            }
+            comma = true;
+            write!(f, "{}", l)?;
+        }
+        write!(f, "]")
+    }
+}
+
 impl BlockReason {
-    pub fn global_filter(id: String) -> Self {
-        BlockReason::nodetails(Initiator::GlobalFilter { id }, true)
+    pub fn block_reason_desc(reasons: &[Self]) -> Option<String> {
+        reasons
+            .iter()
+            .find(|r| r.decision == BDecision::Blocking)
+            .map(|r| r.to_string())
+    }
+
+    pub fn global_filter(id: String, name: String) -> Self {
+        BlockReason::nodetails(Initiator::GlobalFilter { id, name }, true)
     }
 
     pub fn limit(id: String, name: String, key: String, threshold: u64, is_blocking: bool) -> Self {
