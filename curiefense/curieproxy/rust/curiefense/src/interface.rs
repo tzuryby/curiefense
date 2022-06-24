@@ -116,6 +116,19 @@ pub fn jsonlog(
     }
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
+
+    let stats_counter = |kd: InitiatorKind| -> (usize, usize) {
+        match greasons.get(&kd) {
+            None => (0, 0),
+            Some(v) => (v.len(), v.iter().filter(|r| r.decision == BDecision::Blocking).count()),
+        }
+    };
+    let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
+    let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
+    let (flow_control, flow_control_active) = stats_counter(InitiatorKind::FlowControl);
+    let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
+    let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
+
     let val = match mrinfo {
         Some(info) => serde_json::json!({
             "timestamp": now,
@@ -140,16 +153,16 @@ pub fn jsonlog(
 
             "processing_stage": stats.processing_stage,
             "trigger_counters": {
-                "acl": 1,
-                "acl_active": stats.acl_active,
-                "global_filters": stats.globalfilters_total,
-                "global_filters_active": stats.globalfilters_active,
-                "flow_control": stats.flow_total,
-                "flow_control_active": stats.flow_active,
-                "rate_limit": stats.limit_total,
-                "rate_limit_active": stats.limit_active,
-                "content_filters": stats.content_filter_triggered,
-                "content_filters_active": stats.content_filter_active,
+                "acl": acl,
+                "acl_active": acl_active,
+                "global_filters": global_filters,
+                "global_filters_active": global_filters_active,
+                "flow_control": flow_control,
+                "flow_control_active": flow_control_active,
+                "rate_limit": rate_limit,
+                "rate_limit_active": rate_limit_active,
+                "content_filters": content_filters,
+                "content_filters_active": content_filters_active,
             },
             "acl_triggers": get_trigger(&InitiatorKind::Acl),
             "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
