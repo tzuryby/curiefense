@@ -138,6 +138,7 @@ pub unsafe extern "C" fn curiefense_cfr_log(ptr: *mut CFResult, ln: *mut usize) 
             None,
             &dec.result.tags,
             &dec.result.stats,
+            &dec.logs,
         )
         .0
         .to_string(),

@@ -300,6 +300,7 @@ impl InspectionResult {
             None,
             &self.tags.unwrap_or_default(),
             &Stats::default(),
+            &self.logs,
         );
         let resp = json!({
             "logs": self.logs.to_json(),

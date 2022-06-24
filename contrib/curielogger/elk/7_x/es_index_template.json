@@ -53,6 +53,9 @@
         "ip": {
           "type": "ip"
         },
+        "logs": {
+          "type": "text"
+        },
         "method": {
           "type": "keyword"
         },

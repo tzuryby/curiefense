@@ -320,6 +320,7 @@ impl MyEP {
                 block_code,
                 &result.tags,
                 &result.stats,
+                logs,
             );
             for l in logs.to_stringvec() {
                 debug!("{}", l);

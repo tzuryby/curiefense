@@ -92,6 +92,7 @@ impl Decision {
             self.maction.as_ref().map(|a| a.status),
             &tags,
             stats,
+            &logs
         );
         self.to_legacy_json_raw(request_map, logs)
     }
@@ -104,6 +105,7 @@ pub fn jsonlog(
     rcode: Option<u32>,
     tags: &Tags,
     stats: &Stats,
+    logs: &Logs,
 ) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
     let now = chrono::Utc::now();
     let mut tgs = tags.clone();
@@ -151,6 +153,7 @@ pub fn jsonlog(
             "ip": info.rinfo.geoip.ip,
             "method": info.rinfo.meta.method,
             "response_code": rcode,
+            "logs": logs.to_stringvec(),
 
             "processing_stage": stats.processing_stage,
             "trigger_counters": {
