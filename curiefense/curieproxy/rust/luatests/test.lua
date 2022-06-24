@@ -274,7 +274,7 @@ local function test_masking(request_path)
     local secret = raw_request_map["secret"]
     local response = run_inspect_request(raw_request_map)
     local r = cjson.decode(response)
-    for _, section in pairs({"args", "headers", "cookies"}) do
+    for _, section in pairs({"arguments", "headers", "cookies"}) do
       for k, value in pairs(r.request_map[section]) do
         local p = string.find(value, secret)
         if p ~= nil then
