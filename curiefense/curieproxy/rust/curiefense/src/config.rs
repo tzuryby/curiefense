@@ -29,13 +29,22 @@ lazy_static! {
     pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = RwLock::new(HashMap::new());
 }
 
+fn config_logs(cur: &mut Logs, cfg: &Config) {
+    cur.debug("CFGLOAD logs start");
+    cur.extend(cfg.logs.clone());
+    cur.debug("CFGLOAD logs end");
+}
+
 pub fn with_config<R, F>(basepath: &str, logs: &mut Logs, f: F) -> Option<R>
 where
     F: FnOnce(&mut Logs, &Config) -> R,
 {
     let (newconfig, newhsdb) = match CONFIG.read() {
-        Ok(cfg) => match cfg.reload(logs, basepath) {
-            None => return Some(f(logs, &cfg)),
+        Ok(cfg) => match cfg.reload(basepath) {
+            None => {
+                config_logs(logs, &cfg);
+                return Some(f(logs, &cfg));
+            }
             Some(cfginfo) => cfginfo,
         },
         Err(rr) =>
@@ -45,6 +54,7 @@ where
             return None;
         }
     };
+    config_logs(logs, &newconfig);
     let r = f(logs, &newconfig);
     match CONFIG.write() {
         Ok(mut w) => *w = newconfig,
@@ -74,6 +84,7 @@ pub struct Config {
     pub container_name: Option<String>,
     pub flows: HashMap<SequenceKey, Vec<FlowElement>>,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
+    pub logs: Logs,
 }
 
 fn from_map<V: Clone>(mp: &HashMap<String, V>, k: &str) -> Result<V, String> {
@@ -146,7 +157,7 @@ impl Config {
     }
 
     fn resolve(
-        logs: &mut Logs,
+        logs: Logs,
         revision: String,
         last_mod: SystemTime,
         rawmaps: Vec<RawHostMap>,
@@ -159,14 +170,15 @@ impl Config {
     ) -> Config {
         let mut default: Option<HostMap> = None;
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
+        let mut logs = logs;
 
-        let limits = Limit::resolve(logs, rawlimits);
+        let limits = Limit::resolve(&mut logs, rawlimits);
         let acls = rawacls.into_iter().map(|a| (a.id.clone(), a)).collect();
 
         // build the entries while looking for the default entry
         for rawmap in rawmaps {
             let (entries, default_entry) =
-                Config::resolve_security_policies(logs, rawmap.map, &limits, &acls, &content_filter_profiles);
+                Config::resolve_security_policies(&mut logs, rawmap.map, &limits, &acls, &content_filter_profiles);
             if default_entry.is_none() {
                 logs.warning(
                     format!(
@@ -206,9 +218,9 @@ impl Config {
         // order by decreasing matcher length, so that more specific rules are matched first
         securitypolicies.sort_by_key(|b| std::cmp::Reverse(b.matcher_len()));
 
-        let globalfilters = GlobalFilterSection::resolve(logs, rawglobalfilters);
+        let globalfilters = GlobalFilterSection::resolve(&mut logs, rawglobalfilters);
 
-        let flows = flow_resolve(logs, rawflows);
+        let flows = flow_resolve(&mut logs, rawflows);
 
         Config {
             revision,
@@ -219,6 +231,7 @@ impl Config {
             container_name,
             flows,
             content_filter_profiles,
+            logs,
         }
     }
 
@@ -252,12 +265,8 @@ impl Config {
         out
     }
 
-    pub fn load(
-        logs: &mut Logs,
-        basepath: &str,
-        last_mod: SystemTime,
-    ) -> (Config, HashMap<String, ContentFilterRules>) {
-        logs.debug("Loading new configuration - CFGLOAD");
+    pub fn load(logs: Logs, basepath: &str, last_mod: SystemTime) -> (Config, HashMap<String, ContentFilterRules>) {
+        let mut logs = logs;
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
@@ -279,22 +288,27 @@ impl Config {
             Ok(manifest) => manifest.meta.version,
         };
 
-        let securitypolicy = Config::load_config_file(logs, &bjson, "securitypolicy.json");
-        let globalfilters = Config::load_config_file(logs, &bjson, "globalfilter-lists.json");
-        let limits = Config::load_config_file(logs, &bjson, "limits.json");
-        let acls = Config::load_config_file(logs, &bjson, "acl-profiles.json");
-        let rawcontentfilterprofiles = Config::load_config_file(logs, &bjson, "contentfilter-profiles.json");
-        let contentfilterrules = Config::load_config_file(logs, &bjson, "contentfilter-rules.json");
-        let contentfiltergroups = Config::load_config_file(logs, &bjson, "contentfilter-groups.json");
-        let flows = Config::load_config_file(logs, &bjson, "flow-control.json");
+        let securitypolicy = Config::load_config_file(&mut logs, &bjson, "securitypolicy.json");
+        let globalfilters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
+        let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
+        let acls = Config::load_config_file(&mut logs, &bjson, "acl-profiles.json");
+        let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
+        let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
+        let contentfiltergroups = Config::load_config_file(&mut logs, &bjson, "contentfilter-groups.json");
+        let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
 
         let container_name = std::fs::read_to_string("/etc/hostname")
             .ok()
             .map(|s| s.trim().to_string());
 
-        let content_filter_profiles = ContentFilterProfile::resolve(logs, rawcontentfilterprofiles);
+        let content_filter_profiles = ContentFilterProfile::resolve(&mut logs, rawcontentfilterprofiles);
 
-        let hsdb = resolve_rules(logs, &content_filter_profiles, contentfilterrules, contentfiltergroups);
+        let hsdb = resolve_rules(
+            &mut logs,
+            &content_filter_profiles,
+            contentfilterrules,
+            contentfiltergroups,
+        );
 
         let config = Config::resolve(
             logs,
@@ -312,7 +326,8 @@ impl Config {
         (config, hsdb)
     }
 
-    pub fn reload(&self, logs: &mut Logs, basepath: &str) -> Option<(Config, HashMap<String, ContentFilterRules>)> {
+    pub fn reload(&self, basepath: &str) -> Option<(Config, HashMap<String, ContentFilterRules>)> {
+        let mut logs = Logs::default();
         let last_mod = std::fs::metadata(basepath)
             .and_then(|x| x.modified())
             .unwrap_or_else(|rr| {
@@ -336,6 +351,7 @@ impl Config {
             container_name: None,
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
+            logs: Logs::default(),
         }
     }
 }

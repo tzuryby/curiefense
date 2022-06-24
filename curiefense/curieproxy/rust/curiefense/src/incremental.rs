@@ -250,6 +250,7 @@ mod test {
             container_name: None,
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
+            logs: Logs::default(),
         }
     }
 
