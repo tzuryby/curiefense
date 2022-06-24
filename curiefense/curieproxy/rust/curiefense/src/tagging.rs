@@ -156,44 +156,49 @@ pub fn tag_request(
     tags.insert_qualified("cookies", &rinfo.cookies.len().to_string(), Location::Cookies);
     tags.insert_qualified("args", &rinfo.rinfo.qinfo.args.len().to_string(), Location::Request);
     tags.insert_qualified("host", &rinfo.rinfo.host, Location::Request);
-    tags.insert_qualified("ip", &rinfo.rinfo.geoip.ipstr, Location::Request);
+    tags.insert_qualified("ip", &rinfo.rinfo.geoip.ipstr, Location::Ip);
     tags.insert_qualified(
         "geo-continent-name",
         rinfo.rinfo.geoip.continent_name.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
     );
     tags.insert_qualified(
         "geo-continent-code",
         rinfo.rinfo.geoip.continent_code.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
     );
     tags.insert_qualified(
         "geo-city",
         rinfo.rinfo.geoip.city_name.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
+    );
+    tags.insert_qualified(
+        "geo-org",
+        rinfo.rinfo.geoip.company.as_deref().unwrap_or("nil"),
+        Location::Ip,
     );
     tags.insert_qualified(
         "geo-country",
         rinfo.rinfo.geoip.country_name.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
     );
     tags.insert_qualified(
         "geo-region",
         rinfo.rinfo.geoip.region.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
     );
     tags.insert_qualified(
         "geo-subregion",
         rinfo.rinfo.geoip.subregion.as_deref().unwrap_or("nil"),
-        Location::Request,
+        Location::Ip,
     );
     match rinfo.rinfo.geoip.asn {
         None => {
-            tags.insert_qualified("geo-asn", "nil", Location::Request);
+            tags.insert_qualified("geo-asn", "nil", Location::Ip);
         }
         Some(asn) => {
-            let sasn = format!("{}", asn);
-            tags.insert_qualified("geo-asn", &sasn, Location::Request);
+            let sasn = asn.to_string();
+            tags.insert_qualified("geo-asn", &sasn, Location::Ip);
         }
     }
     let mut matched = 0;

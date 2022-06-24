@@ -34,7 +34,8 @@
         "geo-asn:5089",
         "geo-subregion:bne",
         "geo-region:eng",
-        "geo-continent-name:europe"
+        "geo-continent-name:europe",
+        "geo-org:virgin-media-limited"
       ]
     }
   }

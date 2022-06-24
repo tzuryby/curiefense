@@ -48,6 +48,7 @@
         "geo-subregion:nil",
         "sqli",
         "geo-asn:nil",
+        "geo-org:nil",
         "cf-rule-category:sqli",
         "waf",
         "cf-rule-risk:5"
