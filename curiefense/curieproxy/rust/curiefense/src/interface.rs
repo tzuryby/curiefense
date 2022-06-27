@@ -69,7 +69,7 @@ impl Decision {
         self.maction.as_ref().map(|a| a.atype.is_final()).unwrap_or(false)
     }
 
-    pub fn to_legacy_json_raw(&self, request_map: serde_json::Value, logs: Logs) -> String {
+    pub fn to_legacy_json_raw(&self, request_map: serde_json::Value) -> (String, String) {
         let action_desc = match self.maction {
             None => "pass",
             Some(_) => "custom_response",
@@ -77,24 +77,24 @@ impl Decision {
         let response =
             serde_json::to_value(&self.maction).unwrap_or_else(|rr| serde_json::Value::String(rr.to_string()));
         let j = serde_json::json!({
-            "request_map": request_map,
             "action": action_desc,
             "response": response,
-            "logs": logs.logs
         });
-        serde_json::to_string(&j).unwrap_or_else(|_| "{}".to_string())
+        let l = serde_json::to_string(&j).unwrap_or_else(|_| "{}".to_string());
+        let r = serde_json::to_string(&request_map).unwrap_or_else(|_| "{}".to_string());
+        (l, r)
     }
 
-    pub fn to_legacy_json(&self, rinfo: RequestInfo, tags: Tags, logs: Logs, stats: &Stats) -> String {
+    pub fn to_legacy_json(&self, rinfo: RequestInfo, tags: Tags, logs: Logs, stats: &Stats) -> (String, String) {
         let (request_map, _) = jsonlog(
             self,
             Some(&rinfo),
             self.maction.as_ref().map(|a| a.status),
             &tags,
             stats,
-            &logs
+            &logs,
         );
-        self.to_legacy_json_raw(request_map, logs)
+        self.to_legacy_json_raw(request_map)
     }
 }
 

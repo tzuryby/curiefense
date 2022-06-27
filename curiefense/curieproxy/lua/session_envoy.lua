@@ -55,7 +55,7 @@ function session_rust_envoy.inspect(handle)
     --   * path : the full request uri
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
-    local response, err = curiefense.inspect_request(
+    local response, jrequest_map, err = curiefense.inspect_request(
         meta, headers, body_content, ip_str
     )
 
@@ -66,9 +66,10 @@ function session_rust_envoy.inspect(handle)
     local request_map = nil
     if response then
         local response_table = cjson.decode(response)
+        request_map = cjson.decode(jrequest_map)
         handle:logDebug("decision " .. response)
-        utils.log_envoy_messages(handle, response_table["logs"])
-        request_map = response_table["request_map"]
+        handle:logDebug("request " .. jrequest_map)
+        utils.log_envoy_messages(handle, request_map["logs"])
         if response_table["action"] == "custom_response" then
             custom_response(handle, request_map, response_table["response"])
         end

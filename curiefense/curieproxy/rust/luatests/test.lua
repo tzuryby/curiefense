@@ -108,21 +108,21 @@ local function run_inspect_request(raw_request_map)
         headers["Cookie"] = "rbzid=OK;"
       end
     end
-    local response, merr
+    local response, request_map, merr
     if human ~= nil then
-      response, merr = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
+      response, request_map, merr = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
     else
-      response, merr = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
+      response, request_map, merr = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
     end
     if merr then
       error(merr)
     end
-    return response
+    return response, request_map
 end
 
 local function show_logs(logs)
   for _, log in ipairs(logs) do
-      print(log["elapsed_micros"] .. "µs " .. log["message"])
+      print(log)
   end
 end
 
@@ -153,10 +153,11 @@ local function test_raw_request(request_path)
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
-    local response = run_inspect_request(raw_request_map)
+    local response, jrequest_map = run_inspect_request(raw_request_map)
     local r = cjson.decode(response)
+    local request_map = cjson.decode(jrequest_map)
 
-    local good = compare_tag_list(raw_request_map.name, r.request_map.tags, raw_request_map.response.tags)
+    local good = compare_tag_list(raw_request_map.name, request_map.tags, raw_request_map.response.tags)
     if r.action ~= raw_request_map.response.action then
       print("Expected action " .. cjson.encode(raw_request_map.response.action) ..
         ", but got " .. cjson.encode(r.action))
@@ -182,7 +183,7 @@ local function test_raw_request(request_path)
       }) do
         local expected = raw_request_map.response[trigger_name]
         if expected then
-          local actual = r.request_map[trigger_name]
+          local actual = request_map[trigger_name]
 
           if equals(actual, expected) == false then
             local jactual = cjson.encode(actual)
@@ -201,8 +202,9 @@ local function test_raw_request(request_path)
     end
 
     if not good then
-      show_logs(r.logs)
+      show_logs(request_map.logs)
       print(response)
+      print(jrequest_map)
       error("mismatch in " .. raw_request_map.name)
     end
   end
@@ -223,10 +225,11 @@ local function test_raw_request_stats(request_path, pverbose)
       verbose = raw_request_map["verbose"]
     end
 
-    local response = run_inspect_request(raw_request_map)
+    local response, jrequest_map = run_inspect_request(raw_request_map)
     local r = cjson.decode(response)
+    local request_map = cjson.decode(jrequest_map)
 
-    local good = compare_tag_list(raw_request_map.name, r.request_map.tags, raw_request_map.response.tags)
+    local good = compare_tag_list(raw_request_map.name, request_map.tags, raw_request_map.response.tags)
     if r.action ~= raw_request_map.response.action then
       if verbose then
         print("Expected action " .. cjson.encode(raw_request_map.response.action) ..
@@ -253,10 +256,11 @@ local function test_raw_request_stats(request_path, pverbose)
 
     if not good then
       if verbose then
-        for _, log in ipairs(r.logs) do
+        for _, log in ipairs(request_map.logs) do
             print(log["elapsed_micros"] .. "µs " .. log["message"])
         end
         print(response)
+        print(jrequest_map)
       end
       print("mismatch in " .. raw_request_map.name)
     else
@@ -272,10 +276,10 @@ local function test_masking(request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
     local secret = raw_request_map["secret"]
-    local response = run_inspect_request(raw_request_map)
-    local r = cjson.decode(response)
+    local _, jrequest_map = run_inspect_request(raw_request_map)
+    local request_map = cjson.decode(jrequest_map)
     for _, section in pairs({"arguments", "headers", "cookies"}) do
-      for k, value in pairs(r.request_map[section]) do
+      for k, value in pairs(request_map[section]) do
         local p = string.find(value, secret)
         if p ~= nil then
           error("Could find secret in " .. section .. "/" .. k)
@@ -301,23 +305,24 @@ local function test_ratelimit(request_path)
   local raw_request_maps = load_json_file(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
-    local jres = run_inspect_request(raw_request_map)
+    local jres, jrequest_map = run_inspect_request(raw_request_map)
     local res = cjson.decode(jres)
+    local request_map = cjson.decode(jrequest_map)
 
-    if raw_request_map.tag and not contains(res.request_map.tags, raw_request_map.tag) then
-      show_logs(res.logs)
+    if raw_request_map.tag and not contains(request_map.tags, raw_request_map.tag) then
+      show_logs(request_map.logs)
       error("curiefense.session_limit_check should have returned tag '" .. raw_request_map.tag ..
             "', but returned: " .. jres)
     end
 
     if raw_request_map.pass then
       if res["action"] ~= "pass" then
-        show_logs(res.logs)
+        show_logs(request_map.logs)
         error("curiefense.session_limit_check should have returned pass, but returned: " .. jres)
       end
     else
       if res["action"] == "pass" then
-        show_logs(res.logs)
+        show_logs(request_map.logs)
         error("curiefense.session_limit_check should have blocked, but returned: " .. jres)
       end
     end
@@ -336,8 +341,9 @@ local function test_flow(request_path)
   local raw_request_maps = load_json_file(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
-    local jres = run_inspect_request(raw_request_map)
+    local jres, jrequest_map = run_inspect_request(raw_request_map)
     local res = cjson.decode(jres)
+    local request_map = cjson.decode(jrequest_map)
 
     if raw_request_map.pass then
       if res["action"] ~= "pass" then
@@ -352,10 +358,11 @@ local function test_flow(request_path)
     end
 
     if not good then
-        for _, log in ipairs(res.logs) do
+        for _, log in ipairs(request_map.logs) do
             print(log["elapsed_micros"] .. "µs " .. log["message"])
         end
         print(jres)
+        print(jrequest_map)
         error("mismatch in flow control")
     end
 
@@ -383,12 +390,12 @@ local function run_inspect_content_filter(raw_request_map)
       ip = headers["x-forwarded-for"]
     end
 
-    local response, merr = curiefense.inspect_content_filter(meta, headers, raw_request_map.body, ip,
+    local response, jrequest_map, merr = curiefense.inspect_content_filter(meta, headers, raw_request_map.body, ip,
       raw_request_map.content_filter_id)
     if merr then
       error(merr)
     end
-    return response
+    return response, jrequest_map
 end
 
 local test_request = '{ "headers": { ":authority": "localhost:30081", ":method": "GET", ":path": "/dqsqsdqsdcqsd"' ..
@@ -399,8 +406,8 @@ local test_request = '{ "headers": { ":authority": "localhost:30081", ":method":
   '-", "bot" ] } }'
 
 print("***  first request logs, check for configuration problems here ***")
-local tresponse = run_inspect_request(json_decode(test_request))
-show_logs(cjson.decode(tresponse)["logs"])
+local _, trequest_map = run_inspect_request(json_decode(test_request))
+show_logs(cjson.decode(trequest_map).logs)
 print("*** done ***")
 print("")
 
@@ -409,12 +416,13 @@ local function test_content_filter(request_path)
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
-    local response = run_inspect_content_filter(raw_request_map)
+    local response, jrequest_map = run_inspect_content_filter(raw_request_map)
     local r = cjson.decode(response)
+    local request_map = cjson.decode(jrequest_map)
 
     local good = true
 
-    for _, log in ipairs(r.logs) do
+    for _, log in ipairs(request_map.logs) do
         if log["message"] == "Content Filter profile not found" then
           print("content filter profile '" .. raw_request_map.content_filter_id .. "' not found")
           good = false
@@ -435,7 +443,7 @@ local function test_content_filter(request_path)
     end
 
     if not good then
-      for _, log in ipairs(r.logs) do
+      for _, log in ipairs(request_map.logs) do
           print(log["elapsed_micros"] .. "µs " .. log["message"])
       end
       print(response)

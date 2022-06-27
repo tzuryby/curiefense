@@ -88,19 +88,7 @@ end
 
 function nativeutils.log_nginx_messages(handle, logs)
     for _, log in ipairs(logs) do
-        local level = log["level"]
-        local msg = log["elapsed_micros"] .. "µs " .. log["message"]
-        if level == "debug" then
-            handle.log(handle.DEBUG, msg)
-        elseif level == "info" then
-            handle.log(handle.INFO, msg)
-        elseif level == "warning" then
-            handle.log(handle.WARN, msg)
-        elseif level == "error" then
-            handle.log(handle.ERR, msg)
-        else
-            handle.log(handle.ERR, "Can't log this message: " .. cjson.encode(logs))
-        end
+        handle.log(handle.DEBUG, log)
     end
 end
 
@@ -136,19 +124,7 @@ end
 
 function nativeutils.log_envoy_messages(handle, logs)
     for _, log in ipairs(logs) do
-        local level = log["level"]
-        local msg = log["elapsed_micros"] .. "µs " .. log["message"]
-        if level == "debug" then
-            handle:logDebug(msg)
-        elseif level == "info" then
-            handle:logInfo(msg)
-        elseif level == "warning" then
-            handle:logWarn(msg)
-        elseif level == "error" then
-            handle:logErr(msg)
-        else
-            handle:logErr("Can't log this message: " .. cjson.encode(logs))
-        end
+        handle:logDebug(log)
     end
 end
 

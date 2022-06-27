@@ -47,10 +47,12 @@ function session_rust_nginx.inspect(handle)
     --   * path : the full request uri
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
-    local response
-    response, err = curiefense.inspect_request(
+    local response, jrequest_map
+    response, jrequest_map, err = curiefense.inspect_request(
         meta, headers, body_content, ip_str
     )
+
+    handle.ctx.request_map = jrequest_map
 
     if err then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", err))
@@ -58,9 +60,9 @@ function session_rust_nginx.inspect(handle)
 
     if response then
         local response_table = cjson.decode(response)
-        handle.ctx.response = response_table
         handle.log(handle.DEBUG, "decision: " .. response)
-        utils.log_nginx_messages(handle, response_table["logs"])
+        handle.log(handle.DEBUG, "rmap: " .. jrequest_map)
+        utils.log_nginx_messages(handle, cjson.decode(jrequest_map)["logs"])
         if response_table["action"] == "custom_response" then
             custom_response(handle, response_table["response"])
         end
@@ -69,10 +71,9 @@ end
 
 -- log block stage processing
 function session_rust_nginx.log(handle)
-    local response = handle.ctx.response
-    handle.ctx.response = nil
-    local request_map = response.request_map
-    handle.var.request_map = cjson.encode(request_map)
+    local request_map = handle.ctx.request_map
+    handle.ctx.request_map = nil
+    handle.var.request_map = request_map
 end
 
 return session_rust_nginx

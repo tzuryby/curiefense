@@ -12,7 +12,7 @@ use crate::config::contentfilter::Transformation;
 use crate::config::raw::ContentType;
 use crate::config::utils::{RequestSelector, RequestSelectorCondition};
 use crate::interface::stats::Stats;
-use crate::interface::{jsonlog, Decision, Location, Tags};
+use crate::interface::{Decision, Location, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
@@ -293,25 +293,10 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub fn into_json_legacy(self) -> (String, Option<String>) {
-        let rmap = jsonlog(
-            &self.decision,
-            self.rinfo.as_ref(),
-            None,
-            &self.tags.unwrap_or_default(),
-            &Stats::default(),
-            &self.logs,
-        );
-        let resp = json!({
-            "logs": self.logs.to_json(),
-            "request_map": rmap,
-        });
-        (resp.to_string(), self.err)
-    }
-    pub fn into_legacy_json(self) -> (String, Option<String>) {
+    pub fn into_legacy_json(self) -> ((String, String), Option<String>) {
         let resp = match self.rinfo {
             // return the request map, but only if we have it !
-            None => self.decision.to_legacy_json_raw(serde_json::Value::Null, self.logs),
+            None => self.decision.to_legacy_json_raw(serde_json::Value::Null),
             Some(rinfo) => self
                 .decision
                 .to_legacy_json(rinfo, self.tags.unwrap_or_default(), self.logs, &self.stats),

@@ -33,7 +33,7 @@ fn lua_inspect_content_filter(
         String,                  // ip
         String,                  // content_filter_id
     ),
-) -> LuaResult<(String, Option<String>)> {
+) -> LuaResult<(String, String, Option<String>)> {
     let (meta, headers, lua_body, str_ip, content_filter_id) = args;
 
     let res = inspect_content_filter(
@@ -46,8 +46,11 @@ fn lua_inspect_content_filter(
     );
 
     Ok(match res {
-        Err(rr) => ("null".to_string(), Some(rr)),
-        Ok(ir) => ir.into_legacy_json(),
+        Err(rr) => ("null".to_string(), "null".to_string(), Some(rr)),
+        Ok(ir) => {
+            let ((l, r), rr) = ir.into_legacy_json();
+            (l, r, rr)
+        }
     })
 }
 
@@ -103,42 +106,23 @@ fn lua_inspect_request(
         LuaValue, // optional body
         LuaValue, // ip
     ),
-) -> LuaResult<(String, Option<String>)> {
+) -> LuaResult<(String, String, Option<String>)> {
     let (vmeta, vheaders, vlua_body, vstr_ip) = args;
+    let dnull = |rr| ("null".to_string(), "null".to_string(), Some(rr));
     let meta = match FromLua::from_lua(vmeta, lua) {
-        Err(rr) => {
-            return Ok((
-                "null".to_string(),
-                Some(format!("Could not convert the meta argument: {}", rr)),
-            ))
-        }
+        Err(rr) => return Ok(dnull(format!("Could not convert the meta argument: {}", rr))),
         Ok(m) => m,
     };
     let headers = match FromLua::from_lua(vheaders, lua) {
-        Err(rr) => {
-            return Ok((
-                "null".to_string(),
-                Some(format!("Could not convert the headers argument: {}", rr)),
-            ))
-        }
+        Err(rr) => return Ok(dnull(format!("Could not convert the headers argument: {}", rr))),
         Ok(h) => h,
     };
     let lua_body: Option<LuaString> = match FromLua::from_lua(vlua_body, lua) {
-        Err(rr) => {
-            return Ok((
-                "null".to_string(),
-                Some(format!("Could not convert the body argument: {}", rr)),
-            ))
-        }
+        Err(rr) => return Ok(dnull(format!("Could not convert the body argument: {}", rr))),
         Ok(b) => b,
     };
     let str_ip = match FromLua::from_lua(vstr_ip, lua) {
-        Err(rr) => {
-            return Ok((
-                "null".to_string(),
-                Some(format!("Could not convert the ip argument: {}", rr)),
-            ))
-        }
+        Err(rr) => return Ok(dnull(format!("Could not convert the ip argument: {}", rr))),
         Ok(i) => i,
     };
     let grasshopper = DynGrasshopper {};
@@ -152,8 +136,11 @@ fn lua_inspect_request(
     );
 
     Ok(match res {
-        Err(rr) => ("null".to_string(), Some(rr)),
-        Ok(ir) => ir.into_legacy_json(),
+        Err(rr) => dnull(rr),
+        Ok(ir) => {
+            let ((l, r), rr) = ir.into_legacy_json();
+            (l, r, rr)
+        }
     })
 }
 
@@ -199,7 +186,7 @@ fn lua_test_inspect_request(
         String,                  // ip
         bool,                    // humanity
     ),
-) -> LuaResult<(String, Option<String>)> {
+) -> LuaResult<(String, String, Option<String>)> {
     let (meta, headers, lua_body, str_ip, humanity) = args;
     let grasshopper = Some(DummyGrasshopper { humanity });
 
@@ -213,8 +200,11 @@ fn lua_test_inspect_request(
     );
 
     Ok(match res {
-        Err(rr) => ("null".to_string(), Some(rr)),
-        Ok(ir) => ir.into_legacy_json(),
+        Err(rr) => ("null".to_string(), "null".to_string(), Some(rr)),
+        Ok(ir) => {
+            let ((l, r), rr) = ir.into_legacy_json();
+            (l, r, rr)
+        }
     })
 }
 
