@@ -145,6 +145,7 @@ pub fn jsonlog(
                 "global_filters_active": stats.secpol.globalfilters_amount
             },
             "arguments": info.rinfo.qinfo.args.to_json(),
+            "path_parts": info.rinfo.qinfo.path_as_map.to_json(),
             "authority": info.rinfo.meta.authority,
             "cookies": info.cookies.to_json(),
             "headers": info.headers.to_json(),

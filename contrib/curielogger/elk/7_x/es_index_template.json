@@ -59,6 +59,9 @@
         "method": {
           "type": "keyword"
         },
+        "path_parts": {
+          "type": "flattened"
+        },
         "profiling": {
           "type": "nested"
         },
