@@ -27,7 +27,7 @@
           "type": "nested"
         },
         "arguments": {
-          "type": "nested"
+          "type": "flattened"
         },
         "authority": {
           "type": "keyword"
@@ -36,7 +36,7 @@
           "type": "nested"
         },
         "cookies": {
-          "type": "nested"
+          "type": "flattened"
         },
         "custom_response": {
           "type": "boolean"
@@ -48,7 +48,7 @@
           "type": "nested"
         },
         "headers": {
-          "type": "nested"
+          "type": "flattened"
         },
         "ip": {
           "type": "ip"
@@ -63,6 +63,7 @@
           "type": "nested"
         },
         "proxy": {
+          "type": "object",
           "properties": {
             "location": {
               "type": "geo_point",
@@ -78,6 +79,7 @@
           "type": "keyword"
         },
         "security_config": {
+          "type": "object",
           "properties": {
             "global_filters_active": {
               "type": "integer"
@@ -106,6 +108,7 @@
           "type": "text"
         },
         "trigger_counters": {
+          "type": "object",
           "properties": {
             "acl": {
               "type": "integer"
