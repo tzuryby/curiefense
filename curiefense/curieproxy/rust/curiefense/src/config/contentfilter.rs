@@ -35,6 +35,7 @@ pub struct ContentFilterProfile {
     pub content_type: Vec<ContentType>,
     pub max_body_size: usize,
     pub max_body_depth: usize,
+    pub referer_as_uri: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +86,7 @@ impl ContentFilterProfile {
             content_type: Vec::new(),
             max_body_size: usize::MAX,
             max_body_depth: usize::MAX,
+            referer_as_uri: false,
         }
     }
 }
@@ -251,6 +253,7 @@ fn convert_entry(entry: RawContentFilterProfile) -> anyhow::Result<(String, Cont
             content_type: entry.content_type,
             max_body_size,
             max_body_depth,
+            referer_as_uri: entry.referer_as_uri,
         },
     ))
 }

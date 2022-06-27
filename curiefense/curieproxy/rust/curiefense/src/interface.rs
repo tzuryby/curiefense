@@ -351,8 +351,14 @@ pub enum Location {
     Uri,
     Path,
     Pathpart(usize),
+    PathpartValue(usize, String),
+    RefererPath,
+    RefererPathpart(usize),
+    RefererPathpartValue(usize, String),
     UriArgument(String),
     UriArgumentValue(String, String),
+    RefererArgument(String),
+    RefererArgumentValue(String, String),
     Body,
     BodyArgument(String),
     BodyArgumentValue(String, String),
@@ -374,6 +380,7 @@ impl std::fmt::Display for Location {
             Uri => write!(f, "uri"),
             Path => write!(f, "path"),
             Pathpart(p) => write!(f, "path part {}", p),
+            PathpartValue(p, v) => write!(f, "path part {}={}", p, v),
             UriArgument(a) => write!(f, "URI argument {}", a),
             UriArgumentValue(a, v) => write!(f, "URI argument {}={}", a, v),
             Body => write!(f, "body"),
@@ -385,6 +392,11 @@ impl std::fmt::Display for Location {
             Cookies => write!(f, "cookies"),
             Cookie(c) => write!(f, "cookie {}", c),
             CookieValue(c, v) => write!(f, "cookie {}={}", c, v),
+            RefererArgument(a) => write!(f, "Referer argument {}", a),
+            RefererArgumentValue(a, v) => write!(f, "Referer argument {}={}", a, v),
+            RefererPath => write!(f, "referer path"),
+            RefererPathpart(p) => write!(f, "referer path part {}", p),
+            RefererPathpartValue(p, v) => write!(f, "referer path part {}={}", p, v),
         }
     }
 }
@@ -410,6 +422,7 @@ impl Location {
             Uri => Some(Request),
             Path => Some(Uri),
             Pathpart(_) => Some(Path),
+            PathpartValue(k, _) => Some(Pathpart(*k)),
             UriArgument(_) => Some(Uri),
             UriArgumentValue(n, _) => Some(UriArgument(n.clone())),
             Body => Some(Request),
@@ -421,6 +434,11 @@ impl Location {
             Cookies => Some(Request),
             Cookie(_) => Some(Cookies),
             CookieValue(n, _) => Some(Cookie(n.clone())),
+            RefererArgument(_) => Some(Header("referer".to_string())),
+            RefererArgumentValue(n, _) => Some(RefererArgument(n.clone())),
+            RefererPath => Some(Header("referer".to_string())),
+            RefererPathpart(_) => Some(RefererPath),
+            RefererPathpartValue(k, _) => Some(RefererPathpart(*k)),
         }
     }
 
@@ -489,16 +507,34 @@ impl Location {
             Location::Uri => {
                 map.serialize_entry("section", "uri")?;
             }
+            Location::RefererPath => {
+                map.serialize_entry("section", "referer path")?;
+            }
+            Location::RefererPathpart(part) => {
+                map.serialize_entry("part", part)?;
+            }
+            Location::RefererPathpartValue(_, value) => {
+                map.serialize_entry("value", value)?;
+            }
             Location::Path => {
-                map.serialize_entry("name", "path")?;
+                map.serialize_entry("section", "path")?;
             }
             Location::Pathpart(part) => {
                 map.serialize_entry("part", part)?;
+            }
+            Location::PathpartValue(_, value) => {
+                map.serialize_entry("value", value)?;
             }
             Location::UriArgument(name) => {
                 map.serialize_entry("name", name)?;
             }
             Location::UriArgumentValue(_, value) => {
+                map.serialize_entry("value", value)?;
+            }
+            Location::RefererArgument(name) => {
+                map.serialize_entry("name", name)?;
+            }
+            Location::RefererArgumentValue(_, value) => {
                 map.serialize_entry("value", value)?;
             }
             Location::Body => {

@@ -81,6 +81,12 @@ impl RequestField {
             .unwrap_or_default()
     }
 
+    pub fn alter<F>(&mut self, k: &str, f: F) where F: FnOnce(&str) -> String {
+        if let Some (e)  = self.fields.get_mut(k) {
+            e.0 = f(&e.0);
+        }
+    }
+
     pub fn get(&self, k: &str) -> Option<&String> {
         self.fields.get(k).map(|(v, _)| v)
     }

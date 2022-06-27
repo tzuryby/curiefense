@@ -139,6 +139,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                         slogs,
                         &secpolicy.content_filter_profile.decoding,
                         &secpolicy.content_filter_profile.content_type,
+                        secpolicy.content_filter_profile.referer_as_uri,
                         max_depth,
                         &raw,
                     );
@@ -179,7 +180,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                 return AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], 0, &raw),
+                    rinfo: map_request(logs, &[], &[], false, 0, &raw),
                     stats: Stats::default(),
                 };
             }
@@ -188,7 +189,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                 return AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], 0, &raw),
+                    rinfo: map_request(logs, &[], &[], false, 0, &raw),
                     stats: Stats::default(),
                 };
             }
@@ -232,7 +233,7 @@ pub fn content_filter_check_generic_request_map(
             logs.error("Content Filter profile not found");
             return (
                 Decision::pass(Vec::new()),
-                map_request(logs, &[], &[], 25, raw),
+                map_request(logs, &[], &[], false, 25, raw),
                 tags,
                 Stats::default(),
             );
@@ -243,7 +244,7 @@ pub fn content_filter_check_generic_request_map(
     if let Some(body) = raw.mbody {
         if body.len() > waf_profile.max_body_size {
             logs.error("body too large, exiting early");
-            let reqinfo = map_request(logs, &waf_profile.decoding, &[], 0, raw);
+            let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.referer_as_uri, 0, raw);
             let (a, br) = body_too_large(waf_profile.max_body_size, body.len());
             return (
                 Decision::action(a, vec![br]),
@@ -254,7 +255,14 @@ pub fn content_filter_check_generic_request_map(
         }
     }
 
-    let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.max_body_depth, raw);
+    let reqinfo = map_request(
+        logs,
+        &waf_profile.decoding,
+        &[],
+        waf_profile.referer_as_uri,
+        waf_profile.max_body_depth,
+        raw,
+    );
 
     let (waf_result, stats) = match HSDB.read() {
         Ok(rd) => content_filter_check(

@@ -443,6 +443,10 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
                 let nquery = ri.rinfo.qinfo.query.replace(&v, &target);
                 ri.rinfo.qinfo.query = nquery;
             }
+            RefererArgumentValue(_, v) => {
+                let target = masker(masking_seed, &v);
+                ri.headers.alter("referer", |r| r.replace(&v, &target));
+            }
             Body => {
                 ri.rinfo.qinfo.args.mask(masking_seed, "RAW_BODY");
             }
@@ -480,7 +484,7 @@ mod test {
             headers,
             meta,
         };
-        map_request(&mut logs, &[], &[], 500, &raw_request)
+        map_request(&mut logs, &[], &[], false, 500, &raw_request)
     }
 
     #[test]
@@ -659,6 +663,7 @@ mod test {
             ("h2", "U0VDUkVUaDI="),
             ("content-type", "application/json"),
             ("cookie", "COOK=U0VDUkVUCg=="),
+            ("referer", "https://another.site.com/with?a1=SECRETr1&a2=U0VDUkVUcjI="),
         ]
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -673,6 +678,7 @@ mod test {
             &mut logs,
             &[crate::config::contentfilter::Transformation::Base64Decode],
             &[crate::config::raw::ContentType::Json],
+            true,
             50,
             &raw_request,
         );
@@ -698,6 +704,9 @@ mod test {
         let log_string = logged.to_string();
         if log_string.contains("SECRET") {
             panic!("SECRET found in {}", log_string);
+        }
+        if log_string.contains("U0VDU") {
+            panic!("U0VDU found in {}", log_string);
         }
     }
 }

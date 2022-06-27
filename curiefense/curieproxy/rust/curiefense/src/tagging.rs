@@ -270,6 +270,7 @@ mod tests {
             &mut logs,
             &[],
             &[],
+            false,
             500,
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),

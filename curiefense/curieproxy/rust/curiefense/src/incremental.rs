@@ -85,6 +85,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         &mut logs,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
+        secpolicy.content_filter_profile.referer_as_uri,
         0,
         &rawrequest,
     );
@@ -173,6 +174,7 @@ pub async fn finalize<GH: Grasshopper>(
         &mut logs,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
+        secpolicy.content_filter_profile.referer_as_uri,
         secpolicy.content_filter_profile.max_body_depth,
         &rawrequest,
     );

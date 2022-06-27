@@ -183,7 +183,7 @@ fn urldecode_str_def(input: &str) -> String {
 }
 
 /// parses query parameters, that look like a=b&c=d
-pub fn parse_urlencoded_params<F>(args: &mut RequestField, query: &str, locf: F)
+pub fn parse_urlencoded_params<F>(args: &mut RequestField, query: &str, prefix: &str, locf: F)
 where
     F: Fn(String, String) -> Location,
 {
@@ -193,7 +193,7 @@ where
             None => (urldecode_str_def(kv), String::new(), ""),
         };
         let loc = locf(k.clone(), rawvalue.to_string());
-        args.add(k, loc, v);
+        args.add(format!("{}{}", prefix, k), loc, v);
     }
 }
 

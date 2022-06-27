@@ -280,6 +280,8 @@ pub struct RawContentFilterProfile {
     pub content_type: Vec<ContentType>,
     pub max_body_size: Option<usize>,
     pub max_body_depth: Option<usize>,
+    #[serde(default)]
+    pub referer_as_uri: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
