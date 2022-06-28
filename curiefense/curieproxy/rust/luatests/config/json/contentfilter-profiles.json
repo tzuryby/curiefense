@@ -855,7 +855,7 @@
                     "reg": "",
                     "restrict": false,
                     "mask": true,
-                    "exclusions": {}
+                    "exclusions": []
                 }
             ]
         },
