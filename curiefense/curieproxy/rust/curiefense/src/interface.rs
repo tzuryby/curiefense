@@ -795,6 +795,7 @@ impl Initiator {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BDecision {
     Monitor,
+    AlterRequest,
     InitiatorInactive,
     Blocking,
 }
@@ -803,6 +804,7 @@ impl std::fmt::Display for BDecision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BDecision::Monitor => write!(f, "monitor"),
+            BDecision::AlterRequest => write!(f, "alter_request"),
             BDecision::InitiatorInactive => write!(f, "inactive"),
             BDecision::Blocking => write!(f, "blocking"),
         }
@@ -810,16 +812,8 @@ impl std::fmt::Display for BDecision {
 }
 
 impl BDecision {
-    pub fn from_blocking(blocking: bool) -> Self {
-        if blocking {
-            BDecision::Blocking
-        } else {
-            BDecision::Monitor
-        }
-    }
-
     pub fn inactive(&mut self) {
-        if self == &BDecision::Blocking {
+        if self == &BDecision::Blocking || self == &BDecision::AlterRequest {
             *self = BDecision::InitiatorInactive;
         }
     }
@@ -832,6 +826,7 @@ impl Serialize for BDecision {
     {
         serializer.serialize_str(match self {
             BDecision::Monitor => "monitor",
+            BDecision::AlterRequest => "alter_request",
             BDecision::InitiatorInactive => "inactive",
             BDecision::Blocking => "block",
         })
@@ -879,11 +874,11 @@ impl BlockReason {
             .map(|r| r.to_string())
     }
 
-    pub fn global_filter(id: String, name: String) -> Self {
-        BlockReason::nodetails(Initiator::GlobalFilter { id, name }, true)
+    pub fn global_filter(id: String, name: String, decision: BDecision) -> Self {
+        BlockReason::nodetails(Initiator::GlobalFilter { id, name }, decision)
     }
 
-    pub fn limit(id: String, name: String, key: String, threshold: u64, is_blocking: bool) -> Self {
+    pub fn limit(id: String, name: String, key: String, threshold: u64, decision: BDecision) -> Self {
         BlockReason::nodetails(
             Initiator::Limit {
                 id,
@@ -891,27 +886,27 @@ impl BlockReason {
                 key,
                 threshold,
             },
-            is_blocking,
+            decision,
         )
     }
 
-    pub fn flow(id: String, name: String, key: String, is_blocking: bool) -> Self {
-        BlockReason::nodetails(Initiator::Flow { id, name, key }, is_blocking)
+    pub fn flow(id: String, name: String, key: String, decision: BDecision) -> Self {
+        BlockReason::nodetails(Initiator::Flow { id, name, key }, decision)
     }
 
     pub fn phase01_unknown(reason: &str) -> Self {
-        BlockReason::nodetails(Initiator::Phase01Fail(reason.to_string()), true)
+        BlockReason::nodetails(Initiator::Phase01Fail(reason.to_string()), BDecision::Blocking)
     }
 
     pub fn phase02() -> Self {
-        BlockReason::nodetails(Initiator::Phase02, true)
+        BlockReason::nodetails(Initiator::Phase02, BDecision::Blocking)
     }
 
-    fn nodetails(initiator: Initiator, is_blocking: bool) -> Self {
+    fn nodetails(initiator: Initiator, decision: BDecision) -> Self {
         BlockReason {
             initiator,
             location: Location::request(),
-            decision: BDecision::from_blocking(is_blocking),
+            decision,
         }
     }
 
@@ -1052,7 +1047,10 @@ pub struct Action {
 pub enum SimpleActionT {
     Monitor,
     RequestHeader(HashMap<String, String>),
-    Response(String),
+    Response {
+        content: String,
+        content_type: Option<String>,
+    },
     Redirect(String),
     Challenge,
     Default,
@@ -1067,7 +1065,10 @@ impl SimpleActionT {
             Default => 8,
             Challenge => 6,
             Redirect(_) => 4,
-            Response(_) => 3,
+            Response {
+                content: _,
+                content_type: _,
+            } => 3,
             RequestHeader(_) => 2,
             Monitor => 1,
         }
@@ -1075,6 +1076,21 @@ impl SimpleActionT {
 
     fn is_blocking(&self) -> bool {
         !matches!(self, SimpleActionT::RequestHeader(_) | SimpleActionT::Monitor)
+    }
+
+    pub fn to_bdecision(&self) -> BDecision {
+        match self {
+            SimpleActionT::Monitor => BDecision::Monitor,
+            SimpleActionT::Ban(sub, _) => sub.atype.to_bdecision(),
+            SimpleActionT::RequestHeader(_) => BDecision::AlterRequest,
+            SimpleActionT::Response {
+                content: _,
+                content_type: _,
+            }
+            | SimpleActionT::Redirect(_)
+            | SimpleActionT::Challenge
+            | SimpleActionT::Default => BDecision::Blocking,
+        }
     }
 }
 
@@ -1160,13 +1176,14 @@ impl SimpleAction {
             RawActionType::RequestHeader => {
                 SimpleActionT::RequestHeader(rawaction.params.headers.clone().unwrap_or_default())
             }
-            RawActionType::Response => SimpleActionT::Response(
-                rawaction
+            RawActionType::Response => SimpleActionT::Response {
+                content: rawaction
                     .params
                     .content
                     .clone()
                     .unwrap_or_else(|| "default content".into()),
-            ),
+                content_type: rawaction.params.content_type.clone(),
+            },
             RawActionType::Challenge => SimpleActionT::Challenge,
             RawActionType::Redirect => SimpleActionT::Redirect(
                 rawaction
@@ -1207,9 +1224,12 @@ impl SimpleAction {
                 action.headers = Some(hdrs.clone());
                 action.atype = ActionType::AlterHeaders;
             }
-            SimpleActionT::Response(content) => {
+            SimpleActionT::Response { content, content_type } => {
                 action.atype = ActionType::Block;
                 action.content = content.clone();
+                if let Some(ct) = content_type {
+                    action.headers = Some(std::iter::once(("content-type".to_string(), ct.clone())).collect())
+                }
             }
             SimpleActionT::Challenge => {
                 if !is_human {

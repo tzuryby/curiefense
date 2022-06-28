@@ -30,7 +30,7 @@ async fn limit_react<CNX: redis::aio::ConnectionLike>(
 ) -> SimpleDecision {
     tags.insert(&limit.name, Location::Request);
     let action = extract_bannable_action(cnx, logs, &threshold.action, key, ban_key, ban_status).await;
-    let bl = action.is_blocking();
+    let decision = action.atype.to_bdecision();
     SimpleDecision::Action(
         action,
         vec![BlockReason::limit(
@@ -38,7 +38,7 @@ async fn limit_react<CNX: redis::aio::ConnectionLike>(
             limit.name.clone(),
             key.to_string(),
             threshold.limit,
-            bl,
+            decision,
         )],
     )
 }

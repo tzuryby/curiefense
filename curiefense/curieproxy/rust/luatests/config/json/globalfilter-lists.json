@@ -648,5 +648,73 @@
             }
          ]
       }
+   },
+   {
+      "id": "addheaders",
+      "name": "add headers",
+      "source": "self-managed",
+      "mdate": "2021-07-01T09:50:58.505Z",
+      "description": "Add headers",
+      "active": true,
+      "action": {
+         "type": "request_header",
+         "params": {
+            "headers": {
+               "h1": "v1"
+            }
+         }
+      },
+      "tags": [
+         "wheaders"
+      ],
+      "rule": {
+         "relation": "OR",
+         "sections": [
+            {
+               "relation": "OR",
+               "entries": [
+                  [
+                     "ip",
+                     "82.13.8.87",
+                     null
+                  ]
+               ]
+            }
+         ]
+      }
+   },
+   {
+      "id": "contenttype",
+      "name": "content type",
+      "source": "self-managed",
+      "mdate": "2021-07-01T09:50:58.505Z",
+      "description": "Return with content type",
+      "active": true,
+      "action": {
+         "type": "response",
+         "params": {
+            "content_type": "application/json",
+            "status": "200",
+            "content": "{}"
+         }
+      },
+      "tags": [
+         "wcc"
+      ],
+      "rule": {
+         "relation": "OR",
+         "sections": [
+            {
+               "relation": "OR",
+               "entries": [
+                  [
+                     "ip",
+                     "82.13.8.88",
+                     null
+                  ]
+               ]
+            }
+         ]
+      }
    }
 ]

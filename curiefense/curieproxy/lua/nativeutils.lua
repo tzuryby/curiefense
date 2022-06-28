@@ -65,6 +65,14 @@ function nativeutils.nginx_custom_response(handle, action_params)
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end
 
+    if action_params.atype == "alter_headers" and block_mode then
+        handle.log(handle.ERR, cjson.encode(action_params))
+        for k, v in pairs(action_params.headers) do
+            handle.req.set_header(k, v)
+        end
+        return
+    end
+
     if action_params["headers"] and action_params["headers"] ~= cjson.null then
         for k, v in pairs(action_params["headers"]) do
             handle.header[k] = v
@@ -97,6 +105,16 @@ function nativeutils.envoy_custom_response(handle, request_map, action_params)
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end
 
+    if action_params.atype == "alter_headers" and block_mode then
+        log_request(handle, request_map)
+        handle:logDebug("altering the request")
+        local headers = handle:headers()
+        for k, v in pairs(action_params.headers) do
+            headers:replace(k, v)
+        end
+        return
+    end
+
     local response = {
         [ "status" ] = "503",
         [ "headers"] = { [":status"] = "503" },
@@ -116,6 +134,7 @@ function nativeutils.envoy_custom_response(handle, request_map, action_params)
 
     if block_mode then
         log_request(handle, request_map)
+        handle:logDebug(cjson.encode(response))
         handle:respond( response["headers"], response["content"])
     end
 

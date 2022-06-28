@@ -174,6 +174,20 @@ local function test_raw_request(request_path)
           ", but got " .. cjson.encode(r.response.block_mode))
         good = false
       end
+      if raw_request_map.response.headers then
+        local hgood = true
+        for h, v in pairs(raw_request_map.response.headers) do
+          if r.response.headers[h] ~= v then
+            print("Header " .. h .. ", expected " .. cjson.encode(v) .. " but got " ..
+              cjson.encode(r.response.headers[h]))
+            good = false
+            hgood = false
+          end
+        end
+        if not hgood then
+          print("Returned headers are " .. cjson.encode(r.response.headers))
+        end
+      end
       for _, trigger_name in pairs({
          "acl_triggers",
          "rate_limit_triggers",
@@ -195,9 +209,6 @@ local function test_raw_request(request_path)
             good = false
           end
         end
-      end
-      if raw_request_map.response.triggers then
-        error("bad trigger format in " .. raw_request_map.name)
       end
     end
 

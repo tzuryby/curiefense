@@ -216,7 +216,11 @@ pub fn tag_request(
                         tags.clone(),
                         SimpleDecision::Action(
                             a.clone(),
-                            vec![BlockReason::global_filter(psection.id.clone(), psection.name.clone())],
+                            vec![BlockReason::global_filter(
+                                psection.id.clone(),
+                                psection.name.clone(),
+                                a.atype.to_bdecision(),
+                            )],
                         ),
                         stats.mapped(globalfilters.len(), matched),
                     );

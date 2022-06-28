@@ -110,8 +110,7 @@ async fn ban_react<CNX: redis::aio::ConnectionLike>(
             },
         )
         .await;
-        let blocking = action.is_blocking();
-
+        let decision = action.atype.to_bdecision();
         stronger_decision(
             bad,
             SimpleDecision::Action(
@@ -120,7 +119,7 @@ async fn ban_react<CNX: redis::aio::ConnectionLike>(
                     elem.id.to_string(),
                     elem.name.to_string(),
                     redis_key.to_string(),
-                    blocking,
+                    decision,
                 )],
             ),
         )

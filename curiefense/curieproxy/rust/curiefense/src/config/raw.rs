@@ -193,6 +193,7 @@ pub struct RawActionParams {
     pub content: Option<String>,
     pub location: Option<String>,
     pub duration: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl std::default::Default for RawActionParams {
@@ -206,6 +207,7 @@ impl std::default::Default for RawActionParams {
             content: None,
             location: None,
             duration: None,
+            content_type: None,
         }
     }
 }

@@ -109,7 +109,9 @@
                 "limit": "3",
                 "action": {
                     "type": "response",
-                    "content": "body"
+                    "params": {
+                        "content": "body"
+                    }
                 }
             }
         ],
