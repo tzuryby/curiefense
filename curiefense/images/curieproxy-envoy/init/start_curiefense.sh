@@ -29,7 +29,9 @@ do
 	# shellcheck disable=SC2086
 	if [ "$FILEBEAT" = "yes" ]
 	then
-		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS | /usr/bin/filebeat --path.config /etc
+		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS \
+			| grep --line-buffered -v '^-$'
+			| /usr/bin/filebeat --path.config /etc
 	else
 		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS
 	fi

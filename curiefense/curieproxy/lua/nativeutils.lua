@@ -1,7 +1,5 @@
 local nativeutils = {}
 -- helpers for native rust libraries
-local accesslog   = require "lua.accesslog"
-local log_request = accesslog.envoy_log_request
 local cjson       = require "cjson"
 
 function nativeutils.trim(s)
@@ -100,13 +98,12 @@ function nativeutils.log_nginx_messages(handle, logs)
     end
 end
 
-function nativeutils.envoy_custom_response(handle, request_map, action_params)
+function nativeutils.envoy_custom_response(handle, action_params)
     if not action_params then action_params = {} end
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end
 
     if action_params.atype == "alter_headers" and block_mode then
-        log_request(handle, request_map)
         handle:logDebug("altering the request")
         local headers = handle:headers()
         for k, v in pairs(action_params.headers) do
@@ -133,7 +130,6 @@ function nativeutils.envoy_custom_response(handle, request_map, action_params)
     response["headers"][":status"] = response["status"]
 
     if block_mode then
-        log_request(handle, request_map)
         handle:logDebug(cjson.encode(response))
         handle:respond( response["headers"], response["content"])
     end

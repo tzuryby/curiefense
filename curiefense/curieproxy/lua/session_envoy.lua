@@ -59,24 +59,21 @@ function session_rust_envoy.inspect(handle)
         meta, headers, body_content, ip_str
     )
 
+    log_request(handle, jrequest_map)
+
     if err then
         handle:logErr(sfmt("curiefense.inspect_request_map error %s", err))
     end
 
-    local request_map = nil
     if response then
         local response_table = cjson.decode(response)
-        request_map = cjson.decode(jrequest_map)
+        local request_map = cjson.decode(jrequest_map)
         handle:logDebug("decision " .. response)
-        handle:logDebug("request " .. jrequest_map)
         utils.log_envoy_messages(handle, request_map["logs"])
         if response_table["action"] == "custom_response" then
-            custom_response(handle, request_map, response_table["response"])
+            custom_response(handle, response_table["response"])
         end
     end
-
-    log_request(handle, request_map)
-
 end
 
 return session_rust_envoy

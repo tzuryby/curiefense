@@ -7,7 +7,7 @@ output.elasticsearch:
   hosts: "${ELASTICSEARCH_URL}"
 
 logging.to_stderr: true
-logging.level: warning
+logging.level: "${FILEBEAT_LOG_LEVEL:info}"
 logging.metrics.enabled: false
 
 setup.dashboards:

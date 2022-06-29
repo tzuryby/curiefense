@@ -18,6 +18,8 @@ services:
       - TARGET_PORT_B=3000
       - XFF_TRUSTED_HOPS
       - ENVOY_LOG_LEVEL
+      - FILEBEAT
+      - FILEBEAT_LOG_LEVEL
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - KIBANA_URL=http://kibana:5601
     networks:
