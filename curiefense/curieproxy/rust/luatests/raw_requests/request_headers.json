@@ -3,7 +3,7 @@
     "headers": {
       ":authority": "localhost:30081",
       ":method": "GET",
-      ":path": "/anything",
+      ":path": "/anything?ee=12",
       "user-agent": "yay",
       "x-forwarded-for": "82.13.8.87"
     },
@@ -13,7 +13,7 @@
       "block_mode": true,
       "status": 503,
       "headers": {
-        "h1": "v1"
+        "h1": "82.13.8.87 - nil - 12"
       }
     }
   }

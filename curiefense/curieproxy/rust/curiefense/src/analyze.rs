@@ -112,7 +112,7 @@ pub async fn analyze<GH: Grasshopper>(
     if let SimpleDecision::Action(action, reason) = globalfilter_dec {
         logs.debug(|| format!("Global filter decision {:?}", reason));
         brs.extend(reason);
-        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
+        let decision = action.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
         if decision.is_final() {
             return AnalyzeResult {
                 decision,
@@ -131,7 +131,7 @@ pub async fn analyze<GH: Grasshopper>(
         Ok(SimpleDecision::Pass) => (),
         Ok(SimpleDecision::Action(a, curbrs)) => {
             brs.extend(curbrs);
-            let decision = a.to_decision(is_human, &mgh, &reqinfo.headers, brs);
+            let decision = a.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
             if decision.is_final() {
                 return AnalyzeResult {
                     decision,
@@ -158,7 +158,7 @@ pub async fn analyze<GH: Grasshopper>(
     .await;
     if let SimpleDecision::Action(action, curbrs) = limit_check {
         brs.extend(curbrs);
-        let decision = action.to_decision(is_human, &mgh, &reqinfo.headers, brs);
+        let decision = action.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
         if decision.is_final() {
             return AnalyzeResult {
                 decision,

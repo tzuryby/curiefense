@@ -4,7 +4,7 @@ use crate::Logs;
 use std::collections::HashMap;
 
 use crate::config::flow::{FlowElement, SequenceKey};
-use crate::config::utils::RequestSelector;
+use crate::config::matchers::RequestSelector;
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::utils::{check_selector_cond, select_string, RequestInfo};
 

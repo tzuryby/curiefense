@@ -6,12 +6,13 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 pub mod decoders;
+pub mod templating;
 pub mod url;
 
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
+use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
-use crate::config::utils::{RequestSelector, RequestSelectorCondition};
 use crate::interface::stats::Stats;
 use crate::interface::{Decision, Location, Tags};
 use crate::logs::Logs;
@@ -505,7 +506,7 @@ pub fn map_request(
     }
 }
 
-enum Selected<'a> {
+pub enum Selected<'a> {
     OStr(String),
     Str(&'a String),
     U32(u32),
@@ -515,7 +516,7 @@ enum Selected<'a> {
 ///
 /// the reason we return this selected type instead of something directly string-like is
 /// to avoid copies, because in the Asn case there is no way to return a reference
-fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<Selected<'a>> {
+pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<Selected<'a>> {
     match sel {
         RequestSelector::Args(k) => reqinfo.rinfo.qinfo.args.get(k).map(Selected::Str),
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),

@@ -1,7 +1,7 @@
 use crate::config::contentfilter::SectionIdx;
 use serde::ser::SerializeMap;
 use serde::Serialize;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Location {

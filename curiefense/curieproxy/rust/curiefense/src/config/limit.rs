@@ -3,10 +3,10 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use crate::config::raw::{RawLimit, RawLimitSelector};
-use crate::config::utils::{
+use crate::config::matchers::{
     decode_request_selector_condition, resolve_selector_raw, RequestSelector, RequestSelectorCondition, SelectorType,
 };
+use crate::config::raw::{RawLimit, RawLimitSelector};
 use crate::interface::SimpleAction;
 use crate::logs::Logs;
 

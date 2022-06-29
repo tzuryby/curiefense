@@ -1,8 +1,8 @@
+use crate::config::matchers::Matching;
 use crate::config::raw::{
     ContentFilterGroup, ContentFilterRule, ContentType, RawContentFilterEntryMatch, RawContentFilterProfile,
     RawContentFilterProperties,
 };
-use crate::config::utils::Matching;
 use crate::interface::RawTags;
 use crate::logs::Logs;
 

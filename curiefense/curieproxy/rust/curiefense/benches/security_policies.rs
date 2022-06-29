@@ -1,7 +1,7 @@
 use curiefense::config::contentfilter::ContentFilterProfile;
 use curiefense::config::hostmap::*;
+use curiefense::config::matchers::Matching;
 use curiefense::config::raw::AclProfile;
-use curiefense::config::utils::Matching;
 use curiefense::config::Config;
 use curiefense::logs::Logs;
 use curiefense::securitypolicy::match_securitypolicy;

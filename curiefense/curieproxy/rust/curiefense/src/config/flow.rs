@@ -2,8 +2,8 @@ use anyhow::Context;
 use std::collections::{HashMap, HashSet};
 
 use crate::config::limit::{resolve_selector_map, resolve_selectors};
+use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::{RawFlowEntry, RawFlowStep, RawLimitSelector};
-use crate::config::utils::{RequestSelector, RequestSelectorCondition};
 use crate::interface::SimpleAction;
 use crate::logs::Logs;
 

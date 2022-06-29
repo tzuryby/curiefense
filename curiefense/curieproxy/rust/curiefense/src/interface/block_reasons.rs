@@ -1,12 +1,11 @@
 /// this file contains all the data type that are used when interfacing with a proxy
 use crate::config::contentfilter::SectionIdx;
 use serde::ser::SerializeMap;
-use serde::{Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 use super::tagging::{Location, Tags};
-
 
 #[derive(Debug, Clone, Copy, Serialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

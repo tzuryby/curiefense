@@ -3,8 +3,8 @@ pub mod flow;
 pub mod globalfilter;
 pub mod hostmap;
 pub mod limit;
+pub mod matchers;
 pub mod raw;
-pub mod utils;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -19,8 +19,8 @@ use contentfilter::{resolve_rules, ContentFilterProfile, ContentFilterRules};
 use flow::{flow_resolve, FlowElement, SequenceKey};
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, SecurityPolicy};
+use matchers::Matching;
 use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
-use utils::Matching;
 
 use self::raw::RawManifest;
 

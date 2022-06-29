@@ -660,7 +660,7 @@
          "type": "request_header",
          "params": {
             "headers": {
-               "h1": "v1"
+               "h1": "${ip} - ${args.dd} - ${args.ee}"
             }
          }
       },

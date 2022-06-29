@@ -511,7 +511,7 @@ mod test {
             restrict: false,
             mask: true,
             exclusions: HashSet::default(),
-            reg: Some(crate::config::utils::Matching::from_str("SECRET", "SECRET".to_string()).unwrap()),
+            reg: Some(crate::config::matchers::Matching::from_str("SECRET", "SECRET".to_string()).unwrap()),
         }
     }
 

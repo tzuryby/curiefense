@@ -54,7 +54,9 @@ fn resolve_selector_type(k: &str) -> anyhow::Result<SelectorType> {
         "headers" => Ok(SelectorType::Headers),
         "cookies" => Ok(SelectorType::Cookies),
         "args" => Ok(SelectorType::Args),
+        "arguments" => Ok(SelectorType::Args),
         "attrs" => Ok(SelectorType::Attrs),
+        "attributes" => Ok(SelectorType::Attrs),
         _ => Err(anyhow::anyhow!("Unknown selector type {}", k)),
     }
 }

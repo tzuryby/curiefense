@@ -1,9 +1,10 @@
+use crate::config::matchers::RequestSelector;
 /// this file contains all the data type that are used when interfacing with a proxy
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
-use crate::requestfields::RequestField;
-use crate::utils::RequestInfo;
+use crate::utils::templating::{parse_request_template, RequestTemplate, TemplatePart};
+use crate::utils::{selector, RequestInfo, Selected};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -204,7 +205,7 @@ pub struct Action {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimpleActionT {
     Monitor,
-    RequestHeader(HashMap<String, String>),
+    RequestHeader(HashMap<String, RequestTemplate>),
     Response {
         content: String,
         content_type: Option<String>,
@@ -331,9 +332,18 @@ impl SimpleAction {
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(3600),
             ),
-            RawActionType::RequestHeader => {
-                SimpleActionT::RequestHeader(rawaction.params.headers.clone().unwrap_or_default())
-            }
+            RawActionType::RequestHeader => SimpleActionT::RequestHeader(
+                rawaction
+                    .params
+                    .headers
+                    .as_ref()
+                    .map(|hm| {
+                        hm.iter()
+                            .map(|(k, v)| (k.to_string(), parse_request_template(v)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            ),
             RawActionType::Response => SimpleActionT::Response {
                 content: rawaction
                     .params
@@ -367,7 +377,7 @@ impl SimpleAction {
     }
 
     /// returns None when it is a challenge, Some(action) otherwise
-    fn to_action(&self, is_human: bool) -> Option<Action> {
+    fn to_action(&self, rinfo: &RequestInfo, tags: &Tags, is_human: bool) -> Option<Action> {
         let mut action = Action::default();
         action.block_mode = action.atype.is_blocking();
         action.status = self.status;
@@ -375,11 +385,15 @@ impl SimpleAction {
             SimpleActionT::Default => {}
             SimpleActionT::Monitor => action.atype = ActionType::Monitor,
             SimpleActionT::Ban(sub, _) => {
-                action = sub.to_action(is_human).unwrap_or_default();
+                action = sub.to_action(rinfo, tags, is_human).unwrap_or_default();
                 action.ban = true;
             }
             SimpleActionT::RequestHeader(hdrs) => {
-                action.headers = Some(hdrs.clone());
+                action.headers = Some(
+                    hdrs.iter()
+                        .map(|(k, template)| (k.to_string(), render_template(rinfo, tags, template)))
+                        .collect(),
+                );
                 action.atype = ActionType::AlterHeaders;
             }
             SimpleActionT::Response { content, content_type } => {
@@ -410,22 +424,15 @@ impl SimpleAction {
         &self,
         is_human: bool,
         mgh: &Option<GH>,
-        headers: &RequestField,
+        rinfo: &RequestInfo,
+        tags: &Tags,
         reason: Vec<BlockReason>,
     ) -> Decision {
-        let action = match self.to_action(is_human) {
-            None => match (mgh, headers.get("user-agent")) {
+        let action = match self.to_action(rinfo, tags, is_human) {
+            None => match (mgh, rinfo.headers.get("user-agent")) {
                 (Some(gh), Some(ua)) => return challenge_phase01(gh, ua, reason),
                 _ => Action::default(),
             },
-            Some(a) => a,
-        };
-        Decision::action(action, reason)
-    }
-
-    pub fn to_decision_no_challenge(&self, reason: Vec<BlockReason>) -> Decision {
-        let action = match self.to_action(true) {
-            None => Action::default(),
             Some(a) => a,
         };
         Decision::action(action, reason)
@@ -436,11 +443,18 @@ impl SimpleAction {
     }
 }
 
-impl SimpleDecision {
-    pub fn into_decision_no_challenge(self) -> Decision {
-        match self {
-            SimpleDecision::Pass => Decision::pass(Vec::new()),
-            SimpleDecision::Action(action, reason) => action.to_decision_no_challenge(reason),
+fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<RequestSelector>]) -> String {
+    let mut out = String::new();
+    for p in template {
+        match p {
+            TemplatePart::Raw(s) => out.push_str(s),
+            TemplatePart::Var(sel) => match selector(rinfo, sel, tags) {
+                None => out.push_str("nil"),
+                Some(Selected::OStr(s)) => out.push_str(&s),
+                Some(Selected::Str(s)) => out.push_str(s),
+                Some(Selected::U32(v)) => out.push_str(&v.to_string()),
+            },
         }
     }
+    out
 }
