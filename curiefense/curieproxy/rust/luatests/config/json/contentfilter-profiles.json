@@ -212,7 +212,10 @@
             "names": [],
             "regex": []
         },
-        "active": ["sqli","waf"]
+        "active": [
+            "sqli",
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -311,7 +314,9 @@
             "names": [],
             "regex": []
         },
-        "active": ["waf"]
+        "active": [
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -348,7 +353,9 @@
             "names": [],
             "regex": []
         },
-        "active": ["waf"]
+        "active": [
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -421,7 +428,9 @@
             "names": [],
             "regex": []
         },
-        "active": ["waf"]
+        "active": [
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -497,7 +506,9 @@
             "names": [],
             "regex": []
         },
-        "active": ["waf"]
+        "active": [
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -557,7 +568,9 @@
             "names": [],
             "regex": []
         },
-        "active": ["waf"]
+        "active": [
+            "waf"
+        ]
     },
     {
         "masking_seed": "CHANGEME",
@@ -1325,5 +1338,60 @@
             "multipart_form",
             "url_encoded"
         ]
+    },
+    {
+        "allsections": {
+            "max_count": 24,
+            "max_length": 1024,
+            "names": [
+                {
+                    "exclusions": [],
+                    "key": "special",
+                    "mask": false,
+                    "reg": "^[A-Z]+",
+                    "restrict": true
+                }
+            ],
+            "regex": []
+        },
+        "args": {
+            "max_count": 24,
+            "max_length": 1024,
+            "names": [
+                {
+                    "exclusions": [],
+                    "key": "special",
+                    "mask": false,
+                    "reg": ".*",
+                    "restrict": false
+                }
+            ],
+            "regex": []
+        },
+        "cookies": {
+            "max_count": 42,
+            "max_length": 1024,
+            "names": [],
+            "regex": []
+        },
+        "decoding": {
+            "base64": true
+        },
+        "headers": {
+            "max_count": 42,
+            "max_length": 1024,
+            "names": [],
+            "regex": []
+        },
+        "id": "allsections",
+        "ignore_alphanum": false,
+        "name": "all sections test",
+        "path": {
+            "max_count": 42,
+            "max_length": 2048,
+            "names": [],
+            "regex": []
+        },
+        "masking_seed": "CHANGEME"
     }
 ]

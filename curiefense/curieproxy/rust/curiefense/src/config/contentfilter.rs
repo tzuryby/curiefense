@@ -196,12 +196,24 @@ fn mk_entry_match(em: RawContentFilterEntryMatch) -> anyhow::Result<(String, Con
     ))
 }
 
-fn mk_section(props: RawContentFilterProperties) -> anyhow::Result<ContentFilterSection> {
-    let mnames: anyhow::Result<HashMap<String, ContentFilterEntryMatch>> =
-        props.names.into_iter().map(mk_entry_match).collect();
-    let mregex: anyhow::Result<Vec<(Regex, ContentFilterEntryMatch)>> = props
+fn mk_section(
+    allsections: &RawContentFilterProperties,
+    props: RawContentFilterProperties,
+) -> anyhow::Result<ContentFilterSection> {
+    // allsections entries are iterated first, so that they are replaced by entries in prop in case of colision
+    // however, max_count and max_length in allsections are ignored
+    let mnames: anyhow::Result<HashMap<String, ContentFilterEntryMatch>> = allsections
+        .names
+        .iter()
+        .cloned()
+        .chain(props.names.into_iter())
+        .map(mk_entry_match)
+        .collect();
+    let mregex: anyhow::Result<Vec<(Regex, ContentFilterEntryMatch)>> = allsections
         .regex
-        .into_iter()
+        .iter()
+        .cloned()
+        .chain(props.regex.into_iter())
         .map(|e| {
             let (s, v) = mk_entry_match(e)?;
             let re = Regex::new(&s)?;
@@ -240,10 +252,10 @@ fn convert_entry(entry: RawContentFilterProfile) -> anyhow::Result<(String, Cont
             name: entry.name,
             ignore_alphanum: entry.ignore_alphanum,
             sections: Section {
-                headers: mk_section(entry.headers)?,
-                cookies: mk_section(entry.cookies)?,
-                args: mk_section(entry.args)?,
-                path: mk_section(entry.path)?,
+                headers: mk_section(&entry.allsections, entry.headers)?,
+                cookies: mk_section(&entry.allsections, entry.cookies)?,
+                args: mk_section(&entry.allsections, entry.args)?,
+                path: mk_section(&entry.allsections, entry.path)?,
             },
             decoding,
             masking_seed: entry.masking_seed.as_bytes().to_vec(),

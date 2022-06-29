@@ -270,6 +270,8 @@ pub struct RawContentFilterProfile {
     #[serde(default)]
     pub path: RawContentFilterProperties,
     #[serde(default)]
+    pub allsections: RawContentFilterProperties,
+    #[serde(default)]
     pub decoding: ContentFilterDecoding,
     #[serde(default)]
     pub active: Vec<String>,
