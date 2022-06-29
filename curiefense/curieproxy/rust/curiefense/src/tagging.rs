@@ -381,9 +381,7 @@ mod tests {
         let mut ri = mk_rinfo();
         for (ip, expected) in samples {
             ri.rinfo.geoip.ip = Some(ip.parse().unwrap());
-            println!("UN {} {:?}", ip, ssection);
             assert_eq!(check_subsection(&ri, &tags, &ssection).matching, *expected);
-            println!("OP {} {:?}", ip, optimized);
             assert_eq!(check_subsection(&ri, &tags, &optimized).matching, *expected);
         }
     }

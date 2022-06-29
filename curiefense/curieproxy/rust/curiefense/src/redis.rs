@@ -64,7 +64,7 @@ pub async fn extract_bannable_action<CNX: redis::aio::ConnectionLike>(
                     .query_async::<_, ()>(cnx)
                     .await
                 {
-                    println!("*** Redis error {}", rr);
+                    logs.error(|| format!("Redis error {}", rr));
                 }
             }
         }

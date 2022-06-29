@@ -281,7 +281,7 @@ mod tests {
                 }
                 n => {
                     for r in logs.logs.iter() {
-                        println!("{}", r);
+                        eprintln!("{}", r);
                     }
                     panic!("Invalid amount of logs: {}", n);
                 }
