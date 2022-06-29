@@ -448,6 +448,7 @@ fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<Re
     for p in template {
         match p {
             TemplatePart::Raw(s) => out.push_str(s),
+            TemplatePart::Var(RequestSelector::Tags) => out.push_str(&tags.to_json().to_string()),
             TemplatePart::Var(sel) => match selector(rinfo, sel, tags) {
                 None => out.push_str("nil"),
                 Some(Selected::OStr(s)) => out.push_str(&s),
