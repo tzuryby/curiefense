@@ -17,7 +17,15 @@ function session_rust_nginx.inspect(handle)
     end
 
     for k, v in pairs(rheaders) do
-        headers[k] = v
+        if type(v) == "table" then
+            local new_v = ""
+            for i = 1, #v do
+                new_v = new_v .. " " .. v[i]
+            end
+            headers[k] = new_v
+        else
+            headers[k] = v
+        end
     end
 
     handle.log(handle.INFO, cjson.encode(headers))
