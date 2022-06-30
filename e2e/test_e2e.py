@@ -179,9 +179,7 @@ class LogHelper:
         self._es_url = es_url + "/_search"
 
     def check_log_pattern(self, pattern):
-        data = {
-            "query": {"bool": {"must": {"match": {"uri": pattern}}}}
-        }
+        data = {"query": {"bool": {"must": {"match": {"uri": pattern}}}}}
         res = requests.get(self._es_url, json=data)
         nbhits = res.json()["hits"]["total"]["value"]
         if nbhits == 1:
