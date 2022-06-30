@@ -26,13 +26,14 @@ sed -e "s/TARGET_ADDRESS_A/$TADDRA/" -e "s/TARGET_PORT_A/$TPORTA/" -e "s/TARGET_
 
 while true
 do
-	# shellcheck disable=SC2086
 	if [ "$FILEBEAT" = "yes" ]
 	then
+		# shellcheck disable=SC2086
 		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS \
-			| grep --line-buffered -v '^-$'
+			| grep --line-buffered -v '^-$' \
 			| /usr/bin/filebeat --path.config /etc
 	else
+		# shellcheck disable=SC2086
 		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS
 	fi
 	sleep 1
