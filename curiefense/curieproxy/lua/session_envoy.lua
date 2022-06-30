@@ -41,7 +41,11 @@ function session_rust_envoy.inspect(handle)
         if utils.startswith(k, ":") then
             meta[k:sub(2):lower()] = v
         else
-            headers[k] = v
+            if headers[k] then
+                headers[k] = headers[k] .. " " .. v
+            else
+                headers[k] = v
+            end
         end
     end
 
