@@ -180,7 +180,7 @@ class LogHelper:
 
     def check_log_pattern(self, pattern):
         data = {
-            "query": {"bool": {"must": {"match": {"request.attributes.uri": pattern}}}}
+            "query": {"bool": {"must": {"match": {"uri": pattern}}}}
         }
         res = requests.get(self._es_url, json=data)
         nbhits = res.json()["hits"]["total"]["value"]
