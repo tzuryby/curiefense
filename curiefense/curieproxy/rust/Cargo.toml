@@ -8,6 +8,12 @@ members = [
     "curiefense-externalprocessing",
 ]
 
+default-members = [
+    "curiefense",
+    "curiefense-lua",
+    "curiefense-externalprocessing",
+]
+
 [profile.bench]
 debug = true
 lto = true
