@@ -3,7 +3,7 @@ use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
-use crate::utils::templating::{parse_request_template, RequestTemplate, TemplatePart};
+use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -443,13 +443,16 @@ impl SimpleAction {
     }
 }
 
-fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<RequestSelector>]) -> String {
+fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<TVar>]) -> String {
     let mut out = String::new();
     for p in template {
         match p {
             TemplatePart::Raw(s) => out.push_str(s),
-            TemplatePart::Var(RequestSelector::Tags) => out.push_str(&tags.to_json().to_string()),
-            TemplatePart::Var(sel) => match selector(rinfo, sel, tags) {
+            TemplatePart::Var(TVar::Selector(RequestSelector::Tags)) => out.push_str(&tags.to_json().to_string()),
+            TemplatePart::Var(TVar::Tag(tagname)) => {
+                out.push_str(if tags.contains(tagname) { "true" } else { "false" })
+            }
+            TemplatePart::Var(TVar::Selector(sel)) => match selector(rinfo, sel, tags) {
                 None => out.push_str("nil"),
                 Some(Selected::OStr(s)) => out.push_str(&s),
                 Some(Selected::Str(s)) => out.push_str(s),

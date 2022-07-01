@@ -1,13 +1,19 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take, take_till1, take_while, take_while1},
-    combinator::{all_consuming, map, recognize},
+    combinator::{all_consuming, map, opt, recognize},
     multi::many0,
     sequence::{delimited, pair, preceded},
     IResult,
 };
 
 use crate::config::matchers::{decode_attribute, resolve_selector_raw, RequestSelector};
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TVar {
+    Selector(RequestSelector),
+    Tag(String), // match for a specific tag
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TemplatePartT<'t, A> {
@@ -66,25 +72,29 @@ where
     }
 }
 
-fn parse_selector(input: &str) -> IResult<&str, RequestSelector> {
+fn parse_tvar(input: &str) -> IResult<&str, TVar> {
     let (input, selp1) = take_while1(|c| ('a'..='z').contains(&c))(input)?;
-    if let Some(rs) = decode_attribute(selp1) {
-        return Ok((input, rs));
-    }
-    let (input, selp2) = preceded(tag("."), take_till1(|c| c == '}'))(input)?;
-    match resolve_selector_raw(selp1, selp2) {
-        Err(_) => nom::combinator::fail(input),
-        Ok(t) => Ok((input, t)),
+    let (input, oselp2) = opt(preceded(tag("."), take_till1(|c| c == '}')))(input)?;
+    match (selp1, oselp2) {
+        (_, None) => {
+            if let Some(rs) = decode_attribute(selp1) {
+                Ok((input, TVar::Selector(rs)))
+            } else {
+                nom::combinator::fail(input)
+            }
+        }
+        ("tags", Some(tagname)) => Ok((input, TVar::Tag(tagname.to_string()))),
+        (_, Some(selp2)) => match resolve_selector_raw(selp1, selp2) {
+            Err(_) => nom::combinator::fail(input),
+            Ok(t) => Ok((input, TVar::Selector(t))),
+        },
     }
 }
 
-pub type RequestTemplate = Vec<TemplatePart<RequestSelector>>;
+pub type RequestTemplate = Vec<TemplatePart<TVar>>;
 
 pub fn parse_request_template(i: &str) -> RequestTemplate {
-    parse_template(parse_selector, i)
-        .into_iter()
-        .map(|p| p.owned())
-        .collect()
+    parse_template(parse_tvar, i).into_iter().map(|p| p.owned()).collect()
 }
 
 #[cfg(test)]
@@ -141,13 +151,14 @@ mod test {
 
     #[test]
     fn selector_a() {
+        use TVar::*;
         use TemplatePart::*;
         assert_eq!(
             parse_request_template("${ip} - ${headers.foo-bar}"),
             vec![
-                Var(RequestSelector::Ip),
+                Var(Selector(RequestSelector::Ip)),
                 Raw(" - ".to_string()),
-                Var(RequestSelector::Header("foo-bar".to_string()))
+                Var(Selector(RequestSelector::Header("foo-bar".to_string())))
             ]
         )
     }
