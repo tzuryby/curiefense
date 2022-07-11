@@ -45,10 +45,8 @@ fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mu
                 }
             };
         } else {
-            logs.warning("Could not find useragent!");
+            logs.debug("Could not find useragent!");
         }
-    } else {
-        logs.warning("Could not find rbzid cookie!")
     }
     false
 }
