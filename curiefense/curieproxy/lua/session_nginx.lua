@@ -1,9 +1,41 @@
 local session_rust_nginx = {}
 local cjson       = require "cjson"
 local curiefense  = require "curiefense"
-local utils       = require "lua.nativeutils"
 local sfmt = string.format
-local custom_response = utils.nginx_custom_response
+
+local function custom_response(handle, action_params)
+    if not action_params then action_params = {} end
+    local block_mode = action_params.block_mode
+    -- if not block_mode then block_mode = true end
+
+    if action_params.atype == "alter_headers" and block_mode then
+        handle.log(handle.ERR, cjson.encode(action_params))
+        for k, v in pairs(action_params.headers) do
+            handle.req.set_header(k, v)
+        end
+        return
+    end
+
+    if action_params["headers"] and action_params["headers"] ~= cjson.null then
+        for k, v in pairs(action_params["headers"]) do
+            handle.header[k] = v
+        end
+    end
+
+    if action_params["status"] then
+        local raw_status = action_params["status"]
+        local status = tonumber(raw_status) or raw_status
+        handle.status = status
+    end
+
+    handle.log(handle.ERR, cjson.encode(action_params))
+
+    if block_mode then
+        if action_params["content"] then handle.say(action_params["content"]) end
+        handle.exit(handle.HTTP_OK)
+    end
+
+end
 
 local function make_safe_headers(rheaders)
     local headers = {}
@@ -61,7 +93,9 @@ function session_rust_nginx.inspect(handle)
     if response then
         local response_table = cjson.decode(response)
         handle.log(handle.DEBUG, "decision: " .. response)
-        utils.log_nginx_messages(handle, res.logs)
+        for _, log in ipairs(res.logs) do
+            handle.log(handle.DEBUG, log)
+        end
         if response_table["action"] == "custom_response" then
             custom_response(handle, response_table["response"])
         end

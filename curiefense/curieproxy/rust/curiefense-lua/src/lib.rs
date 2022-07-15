@@ -11,6 +11,27 @@ use curiefense::inspect_generic_request_map;
 use curiefense::logs::Logs;
 use curiefense::utils::{InspectionResult, RawRequest};
 
+/// Utility to add the return status to the log string
+fn lua_set_status_string(_lua: &Lua, args: (String, String)) -> LuaResult<String> {
+    let (data, code) = args;
+    match code.parse::<u32>() {
+        Err(_) => Ok(data),
+        Ok(cde) => match serde_json::from_str::<serde_json::Value>(&data) {
+            Err(_) => Ok(data),
+            Ok(mut value) => match value.as_object_mut() {
+                None => Ok(data),
+                Some(mp) => {
+                    mp.insert(
+                        "response_code".to_string(),
+                        serde_json::Value::Number(serde_json::Number::from(cde)),
+                    );
+                    Ok(serde_json::to_string(mp).unwrap_or(data))
+                }
+            },
+        },
+    }
+}
+
 // ******************************************
 // Content Filter ONLY CHECKS
 // ******************************************
@@ -277,6 +298,8 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
         "inspect_content_filter",
         lua.create_function(lua_inspect_content_filter)?,
     )?;
+    // setting the HTTP status code
+    exports.set("set_status_string", lua.create_function(lua_set_status_string)?)?;
 
     Ok(exports)
 }
