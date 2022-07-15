@@ -17,7 +17,7 @@ pub enum CFProgress {
     CFError = 2,
 }
 
-pub struct CHashmap {
+pub struct CFHashmap {
     inner: HashMap<String, String>,
 }
 
@@ -25,17 +25,25 @@ pub struct CHashmap {
 ///
 /// New C hashmap
 #[no_mangle]
-pub unsafe extern "C" fn cf_hashmap_new() -> *mut CHashmap {
-    Box::into_raw(Box::new(CHashmap { inner: HashMap::new() }))
+pub unsafe extern "C" fn cf_hashmap_new() -> *mut CFHashmap {
+    Box::into_raw(Box::new(CFHashmap { inner: HashMap::new() }))
 }
 
 /// # Safety
 ///
 /// Insert into the hashmap. The key and value are not consumed by this API (it copies them).
 #[no_mangle]
-pub unsafe extern "C" fn cf_hashmap_insert(hm: *mut CHashmap, key: *const c_char, value: *const c_char) {
-    let s_key = CStr::from_ptr(key).to_string_lossy().to_string();
-    let s_value = CStr::from_ptr(value).to_string_lossy().to_string();
+pub unsafe extern "C" fn cf_hashmap_insert(
+    hm: *mut CFHashmap,
+    key: *const c_char,
+    key_size: usize,
+    value: *const c_char,
+    value_size: usize,
+) {
+    let sl_key = std::slice::from_raw_parts(key as *const u8, key_size);
+    let s_key = String::from_utf8_lossy(sl_key).to_string();
+    let sl_value = std::slice::from_raw_parts(value as *const u8, value_size);
+    let s_value = String::from_utf8_lossy(sl_value).to_string();
     if let Some(r) = hm.as_mut() {
         r.inner.insert(s_key, s_value);
     }
@@ -45,7 +53,7 @@ pub unsafe extern "C" fn cf_hashmap_insert(hm: *mut CHashmap, key: *const c_char
 ///
 /// Frees a hashmap, and all its content.
 #[no_mangle]
-pub unsafe extern "C" fn cf_hashmap_free(ptr: *mut CHashmap) {
+pub unsafe extern "C" fn cf_hashmap_free(ptr: *mut CFHashmap) {
     if ptr.is_null() {
         return;
     }
@@ -229,12 +237,32 @@ pub async fn inspect_wrapper<GH: Grasshopper>(
 /// # Safety
 ///
 /// Initializes the inspection, returning an executor in case of success, or a null pointer in case of failure.
+///
+/// Note that the hashmaps raw_meta and raw_headers are consumed and freed by this function.
+///
+/// Arguments
+///
+/// loglevel:
+///     0. debug
+///     1. info
+///     2. warning
+///     3. error
+/// raw_configpath: path to the configuration directory
+/// raw_meta: hashmap containing the meta properties.
+///     * required: method and path
+///     * technically optional, but highly recommended: authority, x-request-id
+/// raw_headers: hashmap containing the request headers
+/// raw_ip: a string representing the source IP for the request
+/// mbody: body as a single buffer, or NULL if no body is present
+/// mbody_len: length of the body. It MUST be 0 if mbody is NULL.
+/// cb: the callback that will be used to signal an asynchronous function finished
+/// data: data for the callback
 #[no_mangle]
 pub unsafe extern "C" fn curiefense_async_init(
     loglevel: u8,
     raw_configpath: *const c_char,
-    raw_meta: *mut CHashmap,
-    raw_headers: *mut CHashmap,
+    raw_meta: *mut CFHashmap,
+    raw_headers: *mut CFHashmap,
     raw_ip: *const c_char,
     mbody: *const c_uchar,
     mbody_len: usize,

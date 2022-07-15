@@ -11,6 +11,7 @@ members = [
 default-members = [
     "curiefense",
     "curiefense-lua",
+    "curiefense-ffi",
     "curiefense-externalprocessing",
 ]
 
