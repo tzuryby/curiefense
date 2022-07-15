@@ -1,5 +1,6 @@
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
+use curiefense::interface::Tags;
 use curiefense::utils::RequestMeta;
 use mlua::prelude::*;
 use mlua::FromLua;
@@ -33,7 +34,7 @@ fn lua_inspect_content_filter(
         String,                  // ip
         String,                  // content_filter_id
     ),
-) -> LuaResult<(String, String, Option<String>)> {
+) -> LuaResult<LuaInspectionResult> {
     let (meta, headers, lua_body, str_ip, content_filter_id) = args;
 
     let res = inspect_content_filter(
@@ -44,14 +45,7 @@ fn lua_inspect_content_filter(
         str_ip,
         content_filter_id,
     );
-
-    Ok(match res {
-        Err(rr) => ("null".to_string(), "null".to_string(), Some(rr)),
-        Ok(ir) => {
-            let ((l, r), rr) = ir.into_legacy_json();
-            (l, r, rr)
-        }
-    })
+    Ok(LuaInspectionResult(res))
 }
 
 /// Rust-native inspection top level function
@@ -87,6 +81,51 @@ fn inspect_content_filter(
     })
 }
 
+struct LuaInspectionResult(Result<InspectionResult, String>);
+impl LuaInspectionResult {
+    fn get_with_o<F, A>(&self, f: F) -> LuaResult<Option<A>>
+    where
+        F: FnOnce(&InspectionResult) -> Option<A>,
+    {
+        Ok(match &self.0 {
+            Ok(res) => f(res),
+            Err(_) => None,
+        })
+    }
+    fn get_with<F, A>(&self, f: F) -> LuaResult<Option<A>>
+    where
+        F: FnOnce(&InspectionResult) -> A,
+    {
+        self.get_with_o(|r| Some(f(r)))
+    }
+}
+impl mlua::UserData for LuaInspectionResult {
+    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("error", |_, this| {
+            Ok(match &this.0 {
+                Ok(res) => res.err.clone(),
+                Err(r) => Some(r.clone()),
+            })
+        });
+        fields.add_field_method_get("blocking", |_, this| {
+            Ok(match &this.0 {
+                Ok(r) => r.decision.is_blocking(),
+                Err(_) => false,
+            })
+        });
+        fields.add_field_method_get("tags", |_, this| {
+            this.get_with(|r| {
+                r.tags
+                    .as_ref()
+                    .map(|tgs: &Tags| tgs.as_hash_ref().keys().cloned().collect::<Vec<_>>())
+            })
+        });
+        fields.add_field_method_get("logs", |_, this| this.get_with(|r| r.logs.to_stringvec()));
+        fields.add_field_method_get("response", |_, this| this.get_with(|r| r.decision.response_json()));
+        fields.add_field_method_get("request_map", |_, this| this.get_with(|r| r.log_json()));
+    }
+}
+
 // ******************************************
 // FULL CHECKS
 // ******************************************
@@ -94,7 +133,7 @@ fn inspect_content_filter(
 /// Lua interface to the inspection function
 ///
 /// args are
-/// * meta (contains keys "method", "path", and optionally "authority")
+/// * meta (contains keys "method", "path" and optionally "authority" and "x-request-id")
 /// * headers
 /// * (opt) body
 /// * ip addr
@@ -106,23 +145,23 @@ fn lua_inspect_request(
         LuaValue, // optional body
         LuaValue, // ip
     ),
-) -> LuaResult<(String, String, Option<String>)> {
+) -> LuaResult<LuaInspectionResult> {
     let (vmeta, vheaders, vlua_body, vstr_ip) = args;
-    let dnull = |rr| ("null".to_string(), "null".to_string(), Some(rr));
+    let lerr = |rr| Ok(LuaInspectionResult(Err(rr)));
     let meta = match FromLua::from_lua(vmeta, lua) {
-        Err(rr) => return Ok(dnull(format!("Could not convert the meta argument: {}", rr))),
+        Err(rr) => return lerr(format!("Could not convert the meta argument: {}", rr)),
         Ok(m) => m,
     };
     let headers = match FromLua::from_lua(vheaders, lua) {
-        Err(rr) => return Ok(dnull(format!("Could not convert the headers argument: {}", rr))),
+        Err(rr) => return lerr(format!("Could not convert the headers argument: {}", rr)),
         Ok(h) => h,
     };
     let lua_body: Option<LuaString> = match FromLua::from_lua(vlua_body, lua) {
-        Err(rr) => return Ok(dnull(format!("Could not convert the body argument: {}", rr))),
+        Err(rr) => return lerr(format!("Could not convert the body argument: {}", rr)),
         Ok(b) => b,
     };
     let str_ip = match FromLua::from_lua(vstr_ip, lua) {
-        Err(rr) => return Ok(dnull(format!("Could not convert the ip argument: {}", rr))),
+        Err(rr) => return lerr(format!("Could not convert the ip argument: {}", rr)),
         Ok(i) => i,
     };
     let grasshopper = DynGrasshopper {};
@@ -134,14 +173,7 @@ fn lua_inspect_request(
         str_ip,
         Some(grasshopper),
     );
-
-    Ok(match res {
-        Err(rr) => dnull(rr),
-        Ok(ir) => {
-            let ((l, r), rr) = ir.into_legacy_json();
-            (l, r, rr)
-        }
-    })
+    Ok(LuaInspectionResult(res))
 }
 
 struct DummyGrasshopper {
@@ -186,7 +218,7 @@ fn lua_test_inspect_request(
         String,                  // ip
         bool,                    // humanity
     ),
-) -> LuaResult<(String, String, Option<String>)> {
+) -> LuaResult<LuaInspectionResult> {
     let (meta, headers, lua_body, str_ip, humanity) = args;
     let grasshopper = Some(DummyGrasshopper { humanity });
 
@@ -198,14 +230,7 @@ fn lua_test_inspect_request(
         str_ip,
         grasshopper,
     );
-
-    Ok(match res {
-        Err(rr) => ("null".to_string(), "null".to_string(), Some(rr)),
-        Ok(ir) => {
-            let ((l, r), rr) = ir.into_legacy_json();
-            (l, r, rr)
-        }
-    })
+    Ok(LuaInspectionResult(res))
 }
 
 /// Rust-native inspection top level function

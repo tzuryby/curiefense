@@ -346,15 +346,17 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub fn into_legacy_json(self) -> ((String, String), Option<String>) {
-        let resp = match self.rinfo {
-            // return the request map, but only if we have it !
-            None => self.decision.to_legacy_json_raw(serde_json::Value::Null),
-            Some(rinfo) => self
-                .decision
-                .to_legacy_json(rinfo, self.tags.unwrap_or_default(), self.logs, &self.stats),
+    pub fn log_json(&self) -> String {
+        let dtags = Tags::default();
+        let tags: &Tags = match &self.tags {
+            Some(t) => t,
+            None => &dtags,
         };
-        (resp, self.err)
+
+        match &self.rinfo {
+            None => "{}".to_string(),
+            Some(rinfo) => self.decision.log_json(rinfo, tags, &self.logs, &self.stats),
+        }
     }
 }
 

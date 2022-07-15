@@ -40,10 +40,12 @@ fn inspect_content_filter(
         rinfo: Some(reqinfo),
         stats,
     };
-    let (out, merr) = res.into_legacy_json();
+    let response = res.decision.response_json();
+    let request_map = res.log_json();
+    let merr = res.err;
     match merr {
         Some(rr) => Err(PyTypeError::new_err(rr)),
-        None => Ok(out),
+        None => Ok((response, request_map)),
     }
 }
 
@@ -77,10 +79,12 @@ fn py_inspect_request(
         rinfo: Some(dec.rinfo),
         stats: dec.stats,
     };
-    let (out, merr) = res.into_legacy_json();
+    let response = res.decision.response_json();
+    let request_map = res.log_json();
+    let merr = res.err;
     match merr {
         Some(rr) => Err(PyTypeError::new_err(rr)),
-        None => Ok(out),
+        None => Ok((response, request_map)),
     }
 }
 

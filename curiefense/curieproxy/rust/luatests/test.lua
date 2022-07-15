@@ -108,16 +108,16 @@ local function run_inspect_request(raw_request_map)
         headers["Cookie"] = "rbzid=OK;"
       end
     end
-    local response, request_map, merr
+    local res
     if human ~= nil then
-      response, request_map, merr = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
+      res = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
     else
-      response, request_map, merr = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
+      res = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
     end
-    if merr then
-      error(merr)
+    if res.error then
+      error(res.error)
     end
-    return response, request_map
+    return res
 end
 
 local function show_logs(logs)
@@ -153,9 +153,10 @@ local function test_raw_request(request_path)
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
-    local response, jrequest_map = run_inspect_request(raw_request_map)
-    local r = cjson.decode(response)
-    local request_map = cjson.decode(jrequest_map)
+    local res = run_inspect_request(raw_request_map)
+
+    local r = cjson.decode(res.response)
+    local request_map = cjson.decode(res.request_map)
 
     local good = compare_tag_list(raw_request_map.name, request_map.tags, raw_request_map.response.tags)
     if r.action ~= raw_request_map.response.action then
@@ -214,8 +215,8 @@ local function test_raw_request(request_path)
 
     if not good then
       show_logs(request_map.logs)
-      print(response)
-      print(jrequest_map)
+      print(res.response)
+      print(res.request_map)
       error("mismatch in " .. raw_request_map.name)
     end
   end
@@ -236,9 +237,9 @@ local function test_raw_request_stats(request_path, pverbose)
       verbose = raw_request_map["verbose"]
     end
 
-    local response, jrequest_map = run_inspect_request(raw_request_map)
-    local r = cjson.decode(response)
-    local request_map = cjson.decode(jrequest_map)
+    local res = run_inspect_request(raw_request_map)
+    local r = cjson.decode(res.response)
+    local request_map = cjson.decode(res.request_map)
 
     local good = compare_tag_list(raw_request_map.name, request_map.tags, raw_request_map.response.tags)
     if r.action ~= raw_request_map.response.action then
@@ -270,8 +271,8 @@ local function test_raw_request_stats(request_path, pverbose)
         for _, log in ipairs(request_map.logs) do
             print(log["elapsed_micros"] .. "µs " .. log["message"])
         end
-        print(response)
-        print(jrequest_map)
+        print(res.response)
+        print(res.request_map)
       end
       print("mismatch in " .. raw_request_map.name)
     else
@@ -287,8 +288,8 @@ local function test_masking(request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
     local secret = raw_request_map["secret"]
-    local _, jrequest_map = run_inspect_request(raw_request_map)
-    local request_map = cjson.decode(jrequest_map)
+    local res = run_inspect_request(raw_request_map)
+    local request_map = cjson.decode(res.request_map)
     for _, section in pairs({"arguments", "headers", "cookies"}) do
       for k, value in pairs(request_map[section]) do
         local p = string.find(value, secret)
@@ -316,25 +317,25 @@ local function test_ratelimit(request_path)
   local raw_request_maps = load_json_file(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
-    local jres, jrequest_map = run_inspect_request(raw_request_map)
-    local res = cjson.decode(jres)
-    local request_map = cjson.decode(jrequest_map)
+    local r = run_inspect_request(raw_request_map)
+    local res = cjson.decode(r.response)
+    local request_map = cjson.decode(r.request_map)
 
     if raw_request_map.tag and not contains(request_map.tags, raw_request_map.tag) then
       show_logs(request_map.logs)
       error("curiefense.session_limit_check should have returned tag '" .. raw_request_map.tag ..
-            "', but returned: " .. jres)
+            "', but returned: " .. r.response)
     end
 
     if raw_request_map.pass then
       if res["action"] ~= "pass" then
         show_logs(request_map.logs)
-        error("curiefense.session_limit_check should have returned pass, but returned: " .. jres)
+        error("curiefense.session_limit_check should have returned pass, but returned: " .. r.response)
       end
     else
       if res["action"] == "pass" then
         show_logs(request_map.logs)
-        error("curiefense.session_limit_check should have blocked, but returned: " .. jres)
+        error("curiefense.session_limit_check should have blocked, but returned: " .. r.response)
       end
     end
 
@@ -352,9 +353,9 @@ local function test_flow(request_path)
   local raw_request_maps = load_json_file(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
-    local jres, jrequest_map = run_inspect_request(raw_request_map)
-    local res = cjson.decode(jres)
-    local request_map = cjson.decode(jrequest_map)
+    local r = run_inspect_request(raw_request_map)
+    local res = cjson.decode(r.response)
+    local request_map = cjson.decode(r.request_map)
 
     if raw_request_map.pass then
       if res["action"] ~= "pass" then
@@ -372,8 +373,8 @@ local function test_flow(request_path)
         for _, log in ipairs(request_map.logs) do
             print(log["elapsed_micros"] .. "µs " .. log["message"])
         end
-        print(jres)
-        print(jrequest_map)
+        print(r.response)
+        print(r.request_map)
         error("mismatch in flow control")
     end
 
@@ -417,8 +418,8 @@ local test_request = '{ "headers": { ":authority": "localhost:30081", ":method":
   '-", "bot" ] } }'
 
 print("***  first request logs, check for configuration problems here ***")
-local _, trequest_map = run_inspect_request(json_decode(test_request))
-show_logs(cjson.decode(trequest_map).logs)
+local tres = run_inspect_request(json_decode(test_request))
+show_logs(tres.logs)
 print("*** done ***")
 print("")
 
@@ -427,9 +428,9 @@ local function test_content_filter(request_path)
   print("Testing " .. request_path)
   local raw_request_maps = load_json_file(request_path)
   for _, raw_request_map in pairs(raw_request_maps) do
-    local response, jrequest_map = run_inspect_content_filter(raw_request_map)
-    local r = cjson.decode(response)
-    local request_map = cjson.decode(jrequest_map)
+    local res = run_inspect_content_filter(raw_request_map)
+    local r = cjson.decode(res.response)
+    local request_map = cjson.decode(res.request_map)
 
     local good = true
 
@@ -457,7 +458,7 @@ local function test_content_filter(request_path)
       for _, log in ipairs(request_map.logs) do
           print(log["elapsed_micros"] .. "µs " .. log["message"])
       end
-      print(response)
+      print(res.response)
       error("mismatch in " .. raw_request_map.name .. " profile: " .. raw_request_map.content_filter_id)
     end
   end
