@@ -168,7 +168,14 @@ pub async fn limit_check(
             },
         };
 
-        match redis_get_limit(&mut redis, &key, limit.timeframe, pairvalue).await {
+        // special case for limit thresholds = 0 to avoid redis calls
+        let curcount = if limit.thresholds.iter().all(|t| t.limit == 0) {
+            Ok(1)
+        } else {
+            redis_get_limit(&mut redis, &key, limit.timeframe, pairvalue).await
+        };
+
+        match curcount {
             Err(rr) => logs.error(|| rr.to_string()),
             Ok(current_count) => {
                 for threshold in &limit.thresholds {
