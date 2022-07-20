@@ -186,7 +186,7 @@ impl Initiator {
                 map.serialize_entry("type", "phase2")?;
             }
             Initiator::Sqli(fp) => {
-                map.serialize_entry("type", "xss")?;
+                map.serialize_entry("type", "sqli")?;
                 map.serialize_entry("fingerprint", fp)?;
             }
             Initiator::Xss => {

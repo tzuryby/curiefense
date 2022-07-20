@@ -1,5 +1,5 @@
-use crate::config::matchers::RequestSelector;
 /// this file contains all the data type that are used when interfacing with a proxy
+use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
