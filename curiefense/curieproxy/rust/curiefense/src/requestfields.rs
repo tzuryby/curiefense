@@ -31,8 +31,11 @@ impl RequestField {
 
     pub fn add(&mut self, key: String, ds: Location, value: String) {
         let mut v = value.clone();
+        let mut replace_parameter = true;
         // try to insert each value as its decoded base64 version, if it makes sense
-        if !&v.is_empty() {
+        let change = if v.is_empty() {
+            None
+        } else {
             let mut changed = false;
             for tr in self.decoding.iter() {
                 match tr {
@@ -40,6 +43,7 @@ impl RequestField {
                         if let Ok(n) = crate::utils::decoders::base64dec_all_str(&v) {
                             v = n;
                             changed = true;
+                            replace_parameter = false;
                         }
                     }
                     Transformation::UrlDecode => {
@@ -65,10 +69,19 @@ impl RequestField {
                 }
             }
             if changed {
-                self.base_add(key.clone() + ":decoded", ds.clone(), v);
+                Some(v)
+            } else {
+                None
             }
+        };
+        match (replace_parameter, change) {
+            (_, None) => self.base_add(key, ds, value),
+            (false, Some(decoded_value)) => {
+                self.base_add(key.clone() + ":decoded", ds.clone(), decoded_value);
+                self.base_add(key, ds, value);
+            }
+            (true, Some(decoded_value)) => self.base_add(key, ds, decoded_value),
         }
-        self.base_add(key, ds, value);
     }
 
     pub fn mask(&mut self, masking_seed: &[u8], key: &str) -> HashSet<Location> {

@@ -529,7 +529,7 @@ mod tests {
             Some("text/xml"),
             &[],
             br#"<a>&lt;em&gt;</a>"#,
-            &[("a1", "&lt;em&gt;"), ("a1:decoded", "<em>")],
+            &[("a1", "<em>")],
         );
     }
 
@@ -540,7 +540,7 @@ mod tests {
             Some("text/xml"),
             &[],
             br#"<a>&lt;em&gt</a>"#,
-            &[("a1", "&lt;em&gt"), ("a1:decoded", "<em&gt")],
+            &[("a1", "<em&gt")],
         );
     }
 
