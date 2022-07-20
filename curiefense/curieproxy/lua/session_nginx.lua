@@ -6,27 +6,32 @@ local utils       = require "lua.nativeutils"
 local sfmt = string.format
 local custom_response = utils.nginx_custom_response
 
-function session_rust_nginx.inspect(handle)
-    local ip_str = handle.var.remote_addr
-
+local function make_safe_headers(rheaders)
     local headers = {}
-
-    local rheaders, err = handle.req.get_headers()
-    if err == "truncated" then
-        handle.log(handle.ERR, "truncated headers: " .. err)
-    end
 
     for k, v in pairs(rheaders) do
         if type(v) == "table" then
-            local new_v = ""
-            for i = 1, #v do
-                new_v = new_v .. " " .. v[i]
+            local new_v = v[1]
+            for i = 2, #v do
+                new_v = new_v .. "; " .. v[i]
             end
             headers[k] = new_v
         else
             headers[k] = v
         end
     end
+    return headers
+end
+
+function session_rust_nginx.inspect(handle)
+    local ip_str = handle.var.remote_addr
+
+    local rheaders, err = handle.req.get_headers()
+    if err == "truncated" then
+        handle.log(handle.ERR, "truncated headers: " .. err)
+    end
+
+    local headers = make_safe_headers(rheaders)
 
     handle.log(handle.INFO, cjson.encode(headers))
 
@@ -100,7 +105,7 @@ function session_rust_nginx.log(handle)
         method=handle.var.request_method,
         response={
           code=status,
-          headers=handle.resp.get_headers(),
+          headers=make_safe_headers(handle.resp.get_headers()),
           codedetails="unknown",
           nxgrequestlength=handle.var.request_length
         },
