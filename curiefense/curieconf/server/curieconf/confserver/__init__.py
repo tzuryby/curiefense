@@ -30,6 +30,7 @@ def drop_into_pdb(app, exception):
 
 
 def main(args=None):
+    # only called when running manually, not through uwsgi
     global mongo
     import argparse
 
@@ -43,6 +44,16 @@ def main(args=None):
     parser.add_argument(
         "-p", "--port", type=int, default=int(os.environ.get("CURIECONF_PORT", "5000"))
     )
+    parser.add_argument(
+        "--trusted-username-header",
+        type=str,
+        default=os.environ.get("CURIECONF_TRUSTED_USERNAME_HEADER", ""),
+    )
+    parser.add_argument(
+        "--trusted-email-header",
+        type=str,
+        default=os.environ.get("CURIECONF_TRUSTED_EMAIL_HEADER", ""),
+    )
 
     options = parser.parse_args(args)
 
@@ -52,7 +63,7 @@ def main(args=None):
     try:
         with app.app_context():
             current_app.backend = Backends.get_backend(app, options.dbpath)
-            current_app.options = options
+            current_app.options = options.__dict__
             app.run(debug=options.debug, host=options.host, port=options.port)
     finally:
         pass
