@@ -20,33 +20,12 @@ pub enum AclStage {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Initiator {
-    GlobalFilter {
-        id: String,
-        name: String,
-    },
-    Acl {
-        tags: Vec<String>,
-        stage: AclStage,
-    },
-    ContentFilter {
-        ruleid: String,
-        risk_level: u8,
-    },
-    Limit {
-        id: String,
-        name: String,
-        key: String,
-        threshold: u64,
-    },
-    Flow {
-        id: String,
-        name: String,
-        key: String,
-    },
-    BodyTooDeep {
-        actual: usize,
-        expected: usize,
-    },
+    GlobalFilter { id: String, name: String },
+    Acl { tags: Vec<String>, stage: AclStage },
+    ContentFilter { ruleid: String, risk_level: u8 },
+    Limit { id: String, name: String, threshold: u64 },
+    Flow { id: String, name: String, key: String },
+    BodyTooDeep { actual: usize, expected: usize },
     BodyMissing,
     BodyMalformed(String),
     Phase01Fail(String),
@@ -54,14 +33,8 @@ pub enum Initiator {
     Sqli(String),
     Xss,
     Restricted,
-    TooManyEntries {
-        actual: usize,
-        expected: usize,
-    },
-    EntryTooLarge {
-        actual: usize,
-        expected: usize,
-    },
+    TooManyEntries { actual: usize, expected: usize },
+    EntryTooLarge { actual: usize, expected: usize },
 }
 
 impl std::fmt::Display for Initiator {
@@ -74,7 +47,6 @@ impl std::fmt::Display for Initiator {
             Limit {
                 id,
                 name,
-                key: _,
                 threshold,
             } => write!(f, "rate limit {}[{}] threshold={}", name, id, threshold),
             Flow { id, name, key: _ } => write!(f, "flow control {}[{}]", name, id),
@@ -117,7 +89,6 @@ impl Initiator {
             Initiator::Limit {
                 id: _,
                 name: _,
-                key: _,
                 threshold: _,
             } => RateLimit,
             Initiator::Flow { id: _, name: _, key: _ } => FlowControl,
@@ -159,7 +130,6 @@ impl Initiator {
             Initiator::Limit {
                 id,
                 name,
-                key: _,
                 threshold,
             } => {
                 map.serialize_entry("id", id)?;
@@ -299,16 +269,8 @@ impl BlockReason {
         BlockReason::nodetails(Initiator::GlobalFilter { id, name }, decision)
     }
 
-    pub fn limit(id: String, name: String, key: String, threshold: u64, decision: BDecision) -> Self {
-        BlockReason::nodetails(
-            Initiator::Limit {
-                id,
-                name,
-                key,
-                threshold,
-            },
-            decision,
-        )
+    pub fn limit(id: String, name: String, threshold: u64, decision: BDecision) -> Self {
+        BlockReason::nodetails(Initiator::Limit { id, name, threshold }, decision)
     }
 
     pub fn flow(id: String, name: String, key: String, decision: BDecision) -> Self {
