@@ -73,7 +73,7 @@ pub unsafe fn inspect_async_free(ptr: *mut Executor<(Decision, Tags, Logs)>) {
 
 pub fn inspect_generic_request_map<GH: Grasshopper>(
     configpath: &str,
-    mgh: Option<GH>,
+    mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
 ) -> AnalyzeResult {
@@ -83,7 +83,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
 // generic entry point when the request map has already been parsed
 pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     configpath: &str,
-    mgh: Option<GH>,
+    mgh: Option<&GH>,
     raw: RawRequest<'_>,
     logs: &mut Logs,
 ) -> AnalyzeResult {
@@ -149,7 +149,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
                     let nflows = cfg.flows.clone();
 
                     // without grasshopper, default to being human
-                    let is_human = if let Some(gh) = &mgh {
+                    let is_human = if let Some(gh) = mgh {
                         challenge_verified(gh, &reqinfo, slogs)
                     } else {
                         false

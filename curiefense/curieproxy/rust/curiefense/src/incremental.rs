@@ -157,7 +157,7 @@ pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, Analyze
 
 pub async fn finalize<GH: Grasshopper>(
     idata: IData,
-    mgh: Option<GH>,
+    mgh: Option<&GH>,
     globalfilters: &[GlobalFilterSection],
     flows: &HashMap<SequenceKey, Vec<FlowElement>>,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
@@ -180,7 +180,7 @@ pub async fn finalize<GH: Grasshopper>(
     );
 
     // without grasshopper, default to being human
-    let is_human = if let Some(gh) = &mgh {
+    let is_human = if let Some(gh) = mgh {
         challenge_verified(gh, &reqinfo, &mut logs)
     } else {
         false

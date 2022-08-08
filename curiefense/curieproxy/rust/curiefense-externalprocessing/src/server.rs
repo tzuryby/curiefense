@@ -222,7 +222,7 @@ impl MyEP {
             }
         }
 
-        let (mut dec, logs) = finalize(idata, Some(DynGrasshopper {}), &globalfilters, &flows, None).await;
+        let (mut dec, logs) = finalize(idata, Some(&DynGrasshopper {}), &globalfilters, &flows, None).await;
 
         let stage = if headers_only {
             ProcessingStage::Headers

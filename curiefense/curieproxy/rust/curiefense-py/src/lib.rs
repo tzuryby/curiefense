@@ -70,7 +70,7 @@ fn py_inspect_request(
     };
 
     let grasshopper = DynGrasshopper {};
-    let dec = inspect_generic_request_map(configpath, Some(grasshopper), raw, &mut logs);
+    let dec = inspect_generic_request_map(configpath, Some(&grasshopper), raw, &mut logs);
     let res = InspectionResult {
         decision: dec.decision,
         tags: Some(dec.tags),

@@ -88,7 +88,7 @@ fn limit_match(tags: &Tags, elem: &Limit) -> bool {
 }
 
 /// an item that needs to be checked in redis
-pub struct LimitChecks<'t> {
+pub struct LimitCheck<'t> {
     key: String,
     ban_key: String,
     pairvalue: Option<String>,
@@ -101,7 +101,7 @@ pub fn limit_info<'t>(
     reqinfo: &RequestInfo,
     limits: &'t [Limit],
     tags: &Tags,
-) -> Vec<LimitChecks<'t>> {
+) -> Vec<LimitCheck<'t>> {
     let mut out = Vec::new();
     for limit in limits {
         if !limit_match(tags, limit) {
@@ -121,7 +121,7 @@ pub fn limit_info<'t>(
                 Some(x) => Some(x),
             },
         };
-        out.push(LimitChecks {
+        out.push(LimitCheck {
             key,
             ban_key,
             pairvalue,
@@ -137,7 +137,7 @@ pub struct LimitResult<'t> {
     curcount: i64,
 }
 
-pub async fn limit_query<'t>(logs: &mut Logs, checks: &[LimitChecks<'t>]) -> Vec<LimitResult<'t>> {
+pub async fn limit_query<'t>(logs: &mut Logs, checks: &[LimitCheck<'t>]) -> Vec<LimitResult<'t>> {
     // early return to avoid redis connection
     if checks.is_empty() {
         logs.debug("no limits to check");

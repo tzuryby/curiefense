@@ -459,7 +459,7 @@ impl SimpleAction {
     pub fn to_decision<GH: Grasshopper>(
         &self,
         is_human: bool,
-        mgh: &Option<GH>,
+        mgh: Option<&GH>,
         rinfo: &RequestInfo,
         tags: &Tags,
         reason: Vec<BlockReason>,

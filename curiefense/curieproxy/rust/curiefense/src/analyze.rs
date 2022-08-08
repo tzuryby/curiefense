@@ -6,13 +6,13 @@ use crate::config::flow::{FlowElement, SequenceKey};
 use crate::config::hostmap::SecurityPolicy;
 use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
-use crate::flow::flow_check;
+use crate::flow::{flow_info, flow_process, flow_query, FlowCheck, FlowResult};
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
 use crate::interface::{
     AclStage, Action, ActionType, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
 };
-use crate::limit::limit_check;
+use crate::limit::{limit_info, limit_process, limit_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::utils::{BodyDecodingResult, RequestInfo};
 
@@ -40,20 +40,38 @@ pub enum CfRulesArg<'t> {
     Get(Option<&'t ContentFilterRules>),
 }
 
+pub struct AnalyzeEnv {
+    is_human: bool,
+    reqinfo: RequestInfo,
+}
+
+pub struct APhase1<'t> {
+    reasons: Vec<BlockReason>,
+    flow_checks: Vec<FlowCheck<'t>>,
+    limit_checks: Vec<LimitCheck<'t>>,
+    stats: StatsCollect<BStageMapped>,
+    env: AnalyzeEnv,
+    tags: Tags,
+}
+
+pub enum InitResult<'t> {
+    Res(AnalyzeResult),
+    Phase1(APhase1<'t>),
+}
+
 #[allow(clippy::too_many_arguments)]
-pub async fn analyze<GH: Grasshopper>(
+pub fn analyze_init<'t, GH: Grasshopper>(
     logs: &mut Logs,
     stats: StatsCollect<BStageMapped>,
-    mgh: Option<GH>,
+    mgh: Option<&GH>,
     itags: Tags,
     secpolname: &str,
-    securitypolicy: &SecurityPolicy,
+    securitypolicy: &'t SecurityPolicy,
     reqinfo: RequestInfo,
     is_human: bool,
     globalfilter_dec: SimpleDecision,
-    flows: &HashMap<SequenceKey, Vec<FlowElement>>,
-    cfrules: CfRulesArg<'_>,
-) -> AnalyzeResult {
+    flows: &'t HashMap<SequenceKey, Vec<FlowElement>>,
+) -> InitResult<'t> {
     let mut tags = itags;
     let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
 
@@ -86,24 +104,21 @@ pub async fn analyze<GH: Grasshopper>(
             status: 403,
             ..Action::default()
         };
-        return AnalyzeResult {
+        return InitResult::Res(AnalyzeResult {
             decision: Decision::action(action, vec![reason]),
             tags,
             rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
             stats: stats.mapped_stage_build(),
-        };
+        });
     }
 
-    if let Some(decision) = mgh
-        .as_ref()
-        .and_then(|gh| challenge_phase02(gh, &reqinfo.rinfo.qinfo.uri, &reqinfo.headers))
-    {
-        return AnalyzeResult {
+    if let Some(decision) = mgh.and_then(|gh| challenge_phase02(gh, &reqinfo.rinfo.qinfo.uri, &reqinfo.headers)) {
+        return InitResult::Res(AnalyzeResult {
             decision,
             tags,
             rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
             stats: stats.mapped_stage_build(),
-        };
+        });
     }
     logs.debug("challenge phase2 ignored");
 
@@ -112,38 +127,82 @@ pub async fn analyze<GH: Grasshopper>(
     if let SimpleDecision::Action(action, reason) = globalfilter_dec {
         logs.debug(|| format!("Global filter decision {:?}", reason));
         brs.extend(reason);
-        let decision = action.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
+        let decision = action.to_decision(is_human, mgh, &reqinfo, &tags, brs);
         if decision.is_final() {
-            return AnalyzeResult {
+            return InitResult::Res(AnalyzeResult {
                 decision,
                 tags,
                 rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
                 stats: stats.mapped_stage_build(),
-            };
+            });
         }
         // if the decision was not adopted, get the reason vector back
         brs = decision.reasons;
     }
 
-    let (flow_check_result, stats) = flow_check(logs, stats, flows, &reqinfo, &mut tags).await;
-    if let Err(rr) = flow_check_result {
-        logs.error(|| rr.to_string())
-    }
+    let limit_checks = limit_info(&securitypolicy.name, &reqinfo, &securitypolicy.limits, &tags);
+    let flow_checks = flow_info(logs, flows, &reqinfo, &tags);
+    InitResult::Phase1(APhase1 {
+        reasons: brs,
+        flow_checks,
+        limit_checks,
+        stats,
+        env: AnalyzeEnv { is_human, reqinfo },
+        tags,
+    })
+}
+
+pub struct APhase2<'t> {
+    reasons: Vec<BlockReason>,
+    flow_results: Vec<(&'t FlowElement, FlowResult)>,
+    limit_results: Vec<LimitResult<'t>>,
+    stats: StatsCollect<BStageMapped>,
+    env: AnalyzeEnv,
+    tags: Tags,
+}
+
+pub async fn analyze_query<'t>(logs: &mut Logs, p1: APhase1<'t>) -> APhase2<'t> {
+    let flow_results = match flow_query(p1.flow_checks).await {
+        Err(rr) => {
+            logs.error(|| rr.to_string());
+            Vec::new()
+        }
+        Ok(r) => r,
+    };
     logs.debug("flow checks done");
 
-    // limit checks
-    let (limit_check, stats) = limit_check(
-        logs,
-        stats,
-        &securitypolicy.name,
-        &reqinfo,
-        &securitypolicy.limits,
-        &mut tags,
-    )
-    .await;
+    let limit_results = limit_query(logs, &p1.limit_checks).await;
+    logs.debug("limit checks done");
+
+    APhase2 {
+        reasons: p1.reasons,
+        flow_results,
+        limit_results,
+        stats: p1.stats,
+        env: p1.env,
+        tags: p1.tags,
+    }
+}
+
+pub fn analyze_finish<GH: Grasshopper>(
+    logs: &mut Logs,
+    mgh: Option<&GH>,
+    securitypolicy: &SecurityPolicy,
+    cfrules: CfRulesArg<'_>,
+    p2: APhase2,
+) -> AnalyzeResult {
+    let mut tags = p2.tags;
+    let mut brs = p2.reasons;
+    let is_human = p2.env.is_human;
+    let reqinfo = p2.env.reqinfo;
+    let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
+
+    let stats = flow_process(p2.stats, 0, &p2.flow_results, &mut tags);
+    let (limit_check, stats) = limit_process(logs, stats, 0, &p2.limit_results, &mut tags);
+
     if let SimpleDecision::Action(action, curbrs) = limit_check {
         brs.extend(curbrs);
-        let decision = action.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
+        let decision = action.to_decision(is_human, mgh, &reqinfo, &tags, brs);
         if decision.is_final() {
             return AnalyzeResult {
                 decision,
@@ -182,7 +241,7 @@ pub async fn analyze<GH: Grasshopper>(
 
         if blocking {
             let decision = if decision.challenge {
-                match (reqinfo.headers.get("user-agent"), &mgh) {
+                match (reqinfo.headers.get("user-agent"), mgh) {
                     (Some(ua), Some(gh)) => challenge_phase01(gh, ua, brs),
                     (gua, ggh) => {
                         logs.debug(|| {
@@ -253,5 +312,40 @@ pub async fn analyze<GH: Grasshopper>(
         tags,
         rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
         stats: stats.cf_stage_build(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn analyze<GH: Grasshopper>(
+    logs: &mut Logs,
+    stats: StatsCollect<BStageMapped>,
+    mgh: Option<&GH>,
+    itags: Tags,
+    secpolname: &str,
+    securitypolicy: &SecurityPolicy,
+    reqinfo: RequestInfo,
+    is_human: bool,
+    globalfilter_dec: SimpleDecision,
+    flows: &HashMap<SequenceKey, Vec<FlowElement>>,
+    cfrules: CfRulesArg<'_>,
+) -> AnalyzeResult {
+    let init_result = analyze_init(
+        logs,
+        stats,
+        mgh,
+        itags,
+        secpolname,
+        securitypolicy,
+        reqinfo,
+        is_human,
+        globalfilter_dec,
+        flows,
+    );
+    match init_result {
+        InitResult::Res(result) => result,
+        InitResult::Phase1(p1) => {
+            let p2 = analyze_query(logs, p1).await;
+            analyze_finish(logs, mgh, securitypolicy, cfrules, p2)
+        }
     }
 }

@@ -185,7 +185,7 @@ fn lua_inspect_request(
         Err(rr) => return lerr(format!("Could not convert the ip argument: {}", rr)),
         Ok(i) => i,
     };
-    let grasshopper = DynGrasshopper {};
+    let grasshopper = &DynGrasshopper {};
     let res = inspect_request(
         "/cf-config/current/config",
         meta,
@@ -241,7 +241,8 @@ fn lua_test_inspect_request(
     ),
 ) -> LuaResult<LuaInspectionResult> {
     let (meta, headers, lua_body, str_ip, humanity) = args;
-    let grasshopper = Some(DummyGrasshopper { humanity });
+    let gh = DummyGrasshopper { humanity };
+    let grasshopper = Some(&gh);
 
     let res = inspect_request(
         "/cf-config/current/config",
@@ -261,7 +262,7 @@ fn inspect_request<GH: Grasshopper>(
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
-    grasshopper: Option<GH>,
+    grasshopper: Option<&GH>,
 ) -> Result<InspectionResult, String> {
     let mut logs = Logs::default();
     logs.debug("Inspection init");
