@@ -100,7 +100,7 @@ pub fn limit_info<'t>(
     security_policy_name: &str,
     reqinfo: &RequestInfo,
     limits: &'t [Limit],
-    tags: &mut Tags,
+    tags: &Tags,
 ) -> Vec<LimitChecks<'t>> {
     let mut out = Vec::new();
     for limit in limits {
