@@ -192,7 +192,6 @@ local function test_raw_request(request_path)
       for _, trigger_name in pairs({
          "acl_triggers",
          "rate_limit_triggers",
-         "flow_control_triggers",
          "global_filter_triggers",
          "content_filter_triggers"
       }) do
@@ -356,22 +355,34 @@ local function test_flow(request_path)
     local r = run_inspect_request(raw_request_map)
     local res = cjson.decode(r.response)
     local request_map = cjson.decode(r.request_map)
+    local expected_tag = raw_request_map["tag"]
+    
+    local tag_found = false
+    for _, tag in pairs(request_map["tags"]) do
+      if tag == expected_tag then
+        tag_found = true
+        break
+      end
+    end
 
     if raw_request_map.pass then
-      if res["action"] ~= "pass" then
-        print("curiefense.session_flow_check should have returned pass, but returned: " .. res["action"])
+      if tag_found then
+        print("we found the tag " .. expected_tag .. " in the request info, but it should have been absent")
         good = false
       end
     else
-      if res["action"] == "pass" then
-        print("curiefense.session_flow_check should have blocked, but returned: " .. res["action"])
+      if not tag_found then
+        print("we did not find the tag " .. expected_tag .. " in the request info, but it should have been present. All tags:")
+        for _, tag in pairs(request_map["tags"]) do
+          print(" * " .. tag)
+        end
         good = false
       end
     end
 
     if not good then
         for _, log in ipairs(request_map.logs) do
-            print(log["elapsed_micros"] .. "µs " .. log["message"])
+            print(log)
         end
         print(r.response)
         print(r.request_map)
@@ -495,14 +506,15 @@ for file in lfs.dir[[luatests/contentfilter_only]] do
   end
 end
 
+for file in lfs.dir[[luatests/flows]] do
+  if startswith(file, prefix) and ends_with(file, ".json") then
+    test_flow("luatests/flows/" .. file)
+  end
+end
+
 for file in lfs.dir[[luatests/ratelimit]] do
   if startswith(file, prefix) and ends_with(file, ".json") then
     test_ratelimit("luatests/ratelimit/" .. file)
   end
 end
 
-for file in lfs.dir[[luatests/flows]] do
-  if startswith(file, prefix) and ends_with(file, ".json") then
-    test_flow("luatests/flows/" .. file)
-  end
-end

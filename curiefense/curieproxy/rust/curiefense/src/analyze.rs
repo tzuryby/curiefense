@@ -126,23 +126,8 @@ pub async fn analyze<GH: Grasshopper>(
     }
 
     let (flow_check_result, stats) = flow_check(logs, stats, flows, &reqinfo, &mut tags).await;
-    match flow_check_result {
-        Err(rr) => logs.error(|| rr.to_string()),
-        Ok(SimpleDecision::Pass) => (),
-        Ok(SimpleDecision::Action(a, curbrs)) => {
-            brs.extend(curbrs);
-            let decision = a.to_decision(is_human, &mgh, &reqinfo, &tags, brs);
-            if decision.is_final() {
-                return AnalyzeResult {
-                    decision,
-                    tags,
-                    rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
-                    stats: stats.flow_stage_build(),
-                };
-            }
-            // if the decision was not adopted, get the reason vector back
-            brs = decision.reasons;
-        }
+    if let Err(rr) = flow_check_result {
+        logs.error(|| rr.to_string())
     }
     logs.debug("flow checks done");
 

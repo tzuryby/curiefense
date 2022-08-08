@@ -1,7 +1,3 @@
-use crate::{
-    interface::{SimpleAction, SimpleActionT},
-    logs::Logs,
-};
 use lazy_static::lazy_static;
 use redis::{ConnectionAddr, ConnectionInfo, RedisConnectionInfo};
 
@@ -33,44 +29,6 @@ pub async fn redis_async_conn() -> anyhow::Result<redis::aio::ConnectionManager>
     match &*RPOOL {
         Ok(c) => Ok(c.clone()),
         Err(rr) => Err(anyhow::anyhow!("{}", rr)),
-    }
-}
-
-pub enum BanStatus {
-    NewBan,
-    AlreadyBanned,
-}
-
-pub async fn extract_bannable_action<CNX: redis::aio::ConnectionLike>(
-    cnx: &mut CNX,
-    logs: &mut Logs,
-    action: &SimpleAction,
-    redis_key: &str,
-    ban_key: &str,
-    ban_status: BanStatus,
-) -> SimpleAction {
-    if let SimpleActionT::Ban(subaction, duration) = &action.atype {
-        logs.info(|| format!("Banned key {} for {}s", redis_key, duration));
-        match ban_status {
-            BanStatus::AlreadyBanned => (),
-            BanStatus::NewBan => {
-                if let Err(rr) = redis::pipe()
-                    .cmd("SET")
-                    .arg(ban_key)
-                    .arg(1)
-                    .cmd("EXPIRE")
-                    .arg(ban_key)
-                    .arg(*duration)
-                    .query_async::<_, ()>(cnx)
-                    .await
-                {
-                    logs.error(|| format!("Redis error {}", rr));
-                }
-            }
-        }
-        *subaction.clone()
-    } else {
-        action.clone()
     }
 }
 

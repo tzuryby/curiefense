@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use crate::config::limit::{resolve_selector_map, resolve_selectors};
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::{RawFlowEntry, RawFlowStep, RawLimitSelector};
-use crate::interface::SimpleAction;
 use crate::logs::Logs;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -17,7 +16,7 @@ struct FlowEntry {
     name: String,
     key: Vec<RequestSelector>,
     timeframe: u64,
-    action: SimpleAction,
+    tag: String,
     sequence: Vec<FlowStep>,
 }
 
@@ -45,8 +44,8 @@ pub struct FlowElement {
     pub step: u32,
     /// the entry timeframe
     pub timeframe: u64,
-    /// the entry action
-    pub action: SimpleAction,
+    /// the entry tag
+    pub tag: String,
     /// the step selector
     pub select: Vec<RequestSelectorCondition>,
     /// marker for the last step
@@ -55,8 +54,6 @@ pub struct FlowElement {
 
 impl FlowEntry {
     fn convert(
-        logs: &mut Logs,
-        actions: &HashMap<String, SimpleAction>,
         rawentry: RawFlowEntry,
     ) -> anyhow::Result<FlowEntry> {
         let mkey: anyhow::Result<Vec<RequestSelector>> = rawentry.key.into_iter().map(resolve_selector_map).collect();
@@ -64,18 +61,13 @@ impl FlowEntry {
         let sequence = msequence?;
         let id = rawentry.id;
         let name = rawentry.name;
-        let action = actions.get(&rawentry.action).cloned().unwrap_or_else(|| {
-            logs.error(|| format!("Could not find action {} in flow entry {}", &id, &name));
-            SimpleAction::default()
-        });
-
         Ok(FlowEntry {
             id,
             include: rawentry.include.into_iter().collect(),
             exclude: rawentry.exclude.into_iter().collect(),
             name,
             timeframe: rawentry.timeframe,
-            action,
+            tag: rawentry.tag,
             key: mkey?,
             sequence,
         })
@@ -111,7 +103,6 @@ impl FlowStep {
 
 pub fn flow_resolve(
     logs: &mut Logs,
-    actions: &HashMap<String, SimpleAction>,
     rawentries: Vec<RawFlowEntry>,
 ) -> HashMap<SequenceKey, Vec<FlowElement>> {
     let mut out: HashMap<SequenceKey, Vec<FlowElement>> = HashMap::new();
@@ -121,7 +112,7 @@ pub fn flow_resolve(
         if !rawentry.active {
             continue;
         }
-        match FlowEntry::convert(logs, actions, rawentry) {
+        match FlowEntry::convert(rawentry) {
             Err(rr) => logs.warning(|| rr.to_string()),
             Ok(entry) => {
                 let nsteps = entry.sequence.len();
@@ -129,7 +120,7 @@ pub fn flow_resolve(
                     let vc: &mut Vec<FlowElement> = out.entry(step.sequence_key).or_insert_with(Vec::new);
                     vc.push(FlowElement {
                         id: entry.id.clone(),
-                        action: entry.action.clone(),
+                        tag: entry.tag.clone(),
                         include: entry.include.clone(),
                         exclude: entry.exclude.clone(),
                         key: entry.key.clone(),

@@ -1,6 +1,6 @@
 [
   {
-    "action": "default",
+    "tag": "flow1",
     "active": true,
     "description": "New Flow Control Description and Remarks",
     "exclude": [],
@@ -52,7 +52,7 @@
     "timeframe": 4
   },
   {
-    "action": "default",
+    "tag": "flow2",
     "active": true,
     "description": "abc",
     "exclude": [
@@ -100,7 +100,7 @@
     "timeframe": 4
   },
   {
-    "action": "ijcy5mwz",
+    "tag": "flow3",
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -137,7 +137,7 @@
     "timeframe": 2
   },
   {
-    "action": "default",
+    "tag": "flowheader",
     "active": true,
     "description": "",
     "exclude": [],
@@ -178,44 +178,7 @@
     "timeframe": 4
   },
   {
-    "action": "5ktcoafw",
-    "active": true,
-    "description": "abc",
-    "exclude": [],
-    "id": "flowchallenge",
-    "include": [
-      "all"
-    ],
-    "key": [
-      {
-        "attrs": "ip"
-      }
-    ],
-    "name": "Flow Control (challenge)",
-    "sequence": [
-      {
-        "args": {},
-        "cookies": {},
-        "headers": {
-          "host": "www.example.com"
-        },
-        "method": "GET",
-        "uri": "/rlchl1"
-      },
-      {
-        "args": {},
-        "cookies": {},
-        "headers": {
-          "host": "www.example.com"
-        },
-        "method": "GET",
-        "uri": "/rlchl2"
-      }
-    ],
-    "timeframe": 4
-  },
-  {
-    "action": "monitor",
+    "tag": "flowc1",
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -252,7 +215,7 @@
     "timeframe": 4
   },
   {
-    "action": "5ktcoafw",
+    "tag": "flowc2",
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -289,7 +252,7 @@
     "timeframe": 4
   },
   {
-    "action": "bh3gw11k",
+    "tag": "flowc3",
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -326,7 +289,7 @@
     "timeframe": 4
   },
   {
-    "action": "default",
+    "tag": "flowquery",
     "active": true,
     "description": "abc",
     "exclude": [],

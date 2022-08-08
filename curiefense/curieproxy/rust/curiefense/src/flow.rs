@@ -1,11 +1,10 @@
 use crate::interface::stats::{BStageFlow, BStageMapped, StatsCollect};
-use crate::redis::{extract_bannable_action, get_ban_key, is_banned, BanStatus};
 use crate::Logs;
 use std::collections::HashMap;
 
 use crate::config::flow::{FlowElement, SequenceKey};
 use crate::config::matchers::RequestSelector;
-use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
+use crate::interface::{Location, Tags};
 use crate::utils::{check_selector_cond, select_string, RequestInfo};
 
 fn session_sequence_key(ri: &RequestInfo) -> SequenceKey {
@@ -83,63 +82,17 @@ async fn check_flow<CNX: redis::aio::ConnectionLike>(
     }
 }
 
-async fn ban_react<CNX: redis::aio::ConnectionLike>(
-    logs: &mut Logs,
-    cnx: &mut CNX,
-    elem: &FlowElement,
-    redis_key: &str,
-    blocked: bool,
-    bad: SimpleDecision,
-) -> SimpleDecision {
-    let ban_key = get_ban_key(redis_key);
-    let banned = is_banned(cnx, &ban_key).await;
-    if banned {
-        logs.debug(|| format!("Key {} is banned!", ban_key));
-    }
-    if banned || blocked {
-        let action = extract_bannable_action(
-            cnx,
-            logs,
-            &elem.action,
-            redis_key,
-            &ban_key,
-            if banned {
-                BanStatus::AlreadyBanned
-            } else {
-                BanStatus::NewBan
-            },
-        )
-        .await;
-        let decision = action.atype.to_bdecision();
-        stronger_decision(
-            bad,
-            SimpleDecision::Action(
-                action,
-                vec![BlockReason::flow(
-                    elem.id.to_string(),
-                    elem.name.to_string(),
-                    redis_key.to_string(),
-                    decision,
-                )],
-            ),
-        )
-    } else {
-        bad
-    }
-}
-
 pub async fn flow_check(
     logs: &mut Logs,
     stats: StatsCollect<BStageMapped>,
     flows: &HashMap<SequenceKey, Vec<FlowElement>>,
     reqinfo: &RequestInfo,
     tags: &mut Tags,
-) -> (anyhow::Result<SimpleDecision>, StatsCollect<BStageFlow>) {
+) -> (anyhow::Result<()>, StatsCollect<BStageFlow>) {
     let sequence_key = session_sequence_key(reqinfo);
     match flows.get(&sequence_key) {
-        None => (Ok(SimpleDecision::Pass), stats.no_flow()),
+        None => (Ok(()), stats.no_flow()),
         Some(elems) => {
-            let mut bad = SimpleDecision::Pass;
             // do not establish the connection if unneeded
             let mut cnx = match crate::redis::redis_async_conn().await {
                 Ok(x) => x,
@@ -159,11 +112,10 @@ pub async fn flow_check(
                         match check_flow(&mut cnx, &redis_key, elem.step, elem.timeframe, elem.is_last).await {
                             Ok(FlowResult::LastOk) => {
                                 tags.insert(&elem.name, Location::Request);
-                                bad = ban_react(logs, &mut cnx, elem, &redis_key, false, bad).await;
                             }
                             Ok(FlowResult::LastBlock) => {
                                 tags.insert(&elem.name, Location::Request);
-                                bad = ban_react(logs, &mut cnx, elem, &redis_key, true, bad).await;
+                                tags.insert(&elem.tag, Location::Request);
                             }
                             Ok(FlowResult::NonLast) => {}
                             Err(rr) => return (Err(rr), stats.flow(flow_checked, flow_matched)),
@@ -172,7 +124,7 @@ pub async fn flow_check(
                     None => logs.warning(|| format!("Could not fetch key in flow control {}", elem.name)),
                 }
             }
-            (Ok(bad), stats.flow(flow_checked, flow_matched))
+            (Ok(()), stats.flow(flow_checked, flow_matched))
         }
     }
 }

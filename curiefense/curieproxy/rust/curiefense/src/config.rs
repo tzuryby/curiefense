@@ -226,7 +226,7 @@ impl Config {
 
         let globalfilters = GlobalFilterSection::resolve(&mut logs, actions, rawglobalfilters);
 
-        let flows = flow_resolve(&mut logs, actions, rawflows);
+        let flows = flow_resolve(&mut logs, rawflows);
 
         Config {
             revision,
