@@ -3,6 +3,7 @@ use curiefense::config::hostmap::*;
 use curiefense::config::matchers::Matching;
 use curiefense::config::raw::AclProfile;
 use curiefense::config::Config;
+use curiefense::interface::SimpleAction;
 use curiefense::logs::Logs;
 use curiefense::securitypolicy::match_securitypolicy;
 
@@ -35,6 +36,7 @@ fn gen_bogus_config(sz: usize) -> Config {
         deny_bot: HashSet::new(),
         passthrough: HashSet::new(),
         force_deny: HashSet::new(),
+        action: SimpleAction::from_reason("reason".to_string()),
     };
 
     let dummy_entries: Vec<Matching<SecurityPolicy>> = (0..sz)

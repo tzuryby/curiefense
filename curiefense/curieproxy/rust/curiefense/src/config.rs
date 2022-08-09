@@ -17,12 +17,13 @@ use crate::config::limit::Limit;
 use crate::interface::SimpleAction;
 use crate::logs::Logs;
 use contentfilter::{resolve_rules, ContentFilterProfile, ContentFilterRules};
-use flow::{flow_resolve, FlowElement, SequenceKey};
+use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, SecurityPolicy};
 use matchers::Matching;
 use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
 
+use self::flow::FlowMap;
 use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
@@ -84,7 +85,7 @@ pub struct Config {
     pub default: Option<HostMap>,
     pub last_mod: SystemTime,
     pub container_name: Option<String>,
-    pub flows: HashMap<SequenceKey, Vec<FlowElement>>,
+    pub flows: FlowMap,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
     pub logs: Logs,
 }

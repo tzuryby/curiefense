@@ -3,7 +3,7 @@ use rand::{distributions::Alphanumeric, Rng};
 
 use curiefense::acl::check_acl;
 use curiefense::config::raw::AclProfile;
-use curiefense::interface::{Location, Tags};
+use curiefense::interface::{Location, SimpleAction, Tags};
 
 fn tags_vec(sz: usize) -> Vec<(String, Location)> {
     (0..sz)
@@ -34,6 +34,7 @@ fn gen_profile(sz: usize) -> AclProfile {
         deny_bot: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         passthrough: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         force_deny: tags_vec(sz).into_iter().map(|p| p.0).collect(),
+        action: SimpleAction::from_reason("reason".to_string()),
     }
 }
 

@@ -1,10 +1,6 @@
 use chrono::{DateTime, Utc};
 use curiefense::{
-    config::{
-        flow::{FlowElement, SequenceKey},
-        globalfilter::GlobalFilterSection,
-        with_config,
-    },
+    config::{flow::FlowMap, globalfilter::GlobalFilterSection, with_config},
     grasshopper::DynGrasshopper,
     incremental::{add_body, add_header, finalize, inspect_init, IData},
     interface::{jsonlog, AnalyzeResult, Location},
@@ -46,7 +42,7 @@ pub struct MyEP {
 
 type CfgRequest = (
     RequestMeta,
-    Sender<Option<Result<(IData, Vec<GlobalFilterSection>, HashMap<SequenceKey, Vec<FlowElement>>), String>>>,
+    Sender<Option<Result<(IData, Vec<GlobalFilterSection>, FlowMap), String>>>,
 );
 
 /// this function loops and waits for configuration queries

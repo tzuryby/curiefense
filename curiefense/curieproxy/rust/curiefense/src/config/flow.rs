@@ -53,9 +53,7 @@ pub struct FlowElement {
 }
 
 impl FlowEntry {
-    fn convert(
-        rawentry: RawFlowEntry,
-    ) -> anyhow::Result<FlowEntry> {
+    fn convert(rawentry: RawFlowEntry) -> anyhow::Result<FlowEntry> {
         let mkey: anyhow::Result<Vec<RequestSelector>> = rawentry.key.into_iter().map(resolve_selector_map).collect();
         let msequence: anyhow::Result<Vec<FlowStep>> = rawentry.sequence.into_iter().map(FlowStep::convert).collect();
         let sequence = msequence?;
@@ -101,11 +99,10 @@ impl FlowStep {
     }
 }
 
-pub fn flow_resolve(
-    logs: &mut Logs,
-    rawentries: Vec<RawFlowEntry>,
-) -> HashMap<SequenceKey, Vec<FlowElement>> {
-    let mut out: HashMap<SequenceKey, Vec<FlowElement>> = HashMap::new();
+pub type FlowMap = HashMap<SequenceKey, Vec<FlowElement>>;
+
+pub fn flow_resolve(logs: &mut Logs, rawentries: Vec<RawFlowEntry>) -> FlowMap {
+    let mut out: FlowMap = HashMap::new();
 
     // entries are created with steps in order
     for rawentry in rawentries {

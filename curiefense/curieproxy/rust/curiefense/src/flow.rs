@@ -1,8 +1,7 @@
 use crate::interface::stats::{BStageFlow, BStageMapped, StatsCollect};
 use crate::Logs;
-use std::collections::HashMap;
 
-use crate::config::flow::{FlowElement, SequenceKey};
+use crate::config::flow::{FlowElement, FlowMap, SequenceKey};
 use crate::config::matchers::RequestSelector;
 use crate::interface::{Location, Tags};
 use crate::utils::{check_selector_cond, select_string, RequestInfo};
@@ -35,33 +34,43 @@ fn flow_match(reqinfo: &RequestInfo, tags: &Tags, elem: &FlowElement) -> bool {
     elem.select.iter().all(|e| check_selector_cond(reqinfo, tags, e))
 }
 
-pub enum FlowResult {
+#[derive(Clone)]
+pub struct FlowResult {
+    pub tp: FlowResultType,
+    pub name: String,
+    pub tag: String,
+}
+
+#[derive(Clone, Copy)]
+pub enum FlowResultType {
     NonLast,
     LastOk,
     LastBlock,
 }
 
-pub struct FlowCheck<'t> {
-    redis_key: String,
-    elem: &'t FlowElement,
+#[derive(Clone)]
+pub struct FlowCheck {
+    pub redis_key: String,
+    pub step: u32,
+    pub timeframe: u64,
+    pub is_last: bool,
+    pub name: String,
+    pub tag: String,
 }
 
-async fn check_flow<'t, CNX: redis::aio::ConnectionLike>(
-    cnx: &mut CNX,
-    check: FlowCheck<'t>,
-) -> anyhow::Result<FlowResult> {
+async fn check_flow<CNX: redis::aio::ConnectionLike>(cnx: &mut CNX, check: &FlowCheck) -> anyhow::Result<FlowResult> {
     // first, read from REDIS how many steps already passed
     let mlistlen: Option<usize> = redis::cmd("LLEN").arg(&check.redis_key).query_async(cnx).await?;
     let listlen = mlistlen.unwrap_or(0);
 
-    if check.elem.is_last {
-        if check.elem.step as usize == listlen {
-            Ok(FlowResult::LastOk)
+    let tp = if check.is_last {
+        if check.step as usize == listlen {
+            FlowResultType::LastOk
         } else {
-            Ok(FlowResult::LastBlock)
+            FlowResultType::LastBlock
         }
     } else {
-        if check.elem.step as usize == listlen {
+        if check.step as usize == listlen {
             let (_, mexpire): ((), Option<i64>) = redis::pipe()
                 .cmd("LPUSH")
                 .arg(&check.redis_key)
@@ -74,22 +83,22 @@ async fn check_flow<'t, CNX: redis::aio::ConnectionLike>(
             if expire < 0 {
                 let _: () = redis::cmd("EXPIRE")
                     .arg(&check.redis_key)
-                    .arg(check.elem.timeframe)
+                    .arg(check.timeframe)
                     .query_async(cnx)
                     .await?;
             }
         }
         // never block if not the last step!
-        Ok(FlowResult::NonLast)
-    }
+        FlowResultType::NonLast
+    };
+    Ok(FlowResult {
+        tp,
+        name: check.name.clone(),
+        tag: check.tag.clone(),
+    })
 }
 
-pub fn flow_info<'t>(
-    logs: &mut Logs,
-    flows: &'t HashMap<SequenceKey, Vec<FlowElement>>,
-    reqinfo: &RequestInfo,
-    tags: &Tags,
-) -> Vec<FlowCheck<'t>> {
+pub fn flow_info(logs: &mut Logs, flows: &FlowMap, reqinfo: &RequestInfo, tags: &Tags) -> Vec<FlowCheck> {
     let sequence_key = session_sequence_key(reqinfo);
     match flows.get(&sequence_key) {
         None => Vec::new(),
@@ -102,7 +111,14 @@ pub fn flow_info<'t>(
                 logs.debug(|| format!("Testing flow control {} (step {})", elem.name, elem.step));
                 match build_redis_key(reqinfo, tags, &elem.key, &elem.id, &elem.name) {
                     Some(redis_key) => {
-                        out.push(FlowCheck { redis_key, elem });
+                        out.push(FlowCheck {
+                            redis_key,
+                            step: elem.step,
+                            timeframe: elem.timeframe,
+                            is_last: elem.is_last,
+                            name: elem.name.clone(),
+                            tag: elem.tag.clone(),
+                        });
                     }
                     None => logs.warning(|| format!("Could not fetch key in flow control {}", elem.name)),
                 }
@@ -112,16 +128,15 @@ pub fn flow_info<'t>(
     }
 }
 
-pub async fn flow_query(checks: Vec<FlowCheck<'_>>) -> anyhow::Result<Vec<(&FlowElement, FlowResult)>> {
+pub async fn flow_query(checks: Vec<FlowCheck>) -> anyhow::Result<Vec<FlowResult>> {
     if checks.is_empty() {
         return Ok(Vec::new());
     }
     let mut cnx = crate::redis::redis_async_conn().await?;
     let mut out = Vec::new();
     for check in checks {
-        let elem = check.elem;
-        let r = check_flow(&mut cnx, check).await?;
-        out.push((elem, r));
+        let r = check_flow(&mut cnx, &check).await?;
+        out.push(r);
     }
     Ok(out)
 }
@@ -129,19 +144,19 @@ pub async fn flow_query(checks: Vec<FlowCheck<'_>>) -> anyhow::Result<Vec<(&Flow
 pub fn flow_process(
     stats: StatsCollect<BStageMapped>,
     flow_total: usize,
-    results: &[(&FlowElement, FlowResult)],
+    results: &[FlowResult],
     tags: &mut Tags,
 ) -> StatsCollect<BStageFlow> {
-    for (elem, result) in results {
-        match result {
-            FlowResult::LastOk => {
-                tags.insert(&elem.name, Location::Request);
+    for result in results {
+        match result.tp {
+            FlowResultType::LastOk => {
+                tags.insert(&result.name, Location::Request);
             }
-            FlowResult::LastBlock => {
-                tags.insert(&elem.name, Location::Request);
-                tags.insert(&elem.tag, Location::Request);
+            FlowResultType::LastBlock => {
+                tags.insert(&result.name, Location::Request);
+                tags.insert(&result.tag, Location::Request);
             }
-            FlowResult::NonLast => {}
+            FlowResultType::NonLast => {}
         }
     }
     stats.flow(flow_total, results.len())
@@ -150,7 +165,7 @@ pub fn flow_process(
 pub async fn flow_check(
     logs: &mut Logs,
     stats: StatsCollect<BStageMapped>,
-    flows: &HashMap<SequenceKey, Vec<FlowElement>>,
+    flows: &FlowMap,
     reqinfo: &RequestInfo,
     tags: &mut Tags,
 ) -> (anyhow::Result<()>, StatsCollect<BStageFlow>) {

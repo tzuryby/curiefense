@@ -4,13 +4,14 @@ use crate::config::hostmap::SecurityPolicy;
 
 pub struct BStageInit;
 pub struct BStageSecpol;
+#[derive(Clone)]
 pub struct BStageMapped;
 pub struct BStageFlow;
 pub struct BStageLimit;
 pub struct BStageAcl;
 pub struct BStageContentFilter;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SecpolStats {
     // stage secpol
     pub acl_enabled: bool,
@@ -30,7 +31,7 @@ impl SecpolStats {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Stats {
     pub revision: String,
     pub processing_stage: usize,
@@ -59,7 +60,7 @@ pub struct Stats {
 }
 
 // the builder uses a phantom data structure to make sure we did not forget to update the stats from a previous stage
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StatsCollect<A> {
     stats: Stats,
     phantom: PhantomData<A>,

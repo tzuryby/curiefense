@@ -30,6 +30,7 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::analyze::APhase0;
 use crate::interface::stats::{SecpolStats, Stats, StatsCollect};
 use crate::interface::{BlockReason, Location};
 
@@ -81,12 +82,12 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
 }
 
 // generic entry point when the request map has already been parsed
-pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
+pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     configpath: &str,
     mgh: Option<&GH>,
-    raw: RawRequest<'_>,
+    raw: RawRequest,
     logs: &mut Logs,
-) -> AnalyzeResult {
+) -> Result<APhase0, AnalyzeResult> {
     let mut tags = Tags::default();
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
@@ -166,49 +167,57 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
         }) {
             Some(RequestMappingResult::Res(x)) => x,
             Some(RequestMappingResult::BodyTooLarge((action, br), rinfo)) => {
-                return AnalyzeResult {
+                return Err(AnalyzeResult {
                     decision: Decision::action(action, vec![br]),
                     tags,
                     rinfo,
                     stats: Stats::default(),
-                };
+                });
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
-                return AnalyzeResult {
+                return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo: map_request(logs, &[], &[], false, 0, &raw),
                     stats: Stats::default(),
-                };
+                });
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
-                return AnalyzeResult {
+                return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo: map_request(logs, &[], &[], false, 0, &raw),
                     stats: Stats::default(),
-                };
+                });
             }
         };
-
     tags.extend(ntags);
 
-    analyze::analyze(
-        logs,
+    Ok(APhase0 {
         stats,
-        mgh,
-        tags,
-        &nm,
-        &securitypolicy,
+        itags: tags,
+        secpolname: nm,
+        securitypolicy,
         reqinfo,
         is_human,
         globalfilter_dec,
-        &flows,
-        CfRulesArg::Global,
-    )
-    .await
+        flows,
+    })
+}
+
+// generic entry point when the request map has already been parsed
+pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
+    configpath: &str,
+    mgh: Option<&GH>,
+    raw: RawRequest<'_>,
+    logs: &mut Logs,
+) -> AnalyzeResult {
+    match inspect_generic_request_map_init(configpath, mgh, raw, logs) {
+        Err(res) => res,
+        Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
+    }
 }
 
 // generic entry point when the request map has already been parsed

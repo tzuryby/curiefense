@@ -14,7 +14,7 @@ use crate::config::contentfilter::Transformation;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::interface::stats::Stats;
-use crate::interface::{Decision, Location, Tags};
+use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
@@ -335,7 +335,7 @@ impl RequestInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InspectionResult {
     pub decision: Decision,
     pub rinfo: Option<RequestInfo>,
@@ -356,6 +356,17 @@ impl InspectionResult {
         match &self.rinfo {
             None => "{}".to_string(),
             Some(rinfo) => self.decision.log_json(rinfo, tags, &self.logs, &self.stats),
+        }
+    }
+
+    pub fn from_analyze(logs: Logs, dec: AnalyzeResult) -> Self {
+        InspectionResult {
+            decision: dec.decision,
+            tags: Some(dec.tags),
+            logs,
+            err: None,
+            rinfo: Some(dec.rinfo),
+            stats: dec.stats,
         }
     }
 }

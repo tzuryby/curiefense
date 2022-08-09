@@ -9,16 +9,12 @@ use std::collections::HashMap;
 */
 
 use crate::{
-    analyze::{analyze, CfRulesArg},
+    analyze::{analyze, APhase0, CfRulesArg},
     body::body_too_large,
     challenge_verified,
     config::{
-        contentfilter::ContentFilterRules,
-        contentfilter::SectionIdx,
-        flow::{FlowElement, SequenceKey},
-        globalfilter::GlobalFilterSection,
-        hostmap::SecurityPolicy,
-        Config,
+        contentfilter::ContentFilterRules, contentfilter::SectionIdx, flow::FlowMap, globalfilter::GlobalFilterSection,
+        hostmap::SecurityPolicy, Config,
     },
     contentfilter::cf_default_action,
     grasshopper::Grasshopper,
@@ -159,7 +155,7 @@ pub async fn finalize<GH: Grasshopper>(
     idata: IData,
     mgh: Option<&GH>,
     globalfilters: &[GlobalFilterSection],
-    flows: &HashMap<SequenceKey, Vec<FlowElement>>,
+    flows: &FlowMap,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
 ) -> (AnalyzeResult, Logs) {
     let mut logs = idata.logs;
@@ -188,20 +184,24 @@ pub async fn finalize<GH: Grasshopper>(
 
     let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo);
     tags.insert("all", Location::Request);
+
+    let cfrules = mcfrules
+        .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
+        .unwrap_or(CfRulesArg::Global);
     let dec = analyze(
         &mut logs,
-        stats,
         mgh,
-        tags,
-        &secpolicy.name,
-        &secpolicy,
-        reqinfo,
-        is_human,
-        globalfilter_dec,
-        flows,
-        mcfrules
-            .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
-            .unwrap_or(CfRulesArg::Global),
+        APhase0 {
+            stats,
+            itags: tags,
+            secpolname: secpolicy.name.clone(),
+            securitypolicy: secpolicy,
+            reqinfo,
+            is_human,
+            globalfilter_dec,
+            flows: flows.clone(),
+        },
+        cfrules,
     )
     .await;
     (dec, logs)

@@ -41,9 +41,9 @@ async fn redis_get_limit<CNX: redis::aio::ConnectionLike>(
     cnx: &mut CNX,
     key: &str,
     timeframe: u64,
-    pairvalue: Option<&str>,
+    pairwith: Option<&str>,
 ) -> RedisResult<i64> {
-    let (mcurrent, mexpire): (Option<i64>, Option<i64>) = match &pairvalue {
+    let (mcurrent, mexpire): (Option<i64>, Option<i64>) = match &pairwith {
         None => {
             redis::pipe()
                 .cmd("INCR")
@@ -88,20 +88,36 @@ fn limit_match(tags: &Tags, elem: &Limit) -> bool {
 }
 
 /// an item that needs to be checked in redis
-pub struct LimitCheck<'t> {
-    key: String,
-    ban_key: String,
-    pairvalue: Option<String>,
-    limit: &'t Limit,
+#[derive(Clone)]
+pub struct LimitCheck {
+    pub key: String,
+    pub ban_key: String,
+    pub pairwith: Option<String>,
+    pub limit: Limit,
+}
+
+impl LimitCheck {
+    pub fn zero_limits(&self) -> bool {
+        self.limit.thresholds.iter().all(|t| t.limit == 0)
+    }
+    pub fn ban_for(&self, curcount: i64) -> Option<u64> {
+        self.limit
+            .thresholds
+            .iter()
+            .filter(|th| curcount > th.limit as i64)
+            .filter_map(|th| {
+                if let SimpleActionT::Ban(_, duration) = th.action.atype {
+                    Some(duration)
+                } else {
+                    None
+                }
+            })
+            .max()
+    }
 }
 
 /// generate information that needs to be checked in redis for limit checks
-pub fn limit_info<'t>(
-    security_policy_name: &str,
-    reqinfo: &RequestInfo,
-    limits: &'t [Limit],
-    tags: &Tags,
-) -> Vec<LimitCheck<'t>> {
+pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[Limit], tags: &Tags) -> Vec<LimitCheck> {
     let mut out = Vec::new();
     for limit in limits {
         if !limit_match(tags, limit) {
@@ -114,7 +130,7 @@ pub fn limit_info<'t>(
             Some(k) => k,
         };
         let ban_key = get_ban_key(&key);
-        let pairvalue = match &limit.pairwith {
+        let pairwith = match &limit.pairwith {
             None => None,
             Some(sel) => match select_string(reqinfo, sel, tags) {
                 None => continue,
@@ -124,20 +140,21 @@ pub fn limit_info<'t>(
         out.push(LimitCheck {
             key,
             ban_key,
-            pairvalue,
-            limit,
+            pairwith,
+            limit: limit.clone(),
         })
     }
     out
 }
 
-pub struct LimitResult<'t> {
-    limit: &'t Limit,
-    ban: bool,
-    curcount: i64,
+#[derive(Clone)]
+pub struct LimitResult {
+    pub limit: Limit,
+    pub ban: bool,
+    pub curcount: i64,
 }
 
-pub async fn limit_query<'t>(logs: &mut Logs, checks: &[LimitCheck<'t>]) -> Vec<LimitResult<'t>> {
+pub async fn limit_query<'t>(logs: &mut Logs, checks: Vec<LimitCheck>) -> Vec<LimitResult> {
     // early return to avoid redis connection
     if checks.is_empty() {
         logs.debug("no limits to check");
@@ -163,42 +180,23 @@ pub async fn limit_query<'t>(logs: &mut Logs, checks: &[LimitCheck<'t>]) -> Vec<
                 curcount: 0,
             });
         } else {
-            let curcount = if check.limit.thresholds.iter().all(|t| t.limit == 0) {
+            let curcount = if check.zero_limits() {
                 Ok(1)
             } else {
-                redis_get_limit(
-                    &mut redis,
-                    &check.key,
-                    check.limit.timeframe,
-                    check.pairvalue.as_deref(),
-                )
-                .await
+                redis_get_limit(&mut redis, &check.key, check.limit.timeframe, check.pairwith.as_deref()).await
             };
             match curcount {
                 Err(rr) => logs.error(|| rr.to_string()),
                 Ok(curcount) => {
                     // check for banning
-                    if let Some(duration) = &check
-                        .limit
-                        .thresholds
-                        .iter()
-                        .filter(|th| curcount > th.limit as i64)
-                        .filter_map(|th| {
-                            if let SimpleActionT::Ban(_, duration) = th.action.atype {
-                                Some(duration)
-                            } else {
-                                None
-                            }
-                        })
-                        .next()
-                    {
+                    if let Some(duration) = check.ban_for(curcount) {
                         if let Err(rr) = redis::pipe()
                             .cmd("SET")
                             .arg(&check.ban_key)
                             .arg(1)
                             .cmd("EXPIRE")
                             .arg(&check.ban_key)
-                            .arg(*duration)
+                            .arg(duration)
                             .query_async::<_, ()>(&mut redis)
                             .await
                         {
@@ -223,7 +221,7 @@ pub fn limit_process(
     logs: &mut Logs,
     stats: StatsCollect<BStageFlow>,
     nlimits: usize,
-    results: &[LimitResult<'_>],
+    results: &[LimitResult],
     tags: &mut Tags,
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     let mut out = SimpleDecision::Pass;
@@ -237,7 +235,7 @@ pub fn limit_process(
                 .iter()
                 .find(|t| matches!(t.action.atype, SimpleActionT::Ban(_, _)))
                 .unwrap_or(&result.limit.thresholds[0]);
-            out = stronger_decision(out, limit_pure_react(tags, result.limit, ban_threshold));
+            out = stronger_decision(out, limit_pure_react(tags, &result.limit, ban_threshold));
         }
 
         if result.curcount > 0 {
@@ -245,7 +243,7 @@ pub fn limit_process(
                 // Only one action with highest limit larger than current
                 // counter will be applied, all the rest will be skipped.
                 if result.curcount > threshold.limit as i64 {
-                    out = stronger_decision(out, limit_pure_react(tags, result.limit, threshold));
+                    out = stronger_decision(out, limit_pure_react(tags, &result.limit, threshold));
                 }
             }
         }
@@ -263,6 +261,6 @@ pub async fn limit_check(
     tags: &mut Tags,
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     let checks = limit_info(security_policy_name, reqinfo, limits, tags);
-    let qresults = limit_query(logs, &checks).await;
+    let qresults = limit_query(logs, checks).await;
     limit_process(logs, stats, limits.len(), &qresults, tags)
 }

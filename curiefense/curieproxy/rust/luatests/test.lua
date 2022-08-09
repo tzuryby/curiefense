@@ -112,7 +112,80 @@ local function run_inspect_request(raw_request_map)
     if human ~= nil then
       res = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
     else
-      res = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
+      local r1 = curiefense.inspect_request_init(meta, headers, raw_request_map.body, ip)
+      if r1.error then
+        error(r1.error)
+      end
+      if r1.decided then
+        return r1
+      end
+      local flows = r1.flows
+      local conn = redis.connect(redishost, redisport)
+
+      -- very naive and simple implementation of flow / limit checks
+      local rflows = {}
+      for _, flow in pairs(flows) do
+        local key = flow.key
+        local len = conn:llen(key)
+        local step = flow.step
+        local flowtype = "nonlast"
+        if flow.is_last then
+          if step == len then
+            flowtype = "lastok"
+          else
+            flowtype = "lastblock"
+          end
+        else
+          if step == len then
+            conn:lpush(key, "foo")
+            local ttl = conn:ttl(key)
+            if ttl == nil or ttl < 0 then
+              conn:expire(key, flow.timeframe)
+            end
+          end
+        end
+        table.insert(rflows, flow:result(flowtype))
+      end
+
+      local limits = r1.limits
+      local rlimits = {}
+      for _, limit in pairs(limits) do
+        local key = limit.key
+        local ban_key = limit.ban_key
+        if conn:get(ban_key) then
+          -- banned
+          table.insert(rlimits, limit:result(true, 0))
+        else
+          -- not banned
+          local curcount = 1
+          if not limit.zero_limits then
+            local pw = limit.pairwith
+            local expire
+            if pw then
+              conn:sadd(key, pw)
+              curcount = conn:scard(key)
+              expire = conn:ttl(key)
+            else
+              curcount = conn:incr(key)
+              expire = conn:ttl(key)
+            end
+            if curcount == nil then
+              curcount = 0
+            end
+            if expire == nil or expire < 0 then
+              conn:expire(key, limit.timeframe)
+            end
+          end
+          local duration = limit:ban_for(curcount)
+          if duration then
+            conn:set(ban_key, 1)
+            conn:expire(ban_key, duration)
+          end
+          table.insert(rlimits, limit:result(false, curcount))
+        end
+      end
+
+      res = curiefense.inspect_request_process(r1, rflows, rlimits)
     end
     if res.error then
       error(res.error)
@@ -353,10 +426,9 @@ local function test_flow(request_path)
   for n, raw_request_map in pairs(raw_request_maps) do
     print(" -> step " .. n)
     local r = run_inspect_request(raw_request_map)
-    local res = cjson.decode(r.response)
     local request_map = cjson.decode(r.request_map)
     local expected_tag = raw_request_map["tag"]
-    
+
     local tag_found = false
     for _, tag in pairs(request_map["tags"]) do
       if tag == expected_tag then
@@ -372,7 +444,7 @@ local function test_flow(request_path)
       end
     else
       if not tag_found then
-        print("we did not find the tag " .. expected_tag .. " in the request info, but it should have been present. All tags:")
+        print("we did not find the tag " .. expected_tag .. " in the request info. All tags:")
         for _, tag in pairs(request_map["tags"]) do
           print(" * " .. tag)
         end
@@ -506,15 +578,14 @@ for file in lfs.dir[[luatests/contentfilter_only]] do
   end
 end
 
-for file in lfs.dir[[luatests/flows]] do
-  if startswith(file, prefix) and ends_with(file, ".json") then
-    test_flow("luatests/flows/" .. file)
-  end
-end
-
 for file in lfs.dir[[luatests/ratelimit]] do
   if startswith(file, prefix) and ends_with(file, ".json") then
     test_ratelimit("luatests/ratelimit/" .. file)
   end
 end
 
+for file in lfs.dir[[luatests/flows]] do
+  if startswith(file, prefix) and ends_with(file, ".json") then
+    test_flow("luatests/flows/" .. file)
+  end
+end
