@@ -2,6 +2,7 @@ local session_rust_nginx = {}
 local cjson       = require "cjson"
 local curiefense  = require "curiefense"
 local sfmt = string.format
+local redis = require "resty.redis"
 
 local function custom_response(handle, action_params)
     if not action_params then action_params = {} end
@@ -54,6 +55,15 @@ local function make_safe_headers(rheaders)
     return headers
 end
 
+local function redis_connect()
+    local redishost = os.getenv("REDIS_HOST") or "redis"
+    local redisport = os.getenv("REDIS_PORT") or 6379
+    local red = redis:new()
+    red:set_timeouts(100, 100, 100) -- 100ms
+    red:connect(redishost, redisport)
+    return red
+end
+
 function session_rust_nginx.inspect(handle)
     local ip_str = handle.var.remote_addr
 
@@ -64,8 +74,6 @@ function session_rust_nginx.inspect(handle)
 
     local headers = make_safe_headers(rheaders)
 
-    handle.log(handle.INFO, cjson.encode(headers))
-
     handle.req.read_body()
     local body_content = handle.req.get_body_data()
     if body_content ~= nil then
@@ -73,17 +81,101 @@ function session_rust_nginx.inspect(handle)
     else
         handle.ctx.body_len = 0
     end
-    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
-
     -- the meta table contains the following elements:
     --   * path : the full request uri
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
-    local res = curiefense.inspect_request(
+    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
+
+    local res = curiefense.inspect_request_init(
         meta, headers, body_content, ip_str
     )
 
+    if res.error then
+        handle.log(handle.ERR, sfmt("curiefense.inspect_request_init error %s", res.error))
+    end
+
+    if not res.decided then
+        -- handle flow / limit
+        local flows = res.flows
+        local limits = res.limits
+        local rflows = {}
+        local rlimits = {}
+
+        if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
+            -- Redis required
+            -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
+            local red = redis_connect()
+
+            for _, flow in pairs(flows) do
+                local key = flow.key
+                local len = red:llen(key)
+                local step = flow.step
+                local flowtype = "nonlast"
+                if flow.is_last then
+                    if step == len then
+                        flowtype = "lastok"
+                    else
+                        flowtype = "lastblock"
+                    end
+                else
+                    if step == len then
+                        red:lpush(key, "foo")
+                        local ttl = red:ttl(key)
+                        if ttl == nil or ttl < 0 then
+                        red:expire(key, flow.timeframe)
+                        end
+                    end
+                end
+                table.insert(rflows, flow:result(flowtype))
+            end
+
+            for _, limit in pairs(limits) do
+                local key = limit.key
+                local ban_key = limit.ban_key
+                if red:get(ban_key) then
+                    -- banned
+                    table.insert(rlimits, limit:result(true, 0))
+                else
+                -- not banned
+                    local curcount = 1
+                    if not limit.zero_limits then
+                        local pw = limit.pairwith
+                        local expire
+                        if pw then
+                            red:sadd(key, pw)
+                            curcount = red:scard(key)
+                            expire = red:ttl(key)
+                        else
+                            curcount = red:incr(key)
+                            expire = red:ttl(key)
+                        end
+                        if curcount == nil then
+                            curcount = 0
+                        end
+                        if expire == nil or expire < 0 then
+                            red:expire(key, limit.timeframe)
+                        end
+                    end
+                    local duration = limit:ban_for(curcount)
+                    if duration then
+                        red:set(ban_key, 1)
+                        red:expire(ban_key, duration)
+                    end
+                    table.insert(rlimits, limit:result(false, curcount))
+                end
+            end
+        end
+
+        res = curiefense.inspect_request_process(res, rflows, rlimits)
+        if res.error then
+            handle.log(handle.ERR, sfmt("curiefense.inspect_request_process error %s", res.error))
+        end
+    end
+
     handle.ctx.request_map = res.request_map
+
+    handle.log(handle.INFO, cjson.encode(cjson.decode(res.request_map)["tags"]))
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", res.error))
