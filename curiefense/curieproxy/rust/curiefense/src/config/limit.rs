@@ -114,24 +114,32 @@ pub fn limit_order(a: &LimitThreshold, b: &LimitThreshold) -> Ordering {
 
 #[cfg(test)]
 mod tests {
+    use crate::interface::SimpleActionT;
+
     use super::*;
 
     #[test]
     fn test_limit_ordering() {
-        fn mklimit(name: &str, v: u64) -> LimitThreshold {
+        fn mklimit(v: u64) -> LimitThreshold {
             LimitThreshold {
                 limit: v,
-                action: SimpleAction::from_reason(name.to_string()),
+                action: SimpleAction {
+                    atype: SimpleActionT::Custom {
+                        content: "test".to_string(),
+                    },
+                    headers: None,
+                    status: v as u32,
+                },
             }
         }
-        let l1 = mklimit("l1", 0);
-        let l2 = mklimit("l2", 8);
-        let l3 = mklimit("l3", 4);
-        let l4 = mklimit("l4", 1);
+        let l1 = mklimit(0);
+        let l2 = mklimit(8);
+        let l3 = mklimit(4);
+        let l4 = mklimit(1);
         let mut lvec = vec![l3, l2, l1, l4];
         lvec.sort_unstable_by(limit_order);
-        let names: Vec<String> = lvec.into_iter().map(|l| l.action.reason).collect();
-        let expected: Vec<String> = ["l2", "l3", "l4", "l1"].iter().map(|x| x.to_string()).collect();
-        assert_eq!(names, expected);
+        let status: Vec<u64> = lvec.into_iter().map(|l| l.limit).collect();
+        let expected: Vec<u64> = vec![8, 4, 1, 0];
+        assert_eq!(status, expected);
     }
 }

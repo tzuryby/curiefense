@@ -190,11 +190,8 @@ pub struct RawActionParams {
     pub action: Option<Box<RawAction>>,
     #[serde(default)]
     pub headers: Option<HashMap<String, String>>,
-    pub reason: Option<String>,
     pub content: Option<String>,
-    pub location: Option<String>,
     pub duration: Option<String>,
-    pub content_type: Option<String>,
 }
 
 impl std::default::Default for RawActionParams {
@@ -204,11 +201,8 @@ impl std::default::Default for RawActionParams {
             block_mode: true,
             action: None,
             headers: None,
-            reason: None,
             content: None,
-            location: None,
             duration: None,
-            content_type: None,
         }
     }
 }

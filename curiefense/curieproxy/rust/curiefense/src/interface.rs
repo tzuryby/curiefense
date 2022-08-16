@@ -253,13 +253,16 @@ impl SimpleActionT {
 pub struct SimpleAction {
     pub atype: SimpleActionT,
     pub headers: Option<HashMap<String, RequestTemplate>>,
-    pub status: u32,
-    pub reason: String,
+    pub status: u32
 }
 
 impl Default for SimpleAction {
     fn default() -> Self {
-        SimpleAction::from_reason("default action".to_string())
+        SimpleAction {
+            atype: SimpleActionT::default(),
+            status: 503,
+            headers: None
+        }
     }
 }
 
@@ -306,15 +309,6 @@ impl std::default::Default for Action {
 }
 
 impl SimpleAction {
-    pub fn from_reason(reason: String) -> Self {
-        SimpleAction {
-            atype: SimpleActionT::default(),
-            status: 503,
-            headers: None,
-            reason,
-        }
-    }
-
     pub fn resolve_actions(logs: &mut Logs, rawactions: HashMap<String, RawAction>) -> HashMap<String, Self> {
         let mut out = HashMap::new();
         for (id, raction) in rawactions {
@@ -339,9 +333,7 @@ impl SimpleAction {
                         .action
                         .as_ref()
                         .and_then(|x| SimpleAction::resolve(x).ok())
-                        .unwrap_or_else(|| {
-                            SimpleAction::from_reason(rawaction.params.reason.clone().unwrap_or_else(|| "?".into()))
-                        }),
+                        .unwrap_or_default(),
                 ),
                 rawaction
                     .params
@@ -375,8 +367,7 @@ impl SimpleAction {
         Ok(SimpleAction {
             atype,
             status,
-            headers,
-            reason: rawaction.params.reason.clone().unwrap_or_else(|| "no reason".into()),
+            headers
         })
     }
 

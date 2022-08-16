@@ -88,7 +88,7 @@ impl ContentFilterProfile {
             max_body_size: usize::MAX,
             max_body_depth: usize::MAX,
             referer_as_uri: false,
-            action: SimpleAction::from_reason("default content filter".to_string()),
+            action: SimpleAction::default(),
         }
     }
 }

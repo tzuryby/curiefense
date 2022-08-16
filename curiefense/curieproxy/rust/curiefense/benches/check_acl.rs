@@ -34,7 +34,7 @@ fn gen_profile(sz: usize) -> AclProfile {
         deny_bot: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         passthrough: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         force_deny: tags_vec(sz).into_iter().map(|p| p.0).collect(),
-        action: SimpleAction::from_reason("reason".to_string()),
+        action: SimpleAction::default(),
     }
 }
 
