@@ -102,6 +102,7 @@ function session_rust_nginx.inspect(handle)
         local rflows = {}
         local rlimits = {}
 
+        -- TODO: avoid connecting to redis when there are no flows and all limits are zero limits
         if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
             -- Redis required
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
@@ -132,12 +133,13 @@ function session_rust_nginx.inspect(handle)
 
             for _, limit in pairs(limits) do
                 local key = limit.key
+                -- it might be a good idea to extend the API to only check ban for limits that have ban actions
                 local ban_key = limit.ban_key
                 if red:get(ban_key) then
                     -- banned
                     table.insert(rlimits, limit:result(true, 0))
                 else
-                -- not banned
+                    -- not banned
                     local curcount = 1
                     if not limit.zero_limits then
                         local pw = limit.pairwith

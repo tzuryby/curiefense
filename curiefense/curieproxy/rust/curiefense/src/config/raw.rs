@@ -418,7 +418,7 @@ pub struct RawFlowEntry {
     pub key: Vec<HashMap<String, String>>,
     pub active: bool,
     pub timeframe: u64,
-    pub tag: String,
+    pub tags: Vec<String>,
     pub sequence: Vec<RawFlowStep>,
 }
 

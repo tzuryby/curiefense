@@ -38,7 +38,7 @@ fn flow_match(reqinfo: &RequestInfo, tags: &Tags, elem: &FlowElement) -> bool {
 pub struct FlowResult {
     pub tp: FlowResultType,
     pub name: String,
-    pub tag: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -55,7 +55,7 @@ pub struct FlowCheck {
     pub timeframe: u64,
     pub is_last: bool,
     pub name: String,
-    pub tag: String,
+    pub tags: Vec<String>,
 }
 
 async fn check_flow<CNX: redis::aio::ConnectionLike>(cnx: &mut CNX, check: &FlowCheck) -> anyhow::Result<FlowResult> {
@@ -94,7 +94,7 @@ async fn check_flow<CNX: redis::aio::ConnectionLike>(cnx: &mut CNX, check: &Flow
     Ok(FlowResult {
         tp,
         name: check.name.clone(),
-        tag: check.tag.clone(),
+        tags: check.tags.clone(),
     })
 }
 
@@ -117,7 +117,7 @@ pub fn flow_info(logs: &mut Logs, flows: &FlowMap, reqinfo: &RequestInfo, tags: 
                             timeframe: elem.timeframe,
                             is_last: elem.is_last,
                             name: elem.name.clone(),
-                            tag: elem.tag.clone(),
+                            tags: elem.tags.clone(),
                         });
                     }
                     None => logs.warning(|| format!("Could not fetch key in flow control {}", elem.name)),
@@ -154,7 +154,9 @@ pub fn flow_process(
             }
             FlowResultType::LastBlock => {
                 tags.insert(&result.name, Location::Request);
-                tags.insert(&result.tag, Location::Request);
+                for tag in &result.tags {
+                    tags.insert(tag, Location::Request);
+                }
             }
             FlowResultType::NonLast => {}
         }

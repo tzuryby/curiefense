@@ -35,6 +35,6 @@
       }
     ],
     "timeframe": 60,
-    "tag": "flowc"
+    "tags": ["flowc"]
   }
 ]

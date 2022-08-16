@@ -1,6 +1,6 @@
 [
   {
-    "tag": "flow1",
+    "tags": ["flow1"],
     "active": true,
     "description": "New Flow Control Description and Remarks",
     "exclude": [],
@@ -52,7 +52,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flow2",
+    "tags": ["flow2"],
     "active": true,
     "description": "abc",
     "exclude": [
@@ -100,7 +100,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flow3",
+    "tags": ["flow3"],
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -137,7 +137,7 @@
     "timeframe": 2
   },
   {
-    "tag": "flowheader",
+    "tags": ["flowheader"],
     "active": true,
     "description": "",
     "exclude": [],
@@ -178,7 +178,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flowc1",
+    "tags": ["flowc1"],
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -215,7 +215,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flowc2",
+    "tags": ["flowc2"],
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -252,7 +252,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flowc3",
+    "tags": ["flowc3"],
     "active": true,
     "description": "abc",
     "exclude": [],
@@ -289,7 +289,7 @@
     "timeframe": 4
   },
   {
-    "tag": "flowquery",
+    "tags": ["flowquery"],
     "active": true,
     "description": "abc",
     "exclude": [],

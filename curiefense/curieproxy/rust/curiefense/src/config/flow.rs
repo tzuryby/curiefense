@@ -16,7 +16,7 @@ struct FlowEntry {
     name: String,
     key: Vec<RequestSelector>,
     timeframe: u64,
-    tag: String,
+    tags: Vec<String>,
     sequence: Vec<FlowStep>,
 }
 
@@ -45,7 +45,7 @@ pub struct FlowElement {
     /// the entry timeframe
     pub timeframe: u64,
     /// the entry tag
-    pub tag: String,
+    pub tags: Vec<String>,
     /// the step selector
     pub select: Vec<RequestSelectorCondition>,
     /// marker for the last step
@@ -65,7 +65,7 @@ impl FlowEntry {
             exclude: rawentry.exclude.into_iter().collect(),
             name,
             timeframe: rawentry.timeframe,
-            tag: rawentry.tag,
+            tags: rawentry.tags,
             key: mkey?,
             sequence,
         })
@@ -117,7 +117,7 @@ pub fn flow_resolve(logs: &mut Logs, rawentries: Vec<RawFlowEntry>) -> FlowMap {
                     let vc: &mut Vec<FlowElement> = out.entry(step.sequence_key).or_insert_with(Vec::new);
                     vc.push(FlowElement {
                         id: entry.id.clone(),
-                        tag: entry.tag.clone(),
+                        tags: entry.tags.clone(),
                         include: entry.include.clone(),
                         exclude: entry.exclude.clone(),
                         key: entry.key.clone(),

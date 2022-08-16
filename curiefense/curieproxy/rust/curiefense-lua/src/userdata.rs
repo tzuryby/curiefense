@@ -169,7 +169,7 @@ impl mlua::UserData for LuaFlowCheck {
         fields.add_field_method_get("step", |_, this| Ok(this.0.step));
         fields.add_field_method_get("is_last", |_, this| Ok(this.0.is_last));
         fields.add_field_method_get("name", |_, this| Ok(this.0.name.clone()));
-        fields.add_field_method_get("tag", |_, this| Ok(this.0.tag.clone()));
+        fields.add_field_method_get("tags", |_, this| Ok(this.0.tags.clone()));
         fields.add_field_method_get("timeframe", |_, this| Ok(this.0.timeframe));
     }
 
@@ -190,7 +190,7 @@ impl mlua::UserData for LuaFlowCheck {
             Ok(LuaFlowResult(FlowResult {
                 tp,
                 name: this.0.name.clone(),
-                tag: this.0.tag.clone(),
+                tags: this.0.tags.clone(),
             }))
         });
     }
