@@ -218,8 +218,8 @@ fn lua_inspect_init(
             );
             Ok(match res {
                 Ok((r, logs)) => match r {
-                    InitResult::Res(r) => LInitResult::P0Result(InspectionResult::from_analyze(logs, r)),
-                    InitResult::Phase1(p1) => LInitResult::P1(logs, p1),
+                    InitResult::Res(r) => LInitResult::P0Result(Box::new(InspectionResult::from_analyze(logs, r))),
+                    InitResult::Phase1(p1) => LInitResult::P1(logs, Box::new(p1)),
                 },
                 Err(s) => LInitResult::P0Error(s),
             })
@@ -258,7 +258,7 @@ fn lua_inspect_process(
         LInitResult::P0Error(rr) => return lerr(format!("The first parameter is an error: {}", rr)),
         LInitResult::P1(logs, p1) => (logs, p1),
     };
-    let p2 = APhase2::from_phase1(p1, flow_results, limit_results);
+    let p2 = APhase2::from_phase1(*p1, flow_results, limit_results);
     let grasshopper = &DynGrasshopper {};
     let res = analyze_finish(&mut logs, Some(grasshopper), CfRulesArg::Global, p2);
     Ok(LuaInspectionResult(Ok(InspectionResult::from_analyze(logs, res))))

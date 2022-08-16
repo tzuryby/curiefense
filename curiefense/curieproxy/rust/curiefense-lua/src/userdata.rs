@@ -55,9 +55,9 @@ impl mlua::UserData for LuaInspectionResult {
 /// Data type for the "dialog" API, phase 1, initialization
 #[derive(Clone)]
 pub enum LInitResult {
-    P0Result(InspectionResult),
+    P0Result(Box<InspectionResult>),
     P0Error(String),
-    P1(Logs, APhase1),
+    P1(Logs, Box<APhase1>),
 }
 
 impl LInitResult {
