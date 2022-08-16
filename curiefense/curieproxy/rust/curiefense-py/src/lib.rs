@@ -2,52 +2,11 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-use curiefense::content_filter_check_generic_request_map;
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::inspect_generic_request_map;
 use curiefense::logs::Logs;
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
-
-#[pyfunction]
-fn inspect_content_filter(
-    configpath: &str,
-    meta: HashMap<String, String>,
-    headers: HashMap<String, String>,
-    mbody: Option<&[u8]>,
-    ip: String,
-    content_filter_id: String,
-) -> PyResult<(String, String)> {
-    let mut logs = Logs::default();
-    logs.debug("Inspection init");
-    let rmeta: RequestMeta = RequestMeta::from_map(meta).map_err(PyTypeError::new_err)?;
-
-    let raw = RawRequest {
-        ipstr: ip,
-        meta: rmeta,
-        headers,
-        mbody,
-    };
-
-    let (dec, reqinfo, tags, stats) =
-        content_filter_check_generic_request_map(configpath, &raw, &content_filter_id, &mut logs);
-
-    let res = InspectionResult {
-        decision: dec,
-        tags: Some(tags),
-        logs,
-        err: None,
-        rinfo: Some(reqinfo),
-        stats,
-    };
-    let response = res.decision.response_json();
-    let request_map = res.log_json();
-    let merr = res.err;
-    match merr {
-        Some(rr) => Err(PyTypeError::new_err(rr)),
-        None => Ok((response, request_map)),
-    }
-}
 
 #[pyfunction]
 #[pyo3(name = "inspect_request")]
@@ -139,7 +98,6 @@ fn hyperscan_match(pattern: &str, mmatch: Option<&str>) -> PyResult<Vec<MatchRes
 
 #[pymodule]
 fn curiefense(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(inspect_content_filter, m)?)?;
     m.add_function(wrap_pyfunction!(py_inspect_request, m)?)?;
     m.add_function(wrap_pyfunction!(rust_match, m)?)?;
     m.add_function(wrap_pyfunction!(hyperscan_match, m)?)?;

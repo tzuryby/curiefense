@@ -5,7 +5,6 @@ use curiefense::analyze::analyze_init;
 use curiefense::analyze::APhase2;
 use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
-use curiefense::content_filter_check_generic_request_map;
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
 use curiefense::inspect_generic_request_map;
@@ -41,76 +40,6 @@ fn lua_set_status_string(_lua: &Lua, args: (String, String)) -> LuaResult<String
             },
         },
     }
-}
-
-// ******************************************
-// Content Filter ONLY CHECKS
-// ******************************************
-
-/// Lua interface to the inspection function
-///
-/// args are
-/// * meta (contains keys "method", "path", and optionally "authority")
-/// * headers
-/// * (opt) body
-/// * ip addr
-/// * (opt) grasshopper
-#[allow(clippy::type_complexity)]
-#[allow(clippy::unnecessary_wraps)]
-fn lua_inspect_content_filter(
-    _lua: &Lua,
-    args: (
-        HashMap<String, String>, // meta
-        HashMap<String, String>, // headers
-        Option<LuaString>,       // maybe body
-        String,                  // ip
-        String,                  // content_filter_id
-    ),
-) -> LuaResult<LuaInspectionResult> {
-    let (meta, headers, lua_body, str_ip, content_filter_id) = args;
-
-    let res = inspect_content_filter(
-        "/cf-config/current/config",
-        meta,
-        headers,
-        lua_body.as_ref().map(|s| s.as_bytes()),
-        str_ip,
-        content_filter_id,
-    );
-    Ok(LuaInspectionResult(res))
-}
-
-/// Rust-native inspection top level function
-fn inspect_content_filter(
-    configpath: &str,
-    meta: HashMap<String, String>,
-    headers: HashMap<String, String>,
-    mbody: Option<&[u8]>,
-    ip: String,
-    content_filter_id: String,
-) -> Result<InspectionResult, String> {
-    let mut logs = Logs::default();
-    logs.debug("Inspection init");
-    let rmeta: RequestMeta = RequestMeta::from_map(meta)?;
-
-    let raw = RawRequest {
-        ipstr: ip,
-        meta: rmeta,
-        headers,
-        mbody,
-    };
-
-    let (dec, reqinfo, tags, stats) =
-        content_filter_check_generic_request_map(configpath, &raw, &content_filter_id, &mut logs);
-
-    Ok(InspectionResult {
-        decision: dec,
-        tags: Some(tags),
-        logs,
-        err: None,
-        rinfo: Some(reqinfo),
-        stats,
-    })
 }
 
 // ******************************************
@@ -386,11 +315,6 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     exports.set("inspect_request_process", lua.create_function(lua_inspect_process)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
-    // content filter inspection
-    exports.set(
-        "inspect_content_filter",
-        lua.create_function(lua_inspect_content_filter)?,
-    )?;
     // setting the HTTP status code
     exports.set("set_status_string", lua.create_function(lua_set_status_string)?)?;
 

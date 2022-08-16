@@ -1,6 +1,6 @@
 [
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-risk:5",
       "cf-rule-risk:4"
@@ -42,7 +42,7 @@
     ]
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-id:100016"
     ],
@@ -85,7 +85,7 @@
     ]
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-id:sqlirl3",
       "cf-rule-risk:5",
@@ -131,7 +131,7 @@
     ]
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 512,
       "max_length": 1024,
@@ -175,7 +175,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "sqli",
       "waf"
@@ -223,7 +223,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 3,
       "max_length": 1024,
@@ -286,7 +286,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "waf"
     ],
@@ -326,7 +326,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "waf"
     ],
@@ -366,7 +366,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "waf"
     ],
@@ -442,7 +442,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "waf"
     ],
@@ -521,7 +521,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "waf"
     ],
@@ -584,7 +584,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 512,
       "max_length": 1024,
@@ -620,7 +620,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-category:libinjection",
       "waf"
@@ -661,7 +661,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-category:libinjection",
       "waf"
@@ -702,7 +702,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-category:libinjection",
       "sqli"
@@ -740,7 +740,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 512,
       "max_length": 1024,
@@ -774,7 +774,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [
         {
@@ -867,7 +867,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": [
@@ -900,7 +900,7 @@
     "name": "mask all arguments"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 512,
       "max_length": 1024,
@@ -1024,7 +1024,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "active": [
       "cf-rule-category:libinjection"
     ],
@@ -1060,7 +1060,7 @@
     "name": "mask all arguments"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [
         {
@@ -1169,7 +1169,7 @@
     "name": "rre"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "max_count": 24,
       "max_length": 1024,
@@ -1218,7 +1218,7 @@
     }
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": [
@@ -1251,7 +1251,7 @@
     "name": "inverted regex"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": []
@@ -1279,7 +1279,7 @@
     "name": "expect json"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": []
@@ -1307,7 +1307,7 @@
     "name": "expect xml"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": []
@@ -1336,7 +1336,7 @@
     "name": "expect xml + json"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "args": {
       "names": [],
       "regex": []
@@ -1367,7 +1367,7 @@
     "name": "expect all"
   },
   {
-    "action": "default",
+    "action": "cfblock",
     "allsections": {
       "max_count": 24,
       "max_length": 1024,

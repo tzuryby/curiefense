@@ -9,8 +9,8 @@ local function custom_response(handle, action_params)
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end
 
-    if action_params.atype == "alter_headers" and block_mode then
-        handle.log(handle.ERR, cjson.encode(action_params))
+    if not block_mode then
+        handle.log(handle.DEBUG, "altering: " .. cjson.encode(action_params))
         for k, v in pairs(action_params.headers) do
             handle.req.set_header(k, v)
         end

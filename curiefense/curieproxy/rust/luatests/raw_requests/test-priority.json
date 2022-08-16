@@ -154,9 +154,7 @@
         "cf-rule-risk:3",
         "waf"
       ],
-      "action": "custom_response",
-      "block_mode": false,
-      "status": 403
+      "action": "pass"
     },
     "name": "priority report attack",
     "headers": {
@@ -246,9 +244,7 @@
         "cf-rule-risk:3",
         "waf"
       ],
-      "action": "custom_response",
-      "block_mode": false,
-      "status": 403
+      "action": "pass"
     },
     "name": "priority report + ignore attack",
     "headers": {

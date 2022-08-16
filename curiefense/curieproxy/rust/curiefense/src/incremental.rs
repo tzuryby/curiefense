@@ -16,11 +16,10 @@ use crate::{
         contentfilter::ContentFilterRules, contentfilter::SectionIdx, flow::FlowMap, globalfilter::GlobalFilterSection,
         hostmap::SecurityPolicy, Config,
     },
-    contentfilter::cf_default_action,
     grasshopper::Grasshopper,
     interface::{
         stats::{BStageSecpol, SecpolStats, Stats, StatsCollect},
-        Action, AnalyzeResult, BlockReason, Decision, Location, Tags,
+        Action, AnalyzeResult, BlockReason, Decision, Location, Tags, ActionType,
     },
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
@@ -101,6 +100,15 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
 /// other properties are not checked at this point (restrict for example), this early check purely exists as an anti DOS measure
 pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
+    let cf_block = || Action {
+        atype: ActionType::Block,
+        block_mode: true,
+        ban: false,
+        status: 403,
+        headers: None,
+        content: "Access denied".to_string(),
+        extra_tags: None,
+    };
     if dt.secpol.content_filter_active {
         let hdrs = &dt.secpol.content_filter_profile.sections.headers;
         if dt.headers.len() + new_headers.len() > hdrs.max_count {
@@ -109,7 +117,7 @@ pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<
                 dt.headers.len() + new_headers.len(),
                 hdrs.max_count,
             );
-            return Err(early_block(dt, cf_default_action(true), br));
+            return Err(early_block(dt, cf_block(), br));
         }
         for (k, v) in new_headers {
             let kl = k.to_lowercase();
@@ -124,7 +132,7 @@ pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<
             }
             if v.len() > hdrs.max_length {
                 let br = BlockReason::entry_too_large(SectionIdx::Headers, &kl, v.len(), hdrs.max_length);
-                return Err(early_block(dt, cf_default_action(true), br));
+                return Err(early_block(dt, cf_block(), br));
             }
             dt.headers.insert(kl, v);
         }

@@ -40,7 +40,7 @@ local function custom_response(handle, action_params)
     local block_mode = action_params.block_mode
     -- if not block_mode then block_mode = true end
 
-    if action_params.atype == "alter_headers" and block_mode then
+    if not block_mode then
         handle:logDebug("altering the request")
         local headers = handle:headers()
         for k, v in pairs(action_params.headers) do

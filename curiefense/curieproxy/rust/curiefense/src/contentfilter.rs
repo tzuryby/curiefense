@@ -8,7 +8,7 @@ use crate::config::contentfilter::{
     SectionIdx,
 };
 use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
-use crate::interface::{Action, ActionType, BDecision, BlockReason, Decision, Initiator, Location, Tags};
+use crate::interface::{BDecision, BlockReason, Initiator, Location, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::{masker, RequestInfo};
 use crate::Logs;
@@ -34,18 +34,6 @@ lazy_static! {
     .collect();
 }
 
-pub fn cf_default_action(block_mode: bool) -> Action {
-    Action {
-        atype: ActionType::Block,
-        block_mode,
-        ban: false,
-        status: 403,
-        headers: None,
-        content: "Access denied".to_string(),
-        extra_tags: None,
-    }
-}
-
 #[derive(Default)]
 struct Omitted {
     entries: Section<HashSet<String>>,
@@ -62,19 +50,17 @@ fn get_section(idx: SectionIdx, rinfo: &RequestInfo) -> &RequestField {
     }
 }
 
-fn block_on(reasons: Vec<BlockReason>) -> Result<(), Decision> {
-    if reasons.is_empty() {
-        Ok(())
-    } else {
-        let mut mx = BDecision::Monitor;
-        for r in reasons.iter() {
-            mx = std::cmp::max(mx, r.decision);
-        }
-        Err(Decision::action(cf_default_action(mx == BDecision::Blocking), reasons))
-    }
+fn is_blocking(reasons: &[BlockReason]) -> bool {
+    reasons.iter().any(|r| r.decision >= BDecision::Blocking)
+}
+
+pub struct CfBlock {
+    pub blocking: bool,
+    pub reasons: Vec<BlockReason>,
 }
 
 /// Runs the Content Filter part of curiefense
+/// in case of matches, returns a pair (is_blocking, reasons)
 pub fn content_filter_check(
     logs: &mut Logs,
     stats: StatsCollect<BStageAcl>,
@@ -82,7 +68,7 @@ pub fn content_filter_check(
     rinfo: &RequestInfo,
     profile: &ContentFilterProfile,
     mhsdb: Option<&ContentFilterRules>,
-) -> (Result<(), Decision>, StatsCollect<BStageContentFilter>) {
+) -> (Result<(), CfBlock>, StatsCollect<BStageContentFilter>) {
     use SectionIdx::*;
     let mut omit = Default::default();
 
@@ -104,7 +90,10 @@ pub fn content_filter_check(
             &mut omit,
         ) {
             return (
-                Err(Decision::action(cf_default_action(true), vec![reason])),
+                Err(CfBlock {
+                    blocking: true,
+                    reasons: vec![reason],
+                }),
                 stats.no_content_filter(),
             );
         }
@@ -132,8 +121,14 @@ pub fn content_filter_check(
     } else {
         injection_check(tags, &hca_keys, &omit, test_xss, test_sqli)
     };
-    if let Err(rr) = block_on(iblock) {
-        return (Err(rr), stats.no_content_filter());
+    if is_blocking(&iblock) {
+        return (
+            Err(CfBlock {
+                blocking: true,
+                reasons: iblock,
+            }),
+            stats.no_content_filter(),
+        );
     }
 
     let mut specific_tags = Tags::default();
@@ -161,7 +156,17 @@ pub fn content_filter_check(
                 }
                 Ok(reasons) => {
                     tags.extend(specific_tags);
-                    (block_on(reasons), stats)
+                    if reasons.is_empty() {
+                        (Ok(()), stats)
+                    } else {
+                        (
+                            Err(CfBlock {
+                                blocking: is_blocking(&reasons),
+                                reasons,
+                            }),
+                            stats,
+                        )
+                    }
                 }
             }
         }
@@ -460,8 +465,8 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::interface::jsonlog;
     use crate::interface::stats::Stats;
+    use crate::interface::{jsonlog, Decision};
     use crate::utils::{map_request, RequestMeta};
     use crate::{Logs, RawRequest};
 

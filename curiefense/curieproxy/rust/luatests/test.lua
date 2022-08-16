@@ -467,32 +467,6 @@ local function test_flow(request_path)
   end
 end
 
--- running content filter only filter
-local function run_inspect_content_filter(raw_request_map)
-    local meta = {}
-    local headers = {}
-    for k, v in pairs(raw_request_map.headers) do
-      if startswith(k, ":") then
-          meta[k:sub(2):lower()] = v
-      else
-          headers[k] = v
-      end
-    end
-    local ip = "1.2.3.4"
-    if raw_request_map.ip then
-      ip = raw_request_map.ip
-    elseif headers["x-forwarded-for"] then
-      ip = headers["x-forwarded-for"]
-    end
-
-    local response, jrequest_map, merr = curiefense.inspect_content_filter(meta, headers, raw_request_map.body, ip,
-      raw_request_map.content_filter_id)
-    if merr then
-      error(merr)
-    end
-    return response, jrequest_map
-end
-
 local test_request = '{ "headers": { ":authority": "localhost:30081", ":method": "GET", ":path": "/dqsqsdqsdcqsd"' ..
   ', "user-agent": "dummy", "x-forwarded-for": "12.13.14.15" }, "name": "test block by ip tagging", "response": {' ..
   '"action": "custom_response", "block_mode": true, "status": 503, "tags": [ "all", "geo:united-states", "ip:12-1' ..
@@ -505,47 +479,6 @@ local tres = run_inspect_request(json_decode(test_request))
 show_logs(tres.logs)
 print("*** done ***")
 print("")
-
--- testing content filter only filtering
-local function test_content_filter(request_path)
-  print("Testing " .. request_path)
-  local raw_request_maps = load_json_file(request_path)
-  for _, raw_request_map in pairs(raw_request_maps) do
-    local res = run_inspect_content_filter(raw_request_map)
-    local r = cjson.decode(res.response)
-    local request_map = cjson.decode(res.request_map)
-
-    local good = true
-
-    for _, log in ipairs(request_map.logs) do
-        if log["message"] == "Content Filter profile not found" then
-          print("content filter profile '" .. raw_request_map.content_filter_id .. "' not found")
-          good = false
-        end
-    end
-
-    if r.action ~= raw_request_map.response.action then
-      print("Expected action " .. cjson.encode(raw_request_map.response.action) ..
-        ", but got " .. cjson.encode(r.action))
-      good = false
-    end
-    if r.response ~= cjson.null then
-      if r.response.status ~= raw_request_map.response.status then
-        print("Expected status " .. cjson.encode(raw_request_map.response.status) ..
-          ", but got " .. cjson.encode(r.response.status))
-        good = false
-      end
-    end
-
-    if not good then
-      for _, log in ipairs(request_map.logs) do
-          print(log["elapsed_micros"] .. "µs " .. log["message"])
-      end
-      print(res.response)
-      error("mismatch in " .. raw_request_map.name .. " profile: " .. raw_request_map.content_filter_id)
-    end
-  end
-end
 
 local prefix = nil
 
@@ -569,12 +502,6 @@ end
 for file in lfs.dir[[luatests/masking]] do
   if startswith(file, prefix) and ends_with(file, ".json") then
     test_masking("luatests/masking/" .. file)
-  end
-end
-
-for file in lfs.dir[[luatests/contentfilter_only]] do
-  if startswith(file, prefix) and ends_with(file, ".json") then
-    test_content_filter("luatests/contentfilter_only/" .. file)
   end
 end
 

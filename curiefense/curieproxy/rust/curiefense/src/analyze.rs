@@ -287,16 +287,8 @@ pub fn analyze_finish<GH: Grasshopper>(
         }
     }
 
-    let mut cfcheck = |stats, mrls| {
-        content_filter_check(
-            logs,
-            stats,
-            &mut tags,
-            &reqinfo,
-            &secpol.content_filter_profile,
-            mrls,
-        )
-    };
+    let mut cfcheck =
+        |stats, mrls| content_filter_check(logs, stats, &mut tags, &reqinfo, &secpol.content_filter_profile, mrls);
     // otherwise, run content_filter_check
     let (content_filter_result, stats) = match cfrules {
         CfRulesArg::Global => match HSDB.read() {
@@ -312,19 +304,24 @@ pub fn analyze_finish<GH: Grasshopper>(
 
     let decision = match content_filter_result {
         Ok(()) => Decision::pass(brs),
-        Err(decision) => {
-            brs.extend(decision.reasons.into_iter().map(|mut reason| {
+        Err(cfblock) => {
+            brs.extend(cfblock.reasons.into_iter().map(|mut reason| {
                 if !secpol.content_filter_active {
                     reason.decision.inactive();
                 }
                 reason
             }));
-            match decision.maction {
-                None => Decision::pass(brs),
-                Some(mut action) => {
+            if cfblock.blocking {
+                let mut dec = secpol
+                    .content_filter_profile
+                    .action
+                    .to_decision(is_human, mgh, &reqinfo, &tags, brs);
+                if let Some(mut action) = dec.maction.as_mut() {
                     action.block_mode &= secpol.content_filter_active;
-                    Decision::action(action, brs)
                 }
+                dec
+            } else {
+                Decision::pass(brs)
             }
         }
     };

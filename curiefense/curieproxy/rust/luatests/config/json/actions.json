@@ -79,5 +79,11 @@
   },
   "ye8qyg0h": {
     "type": "skip"
+  },
+  "cfblock": {
+    "type": "custom",
+    "params": {
+      "status": "403"
+    }
   }
 }

@@ -19,8 +19,7 @@ pub mod utils;
 
 use analyze::CfRulesArg;
 use body::body_too_large;
-use config::{with_config, HSDB};
-use contentfilter::content_filter_check;
+use config::{with_config};
 use grasshopper::Grasshopper;
 use interface::{Action, ActionType, Decision};
 use interface::{AnalyzeResult, Tags};
@@ -218,82 +217,4 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
         Err(res) => res,
         Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
     }
-}
-
-// generic entry point when the request map has already been parsed
-pub fn content_filter_check_generic_request_map(
-    configpath: &str,
-    raw: &RawRequest,
-    content_filter_id: &str,
-    logs: &mut Logs,
-) -> (Decision, RequestInfo, Tags, Stats) {
-    let mut tags = Tags::default();
-    logs.debug("Content Filter inspection starts");
-    let (revision, waf_profile) = match with_config(configpath, logs, |_slogs, cfg| {
-        (
-            cfg.revision.clone(),
-            cfg.content_filter_profiles.get(content_filter_id).cloned(),
-        )
-    }) {
-        Some((revision, Some(prof))) => (revision, prof),
-        _ => {
-            logs.error("Content Filter profile not found");
-            return (
-                Decision::pass(Vec::new()),
-                map_request(logs, &[], &[], false, 25, raw),
-                tags,
-                Stats::default(),
-            );
-        }
-    };
-
-    let stats = StatsCollect::new(revision).content_filter_only();
-    if let Some(body) = raw.mbody {
-        if body.len() > waf_profile.max_body_size {
-            logs.error("body too large, exiting early");
-            let reqinfo = map_request(logs, &waf_profile.decoding, &[], waf_profile.referer_as_uri, 0, raw);
-            let (a, br) = body_too_large(waf_profile.max_body_size, body.len());
-            return (
-                Decision::action(a, vec![br]),
-                reqinfo,
-                tags,
-                stats.no_content_filter().cf_stage_build(),
-            );
-        }
-    }
-
-    let reqinfo = map_request(
-        logs,
-        &waf_profile.decoding,
-        &[],
-        waf_profile.referer_as_uri,
-        waf_profile.max_body_depth,
-        raw,
-    );
-
-    let (waf_result, stats) = match HSDB.read() {
-        Ok(rd) => content_filter_check(
-            logs,
-            stats,
-            &mut tags,
-            &reqinfo,
-            &waf_profile,
-            rd.get(content_filter_id),
-        ),
-        Err(rr) => {
-            logs.error(|| format!("Could not get lock on HSDB: {}", rr));
-            (Ok(()), stats.no_content_filter())
-        }
-    };
-    logs.debug("Content Filter checks done");
-
-    (
-        match waf_result {
-            Ok(()) => Decision::pass(Vec::new()),
-            Err(d) => d,
-        },
-        reqinfo,
-        tags,
-        stats.cf_stage_build(),
-    )
 }
