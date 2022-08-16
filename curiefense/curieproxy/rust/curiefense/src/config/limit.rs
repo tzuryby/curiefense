@@ -129,6 +129,7 @@ mod tests {
                     },
                     headers: None,
                     status: v as u32,
+                    extra_tags: None,
                 },
             }
         }

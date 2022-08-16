@@ -159,6 +159,8 @@ pub struct RawAction {
     #[serde(rename = "type", default)]
     pub type_: RawActionType,
     #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
     pub params: RawActionParams,
 }
 
@@ -251,7 +253,10 @@ impl AclProfile {
     pub fn resolve(logs: &mut Logs, actions: &HashMap<String, SimpleAction>, acl: RawAclProfile) -> Self {
         let id = acl.id;
         let action = match acl.action {
-            None => SimpleAction::default(),
+            None => {
+                logs.warning(|| format!("Could not find the action in acl profile {}, using default action", id));
+                SimpleAction::default()
+            }
             Some(aid) => actions.get(&aid).cloned().unwrap_or_else(|| {
                 logs.error(|| format!("Could not resolve action {} in acl profile {}", aid, id));
                 SimpleAction::default()

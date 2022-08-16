@@ -1,6 +1,6 @@
 [
   {
-    "action": "default",
+    "action": "b403",
     "allow": [],
     "allow_bot": [],
     "deny": [],
@@ -11,7 +11,7 @@
     "passthrough": []
   },
   {
-    "action": "default",
+    "action": "b403",
     "allow": [
       "allow"
     ],

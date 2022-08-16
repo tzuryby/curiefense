@@ -2064,11 +2064,15 @@
         "ip:13-129-64-253",
         "geo-org:nil",
         "bot",
-        "geo-asn:nil"
+        "geo-asn:nil",
+        "myextratag"
       ],
       "action": "custom_response",
       "block_mode": true,
-      "status": 403
+      "status": 403,
+      "headers": {
+        "h1": "13.129.64.253"
+      }
     },
     "name": "inverted re block",
     "headers": {

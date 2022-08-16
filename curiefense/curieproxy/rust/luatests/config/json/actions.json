@@ -80,7 +80,17 @@
   "ye8qyg0h": {
     "type": "skip"
   },
-  "cfblock": {
+  "blockheaders": {
+    "tags": ["myextratag"],
+    "type": "custom",
+    "params": {
+      "status": "403",
+      "headers": {
+        "h1": "${ip}"
+      }
+    }
+  },
+  "b403": {
     "type": "custom",
     "params": {
       "status": "403"

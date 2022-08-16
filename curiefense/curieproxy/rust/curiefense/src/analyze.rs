@@ -8,30 +8,11 @@ use crate::flow::{flow_info, flow_process, flow_query, FlowCheck, FlowResult};
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
 use crate::interface::{
-    AclStage, Action, ActionType, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
+    AclStage, Action, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
 };
 use crate::limit::{limit_info, limit_process, limit_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::utils::{BodyDecodingResult, RequestInfo};
-
-fn acl_block(blocking: bool, reasons: Vec<BlockReason>) -> Decision {
-    Decision::action(
-        Action {
-            atype: if blocking {
-                ActionType::Block
-            } else {
-                ActionType::Monitor
-            },
-            block_mode: blocking,
-            ban: false,
-            status: 403,
-            headers: None,
-            content: "access denied".to_string(),
-            extra_tags: None,
-        },
-        reasons,
-    )
-}
 
 pub enum CfRulesArg<'t> {
     Global,
@@ -148,7 +129,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
     if let SimpleDecision::Action(action, reason) = globalfilter_dec {
         logs.debug(|| format!("Global filter decision {:?}", reason));
         brs.extend(reason);
-        let decision = action.to_decision(is_human, mgh, &reqinfo, &tags, brs);
+        let decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
         if decision.is_final() {
             return InitResult::Res(AnalyzeResult {
                 decision,
@@ -223,7 +204,7 @@ pub fn analyze_finish<GH: Grasshopper>(
 
     if let SimpleDecision::Action(action, curbrs) = limit_check {
         brs.extend(curbrs);
-        let decision = action.to_decision(is_human, mgh, &reqinfo, &tags, brs);
+        let decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
         if decision.is_final() {
             return AnalyzeResult {
                 decision,
@@ -261,6 +242,13 @@ pub fn analyze_finish<GH: Grasshopper>(
         }
 
         if blocking {
+            let acl_block = |reasons, tags: &mut Tags| {
+                secpol
+                    .acl_profile
+                    .action
+                    .to_decision(is_human, mgh, &reqinfo, tags, reasons)
+            };
+
             let decision = if decision.challenge {
                 match (reqinfo.headers.get("user-agent"), mgh) {
                     (Some(ua), Some(gh)) => challenge_phase01(gh, ua, brs),
@@ -272,11 +260,11 @@ pub fn analyze_finish<GH: Grasshopper>(
                                 ggh.is_some()
                             )
                         });
-                        acl_block(true, brs)
+                        acl_block(brs, &mut tags)
                     }
                 }
             } else {
-                acl_block(true, brs)
+                acl_block(brs, &mut tags)
             };
             return AnalyzeResult {
                 decision,
@@ -315,7 +303,7 @@ pub fn analyze_finish<GH: Grasshopper>(
                 let mut dec = secpol
                     .content_filter_profile
                     .action
-                    .to_decision(is_human, mgh, &reqinfo, &tags, brs);
+                    .to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
                 if let Some(mut action) = dec.maction.as_mut() {
                     action.block_mode &= secpol.content_filter_active;
                 }

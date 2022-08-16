@@ -253,15 +253,17 @@ impl SimpleActionT {
 pub struct SimpleAction {
     pub atype: SimpleActionT,
     pub headers: Option<HashMap<String, RequestTemplate>>,
-    pub status: u32
+    pub status: u32,
+    pub extra_tags: Option<HashSet<String>>,
 }
 
 impl Default for SimpleAction {
     fn default() -> Self {
         SimpleAction {
             atype: SimpleActionT::default(),
+            headers: None,
             status: 503,
-            headers: None
+            extra_tags: None,
         }
     }
 }
@@ -364,10 +366,17 @@ impl SimpleAction {
                 .map(|(k, v)| (k.to_string(), parse_request_template(v)))
                 .collect()
         });
+        let extra_tags = if rawaction.tags.is_empty() {
+            None
+        } else {
+            Some(rawaction.tags.iter().cloned().collect())
+        };
+
         Ok(SimpleAction {
             atype,
             status,
-            headers
+            headers,
+            extra_tags,
         })
     }
 
@@ -407,7 +416,7 @@ impl SimpleAction {
         is_human: bool,
         mgh: Option<&GH>,
         rinfo: &RequestInfo,
-        tags: &Tags,
+        tags: &mut Tags,
         reason: Vec<BlockReason>,
     ) -> Decision {
         if self.atype == SimpleActionT::Skip {
@@ -415,6 +424,9 @@ impl SimpleAction {
                 maction: None,
                 reasons: reason,
             };
+        }
+        for t in self.extra_tags.iter().flat_map(|s| s.iter()) {
+            tags.insert(t, Location::Request);
         }
         let action = match self.to_action(rinfo, tags, is_human) {
             None => match (mgh, rinfo.headers.get("user-agent")) {
