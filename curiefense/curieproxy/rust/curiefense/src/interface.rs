@@ -217,14 +217,8 @@ pub struct Action {
 pub enum SimpleActionT {
     Skip,
     Monitor,
-    RequestHeader(HashMap<String, RequestTemplate>),
-    Response {
-        content: String,
-        content_type: Option<String>,
-    },
-    Redirect(String),
+    Custom { content: String },
     Challenge,
-    Default,
     Ban(Box<SimpleAction>, u64), // duration, ttl
 }
 
@@ -233,21 +227,15 @@ impl SimpleActionT {
         use SimpleActionT::*;
         match self {
             Ban(sub, _) => sub.atype.priority(),
-            Default => 8,
+            Custom { content: _ } => 8,
             Challenge => 6,
-            Redirect(_) => 4,
-            Response {
-                content: _,
-                content_type: _,
-            } => 3,
-            RequestHeader(_) => 2,
             Monitor => 1,
             Skip => 0,
         }
     }
 
     fn is_blocking(&self) -> bool {
-        !matches!(self, SimpleActionT::RequestHeader(_) | SimpleActionT::Monitor)
+        !matches!(self, SimpleActionT::Monitor)
     }
 
     pub fn to_bdecision(&self) -> BDecision {
@@ -255,14 +243,7 @@ impl SimpleActionT {
             SimpleActionT::Skip => BDecision::Skip,
             SimpleActionT::Monitor => BDecision::Monitor,
             SimpleActionT::Ban(sub, _) => sub.atype.to_bdecision(),
-            SimpleActionT::RequestHeader(_) => BDecision::AlterRequest,
-            SimpleActionT::Response {
-                content: _,
-                content_type: _,
-            }
-            | SimpleActionT::Redirect(_)
-            | SimpleActionT::Challenge
-            | SimpleActionT::Default => BDecision::Blocking,
+            SimpleActionT::Challenge | SimpleActionT::Custom { content: _ } => BDecision::Blocking,
         }
     }
 }
@@ -271,6 +252,7 @@ impl SimpleActionT {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimpleAction {
     pub atype: SimpleActionT,
+    pub headers: Option<HashMap<String, RequestTemplate>>,
     pub status: u32,
     pub reason: String,
 }
@@ -283,7 +265,9 @@ impl Default for SimpleAction {
 
 impl Default for SimpleActionT {
     fn default() -> Self {
-        SimpleActionT::Default
+        SimpleActionT::Custom {
+            content: "blocked".to_string(),
+        }
     }
 }
 
@@ -293,7 +277,6 @@ pub enum ActionType {
     Skip,
     Monitor,
     Block,
-    AlterHeaders,
 }
 
 impl ActionType {
@@ -327,6 +310,7 @@ impl SimpleAction {
         SimpleAction {
             atype: SimpleActionT::default(),
             status: 503,
+            headers: None,
             reason,
         }
     }
@@ -347,7 +331,6 @@ impl SimpleAction {
     fn resolve(rawaction: &RawAction) -> anyhow::Result<SimpleAction> {
         let atype = match rawaction.type_ {
             RawActionType::Skip => SimpleActionT::Skip,
-            RawActionType::Default => SimpleActionT::Default,
             RawActionType::Monitor => SimpleActionT::Monitor,
             RawActionType::Ban => SimpleActionT::Ban(
                 Box::new(
@@ -367,34 +350,14 @@ impl SimpleAction {
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(3600),
             ),
-            RawActionType::RequestHeader => SimpleActionT::RequestHeader(
-                rawaction
-                    .params
-                    .headers
-                    .as_ref()
-                    .map(|hm| {
-                        hm.iter()
-                            .map(|(k, v)| (k.to_string(), parse_request_template(v)))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            ),
-            RawActionType::Response => SimpleActionT::Response {
+            RawActionType::Custom => SimpleActionT::Custom {
                 content: rawaction
                     .params
                     .content
                     .clone()
                     .unwrap_or_else(|| "default content".into()),
-                content_type: rawaction.params.content_type.clone(),
             },
             RawActionType::Challenge => SimpleActionT::Challenge,
-            RawActionType::Redirect => SimpleActionT::Redirect(
-                rawaction
-                    .params
-                    .location
-                    .clone()
-                    .ok_or_else(|| anyhow::anyhow!("no location for redirect in rule {:?}", rawaction))?,
-            ),
         };
         let status = if let Some(sstatus) = &rawaction.params.status {
             match sstatus.parse::<u32>() {
@@ -404,9 +367,15 @@ impl SimpleAction {
         } else {
             503
         };
+        let headers = rawaction.params.headers.as_ref().map(|hm| {
+            hm.iter()
+                .map(|(k, v)| (k.to_string(), parse_request_template(v)))
+                .collect()
+        });
         Ok(SimpleAction {
             atype,
             status,
+            headers,
             reason: rawaction.params.reason.clone().unwrap_or_else(|| "no reason".into()),
         })
     }
@@ -416,41 +385,27 @@ impl SimpleAction {
         let mut action = Action::default();
         action.block_mode = action.atype.is_blocking();
         action.status = self.status;
+        action.headers = self.headers.as_ref().map(|hm| {
+            hm.iter()
+                .map(|(k, v)| (k.to_string(), render_template(rinfo, tags, v)))
+                .collect()
+        });
         match &self.atype {
-            SimpleActionT::Default => {}
             SimpleActionT::Skip => action.atype = ActionType::Skip,
             SimpleActionT::Monitor => action.atype = ActionType::Monitor,
             SimpleActionT::Ban(sub, _) => {
                 action = sub.to_action(rinfo, tags, is_human).unwrap_or_default();
                 action.ban = true;
             }
-            SimpleActionT::RequestHeader(hdrs) => {
-                action.headers = Some(
-                    hdrs.iter()
-                        .map(|(k, template)| (k.to_string(), render_template(rinfo, tags, template)))
-                        .collect(),
-                );
-                action.atype = ActionType::AlterHeaders;
-            }
-            SimpleActionT::Response { content, content_type } => {
+            SimpleActionT::Custom { content } => {
                 action.atype = ActionType::Block;
                 action.content = content.clone();
-                if let Some(ct) = content_type {
-                    action.headers = Some(std::iter::once(("content-type".to_string(), ct.clone())).collect())
-                }
             }
             SimpleActionT::Challenge => {
                 if !is_human {
                     return None;
                 }
                 action.atype = ActionType::Monitor;
-            }
-            SimpleActionT::Redirect(to) => {
-                let mut headers = HashMap::new();
-                action.content = "You are being redirected".into();
-                headers.insert("Location".into(), to.clone());
-                action.atype = ActionType::Block;
-                action.headers = Some(headers);
             }
         }
         Some(action)

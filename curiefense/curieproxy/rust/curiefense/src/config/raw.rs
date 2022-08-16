@@ -166,18 +166,15 @@ pub struct RawAction {
 #[serde(rename_all = "snake_case")]
 pub enum RawActionType {
     Skip,
-    Default,
-    Ban,
-    Response,
-    Challenge,
-    Redirect,
     Monitor,
-    RequestHeader,
+    Custom,
+    Ban,
+    Challenge,
 }
 
 impl std::default::Default for RawActionType {
     fn default() -> Self {
-        RawActionType::Default
+        RawActionType::Custom
     }
 }
 

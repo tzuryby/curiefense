@@ -1,53 +1,53 @@
 {
   "3lfpo6xe": {
     "params": {
-      "location": "http://www.google.com",
+      "headers": {
+        "location": "http://www.google.com"
+      },
       "status": "456"
     },
-    "type": "redirect"
+    "type": "custom"
   },
   "5ktcoafw": {
     "type": "challenge"
   },
   "a7ge3v0l": {
-    "params": {
-      "action": {
-        "params": {},
-        "type": "default"
-      }
-    },
-    "type": "default"
+    "type": "custom"
   },
   "an6yhiyr": {
     "params": {
       "content": "{}",
-      "content_type": "application/json",
+      "headers": {
+        "content-type": "application/json"
+      },
       "status": "200"
     },
-    "type": "response"
+    "type": "custom"
   },
   "bh3gw11k": {
     "params": {
-      "location": "http://www.redir.com",
+      "headers": {
+        "location": "http://www.redir.com"
+      },
       "status": "333"
     },
-    "type": "redirect"
+    "type": "custom"
   },
   "d5vnu3hs": {
     "params": {
       "content": "body"
     },
-    "type": "response"
+    "type": "custom"
   },
   "default": {
-    "type": "default"
+    "type": "custom"
   },
   "dxfyhx4n": {
     "params": {
       "content": "lol",
       "status": "123"
     },
-    "type": "response"
+    "type": "custom"
   },
   "fq8faptj": {
     "params": {
@@ -55,12 +55,12 @@
         "h1": "${ip} - ${args.dd} - ${args.ee}"
       }
     },
-    "type": "request_header"
+    "type": "monitor"
   },
   "ijcy5mwz": {
     "params": {
       "action": {
-        "type": "default"
+        "type": "custom"
       },
       "duration": "4"
     },
@@ -71,9 +71,11 @@
   },
   "sk9lz9q4": {
     "params": {
-      "location": "/1234"
+      "headers": {
+        "location": "/1234"
+      }
     },
-    "type": "redirect"
+    "type": "custom"
   },
   "ye8qyg0h": {
     "type": "skip"

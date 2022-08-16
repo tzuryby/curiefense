@@ -1,7 +1,7 @@
 {
   "default": {
     "name": "default blocking action",
-    "type": "default"
+    "type": "custom"
   },
   "monitor": {
     "name": "default monitoring action",

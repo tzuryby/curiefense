@@ -9,9 +9,8 @@
     },
     "name": "test headers custom response",
     "response": {
-      "action": "custom_response",
-      "block_mode": true,
-      "status": 503,
+      "action": "pass",
+      "block_mode": false,
       "headers": {
         "h1": "82.13.8.87 - nil - 12"
       }
