@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::acl::check_acl;
 use crate::config::contentfilter::ContentFilterRules;
@@ -28,7 +29,7 @@ pub struct APhase0 {
     pub itags: Tags,
     pub reqinfo: RequestInfo,
     pub secpolname: String,
-    pub securitypolicy: SecurityPolicy,
+    pub securitypolicy: Arc<SecurityPolicy>,
     pub stats: StatsCollect<BStageMapped>,
 }
 
@@ -37,7 +38,7 @@ pub struct AnalysisInfo {
     is_human: bool,
     reasons: Vec<BlockReason>,
     reqinfo: RequestInfo,
-    securitypolicy: SecurityPolicy,
+    securitypolicy: Arc<SecurityPolicy>,
     stats: StatsCollect<BStageMapped>,
     tags: Tags,
 }

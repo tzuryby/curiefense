@@ -10,6 +10,7 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::SystemTime;
 
@@ -105,9 +106,9 @@ impl Config {
         limits: &HashMap<String, Limit>,
         acls: &HashMap<String, AclProfile>,
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
-    ) -> (Vec<Matching<SecurityPolicy>>, Option<SecurityPolicy>) {
-        let mut default: Option<SecurityPolicy> = None;
-        let mut entries: Vec<Matching<SecurityPolicy>> = Vec::new();
+    ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
+        let mut default: Option<Arc<SecurityPolicy>> = None;
+        let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
 
         for rawmap in rawmaps {
             let acl_profile: AclProfile = match acls.get(&rawmap.acl_profile) {
@@ -145,9 +146,9 @@ impl Config {
                 if default.is_some() {
                     logs.warning("Multiple __default__ maps");
                 }
-                default = Some(securitypolicy);
+                default = Some(Arc::new(securitypolicy));
             } else {
-                match Matching::from_str(&rawmap.match_, securitypolicy) {
+                match Matching::from_str(&rawmap.match_, Arc::new(securitypolicy)) {
                     Err(rr) => {
                         logs.warning(format!("Invalid regex {} in entry {}: {}", &rawmap.match_, &mapname, rr).as_str())
                     }
@@ -155,7 +156,7 @@ impl Config {
                 }
             }
         }
-        entries.sort_by_key(|x: &Matching<SecurityPolicy>| usize::MAX - x.matcher_len());
+        entries.sort_by_key(|x: &Matching<Arc<SecurityPolicy>>| usize::MAX - x.matcher_len());
         (entries, default)
     }
 

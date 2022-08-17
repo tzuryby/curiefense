@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 /* this module exposes an incremental interface to analyzing requests
 
    It works on the assumption that the `RequestMeta` can always be
@@ -7,6 +5,8 @@ use std::collections::HashMap;
    the `host` header is always present during that stage. This seems to be
    the case for envoy in its external processing mode.
 */
+
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     analyze::{analyze, APhase0, CfRulesArg},
@@ -19,7 +19,7 @@ use crate::{
     grasshopper::Grasshopper,
     interface::{
         stats::{BStageSecpol, SecpolStats, Stats, StatsCollect},
-        Action, AnalyzeResult, BlockReason, Decision, Location, Tags, ActionType,
+        Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags,
     },
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
@@ -31,7 +31,7 @@ pub struct IData {
     pub logs: Logs,
     meta: RequestMeta,
     headers: HashMap<String, String>,
-    secpol: SecurityPolicy,
+    secpol: Arc<SecurityPolicy>,
     body: Option<Vec<u8>>,
     trusted_hops: u32,
     stats: StatsCollect<BStageSecpol>,
@@ -60,7 +60,7 @@ pub fn inspect_init(
             body: None,
             trusted_hops,
             stats: StatsCollect::new(config.revision.clone())
-                .secpol(SecpolStats::build(secpol, config.globalfilters.len())),
+                .secpol(SecpolStats::build(&secpol, config.globalfilters.len())),
         }),
     }
 }
@@ -247,14 +247,14 @@ mod test {
                 id: "__default__".to_string(),
                 name: "default".to_string(),
                 entries: Vec::new(),
-                default: Some(SecurityPolicy {
+                default: Some(Arc::new(SecurityPolicy {
                     name: "default".to_string(),
                     acl_active: false,
                     acl_profile: AclProfile::default(),
                     content_filter_active: true,
                     content_filter_profile: cf,
                     limits: Vec::new(),
-                }),
+                })),
             }),
             last_mod: SystemTime::now(),
             container_name: None,
