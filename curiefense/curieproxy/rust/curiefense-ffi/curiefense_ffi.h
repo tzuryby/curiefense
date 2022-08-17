@@ -9,11 +9,34 @@ typedef enum CFProgress {
   CFError = 2,
 } CFProgress;
 
+/**
+ * An enum that represents the return status of the streaming API
+ *
+ * CFSDone means we have a result
+ * CFSMore means we can add headers or body, or run the analysis
+ * CFSError means there is an error, that can be read using curiefense_stream_error
+ */
+typedef enum CFStreamStatus {
+  CFSDone = 0,
+  CFSMore = 1,
+  CFSError = 2,
+} CFStreamStatus;
+
 typedef struct CFExec CFExec;
 
 typedef struct CFHashmap CFHashmap;
 
 typedef struct CFResult CFResult;
+
+/**
+ * C streaming API configuration item
+ */
+typedef struct CFStreamConfig CFStreamConfig;
+
+/**
+ * Handle for the C streaming API
+ */
+typedef struct CFStreamHandle CFStreamHandle;
 
 /**
  * # Safety
@@ -150,3 +173,104 @@ enum CFProgress curiefense_async_step(struct CFExec *ptr, struct CFResult **out)
  * this function to abort early.
  */
 void curiefense_async_free(struct CFExec *ptr);
+
+/**
+ * # Safety
+ *
+ * Returns a configuration handle for the stream API. Must be called when configuration changes.
+ * Is freed using curiefense_stream_config_free
+ */
+struct CFStreamConfig *curiefense_stream_config_init(uint8_t loglevel, const char *raw_configpath);
+
+/**
+ * # Safety
+ *
+ * frees the CFStreamConfig object
+ *
+ * note that it is perfectly safe to free it while other requests are being processed, as the underlying
+ * data is protected by refcounted pointers.
+ */
+void curiefense_stream_config_free(struct CFStreamConfig *config);
+
+/**
+ * # Safety
+ *
+ * Initializes the inspection, returning a stream object.
+ * This never returns a null pointer, even if the function fails.
+ * In case of failure, you can get the error message by calling the
+ * curiefense_stream_error function on the returned object
+ *
+ * Note that the hashmap raw_meta is freed by this function.
+ *
+ * Arguments
+ *
+ * loglevel:
+ *     0. debug
+ *     1. info
+ *     2. warning
+ *     3. error
+ * raw_configpath: path to the configuration directory
+ * raw_meta: hashmap containing the meta properties.
+ *     * required: method and path
+ *     * technically optional, but highly recommended: authority, x-request-id
+ * raw_ip: a string representing the source IP for the request
+ * success: a pointer to a value that will be set to true on success, and false on failure
+ */
+struct CFStreamHandle *curiefense_stream_start(const struct CFStreamConfig *config,
+                                               struct CFHashmap *raw_meta,
+                                               const char *raw_ip,
+                                               enum CFStreamStatus *success);
+
+/**
+ * # Safety
+ *
+ * Frees the stream object.
+ *
+ * You should use this function, when aborting:
+ *  * the object is in an error state, and you already retrieved the error message from curiefense_stream_error
+ *  * you want to abort early
+ */
+void curiefense_stream_free(struct CFStreamHandle *ptr);
+
+/**
+ * # Safety
+ *
+ * Returns the streaming error, if available. The returned string can be freed with curiefense_str_free.
+ */
+char *curiefense_stream_error(const struct CFStreamHandle *ptr);
+
+/**
+ * # Safety
+ *
+ * Adds a header to the stream handle object
+ */
+enum CFStreamStatus curiefense_stream_add_header(struct CFStreamHandle **sh,
+                                                 const char *key,
+                                                 uintptr_t key_size,
+                                                 const char *value,
+                                                 uintptr_t value_size);
+
+/**
+ * # Safety
+ *
+ * Adds a body part to the stream handle object
+ */
+enum CFStreamStatus curiefense_stream_add_body(struct CFStreamHandle **sh,
+                                               const uint8_t *body,
+                                               uintptr_t body_size);
+
+/**
+ * # Safety
+ *
+ * Runs the analysis on the stream handle object. If the stream handle object is in an error state,
+ * this will return a null pointer.
+ *
+ * Note that the CFStreamHandle object is freed by this function, even when it represents an error.
+ *
+ * cb: the callback that will be used to signal an asynchronous function finished
+ * data: data for the callback
+ */
+struct CFExec *curiefense_stream_exec(const struct CFStreamConfig *config,
+                                      struct CFStreamHandle *sh,
+                                      void (*cb)(uint64_t),
+                                      uint64_t data);

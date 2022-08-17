@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use curiefense::{
     config::{flow::FlowMap, globalfilter::GlobalFilterSection, with_config},
     grasshopper::DynGrasshopper,
-    incremental::{add_body, add_header, finalize, inspect_init, IData},
+    incremental::{add_body, finalize, inspect_init, IData, IPInfo, add_headers},
     interface::{jsonlog, AnalyzeResult, Location},
     logs::{LogLevel, Logs},
     utils::RequestMeta,
@@ -62,7 +62,7 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
 
         let mut logs = Logs::new(loglevel);
         let midata = with_config(configpath, &mut logs, |_, cfg| {
-            inspect_init(cfg, loglevel, meta, trustedhops).map(|o| {
+            inspect_init(cfg, loglevel, meta, IPInfo::Hops(trustedhops as usize)).map(|o| {
                 // we have to clone all this data here :(
                 // that would not be necessary if we could avoid the autoreloading feature, but had a system for reloading the server when the configuration changes
                 let gf = cfg.globalfilters.clone();
@@ -189,7 +189,7 @@ impl MyEP {
 
         let (idata, globalfilters, flows) = midata.unwrap().unwrap().unwrap();
 
-        let mut idata = match add_header(idata, mheaders) {
+        let mut idata = match add_headers(idata, mheaders) {
             Ok(i) => i,
             Err((logs, dec)) => {
                 self.send_action(ProcessingStage::Headers, tx, &dec, &logs, None).await;
@@ -202,7 +202,7 @@ impl MyEP {
             loop {
                 match next_message(msg).await?.request {
                     Some(ext_proc::processing_request::Request::RequestBody(bdy)) => {
-                        idata = match add_body(idata, bdy.body) {
+                        idata = match add_body(idata, &bdy.body) {
                             Ok(i) => i,
                             Err((logs, dec)) => {
                                 self.send_action(ProcessingStage::Body, tx, &dec, &logs, None).await;

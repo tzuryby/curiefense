@@ -108,7 +108,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     let ((nm, securitypolicy), (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
             let mmapinfo =
-                match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs).map(|(nm, um)| (nm, um.clone()));
+                match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs).map(|(nm, um)| (nm, um));
             match mmapinfo {
                 Some((nm, secpolicy)) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it

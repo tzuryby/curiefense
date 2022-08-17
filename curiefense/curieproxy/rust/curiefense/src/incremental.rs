@@ -27,22 +27,48 @@ use crate::{
     utils::{map_request, RawRequest, RequestMeta},
 };
 
+pub enum IPInfo {
+    Ip(String),
+    Hops(usize),
+}
+
 pub struct IData {
     pub logs: Logs,
     meta: RequestMeta,
     headers: HashMap<String, String>,
     secpol: Arc<SecurityPolicy>,
     body: Option<Vec<u8>>,
-    trusted_hops: u32,
+    ipinfo: IPInfo,
     stats: StatsCollect<BStageSecpol>,
 }
 
-pub fn inspect_init(
-    config: &Config,
-    loglevel: LogLevel,
-    meta: RequestMeta,
-    trusted_hops: u32,
-) -> Result<IData, String> {
+impl IData {
+    fn ip(&self) -> String {
+        match &self.ipinfo {
+            IPInfo::Ip(s) => s.clone(),
+            IPInfo::Hops(hops) => extract_ip(*hops, &self.headers),
+        }
+    }
+}
+
+/// reproduces the original IP extraction algorithm, for envoy
+pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> String {
+    let detect_ip = |xff: &str| -> String {
+        let splitted = xff.split(',').collect::<Vec<_>>();
+        if trusted_hops < splitted.len() {
+            splitted[splitted.len() - trusted_hops]
+        } else {
+            splitted[0]
+        }
+        .to_string()
+    };
+    headers
+        .get("x-forwarded-for")
+        .map(|s| detect_ip(s.as_str()))
+        .unwrap_or_else(|| "1.1.1.1".to_string())
+}
+
+pub fn inspect_init(config: &Config, loglevel: LogLevel, meta: RequestMeta, ipinfo: IPInfo) -> Result<IData, String> {
     let mut logs = Logs::new(loglevel);
     let mr = match_securitypolicy(
         meta.authority.as_deref().unwrap_or("localhost"),
@@ -58,7 +84,7 @@ pub fn inspect_init(
             headers: HashMap::new(),
             secpol: secpol.clone(),
             body: None,
-            trusted_hops,
+            ipinfo,
             stats: StatsCollect::new(config.revision.clone())
                 .secpol(SecpolStats::build(&secpol, config.globalfilters.len())),
         }),
@@ -68,10 +94,11 @@ pub fn inspect_init(
 /// called when the content filter policy is violated
 /// no tags are returned though!
 fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeResult) {
+    let ipstr = idata.ip();
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
     let rawrequest = RawRequest {
-        ipstr: extract_ip(idata.trusted_hops as usize, &idata.headers),
+        ipstr,
         headers: idata.headers,
         meta: idata.meta,
         mbody: idata.body.as_deref(),
@@ -99,7 +126,18 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
 /// incrementally add headers, can exit early if there are too many headers, or they are too large
 ///
 /// other properties are not checked at this point (restrict for example), this early check purely exists as an anti DOS measure
-pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<IData, (Logs, AnalyzeResult)> {
+pub fn add_headers(idata: IData, new_headers: HashMap<String, String>) -> Result<IData, (Logs, AnalyzeResult)> {
+    let mut dt = idata;
+    for (k, v) in new_headers {
+        dt = add_header(dt, k, v)?;
+    }
+    Ok(dt)
+}
+
+/// incrementally add a single header, can exit early if there are too many headers, or they are too large
+///
+/// other properties are not checked at this point (restrict for example), this early check purely exists as an anti DOS measure
+pub fn add_header(idata: IData, key: String, value: String) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
     let cf_block = || Action {
         atype: ActionType::Block,
@@ -112,38 +150,32 @@ pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<
     };
     if dt.secpol.content_filter_active {
         let hdrs = &dt.secpol.content_filter_profile.sections.headers;
-        if dt.headers.len() + new_headers.len() > hdrs.max_count {
-            let br = BlockReason::too_many_entries(
-                SectionIdx::Headers,
-                dt.headers.len() + new_headers.len(),
-                hdrs.max_count,
-            );
+        if dt.headers.len() >= hdrs.max_count {
+            let br = BlockReason::too_many_entries(SectionIdx::Headers, dt.headers.len() + 1, hdrs.max_count);
             return Err(early_block(dt, cf_block(), br));
         }
-        for (k, v) in new_headers {
-            let kl = k.to_lowercase();
-            if kl == "content-length" {
-                if let Ok(content_length) = v.parse::<usize>() {
-                    let max_size = dt.secpol.content_filter_profile.max_body_size;
-                    if content_length > max_size {
-                        let (a, br) = body_too_large(max_size, content_length);
-                        return Err(early_block(dt, a, br));
-                    }
+        let kl = key.to_lowercase();
+        if kl == "content-length" {
+            if let Ok(content_length) = value.parse::<usize>() {
+                let max_size = dt.secpol.content_filter_profile.max_body_size;
+                if content_length > max_size {
+                    let (a, br) = body_too_large(max_size, content_length);
+                    return Err(early_block(dt, a, br));
                 }
             }
-            if v.len() > hdrs.max_length {
-                let br = BlockReason::entry_too_large(SectionIdx::Headers, &kl, v.len(), hdrs.max_length);
-                return Err(early_block(dt, cf_block(), br));
-            }
-            dt.headers.insert(kl, v);
         }
+        if value.len() > hdrs.max_length {
+            let br = BlockReason::entry_too_large(SectionIdx::Headers, &kl, value.len(), hdrs.max_length);
+            return Err(early_block(dt, cf_block(), br));
+        }
+        dt.headers.insert(kl, value);
     } else {
-        dt.headers.extend(new_headers);
+        dt.headers.insert(key.to_lowercase(), value);
     }
     Ok(dt)
 }
 
-pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, AnalyzeResult)> {
+pub fn add_body(idata: IData, new_body: &[u8]) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
 
     // ignore body when requested, even when the content filter is not active
@@ -160,7 +192,7 @@ pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, Analyze
     }
 
     match dt.body.as_mut() {
-        None => dt.body = Some(new_body),
+        None => dt.body = Some(new_body.to_vec()),
         Some(b) => b.extend(new_body),
     }
     Ok(dt)
@@ -173,10 +205,11 @@ pub async fn finalize<GH: Grasshopper>(
     flows: &FlowMap,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
 ) -> (AnalyzeResult, Logs) {
+    let ipstr = idata.ip();
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
     let rawrequest = RawRequest {
-        ipstr: extract_ip(idata.trusted_hops as usize, &idata.headers),
+        ipstr,
         headers: idata.headers,
         meta: idata.meta,
         mbody: idata.body.as_deref(),
@@ -221,22 +254,6 @@ pub async fn finalize<GH: Grasshopper>(
     )
     .await;
     (dec, logs)
-}
-
-fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> String {
-    let detect_ip = |xff: &str| -> String {
-        let splitted = xff.split(',').collect::<Vec<_>>();
-        if trusted_hops < splitted.len() {
-            splitted[splitted.len() - trusted_hops]
-        } else {
-            splitted[0]
-        }
-        .to_string()
-    };
-    headers
-        .get("x-forwarded-for")
-        .map(|s| detect_ip(s.as_str()))
-        .unwrap_or_else(|| "1.1.1.1".to_string())
 }
 
 #[cfg(test)]
@@ -287,7 +304,7 @@ mod test {
                 extra: HashMap::default(),
                 requestid: None,
             },
-            1,
+            IPInfo::Ip("1.2.3.4".to_string()),
         )
         .unwrap()
     }
@@ -299,12 +316,12 @@ mod test {
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
         // adding no headers
-        let idata = add_header(idata, HashMap::new()).unwrap();
+        let idata = add_headers(idata, HashMap::new()).unwrap();
         // adding one header
-        let idata = add_header(idata, hashmap(&[("k1", "v1")])).unwrap();
-        let idata = add_header(idata, hashmap(&[("k2", "v2")])).unwrap();
-        let idata = add_header(idata, hashmap(&[("k3", "v3")])).unwrap();
-        let idata = add_header(idata, hashmap(&[("k4", "v4")]));
+        let idata = add_headers(idata, hashmap(&[("k1", "v1")])).unwrap();
+        let idata = add_headers(idata, hashmap(&[("k2", "v2")])).unwrap();
+        let idata = add_headers(idata, hashmap(&[("k3", "v3")])).unwrap();
+        let idata = add_headers(idata, hashmap(&[("k4", "v4")]));
         assert!(idata.is_err())
     }
 
@@ -315,9 +332,9 @@ mod test {
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
         // adding no headers
-        let idata = add_header(idata, HashMap::new()).unwrap();
+        let idata = add_headers(idata, HashMap::new()).unwrap();
         // adding one header
-        let idata = add_header(idata, hashmap(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3")]));
+        let idata = add_headers(idata, hashmap(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3")]));
         assert!(idata.is_ok())
     }
 
@@ -328,9 +345,9 @@ mod test {
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
         // adding no headers
-        let idata = add_header(idata, HashMap::new()).unwrap();
+        let idata = add_headers(idata, HashMap::new()).unwrap();
         // adding one header
-        let idata = add_header(
+        let idata = add_headers(
             idata,
             hashmap(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3"), ("k4", "v4"), ("k5", "v5")]),
         );
@@ -344,14 +361,14 @@ mod test {
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
         // adding no headers
-        let idata = add_header(idata, HashMap::new()).unwrap();
+        let idata = add_headers(idata, HashMap::new()).unwrap();
         // adding one header
-        let idata = add_header(
+        let idata = add_headers(
             idata,
             hashmap(&[("k1", "v1"), ("k2", "v2"), ("k3", "v3"), ("k4", "v4"), ("k5", "v5")]),
         )
         .unwrap();
-        let idata = add_header(idata, hashmap(&[("kn", "DQSQSDQSDQSDQSD")]));
+        let idata = add_headers(idata, hashmap(&[("kn", "DQSQSDQSDQSDQSD")]));
         assert!(idata.is_err())
     }
 
@@ -361,7 +378,7 @@ mod test {
         cf.max_body_size = 100;
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
-        let idata = add_header(idata, hashmap(&[("content-length", "150"), ("k4", "v4"), ("k5", "v5")]));
+        let idata = add_headers(idata, hashmap(&[("content-length", "150"), ("k4", "v4"), ("k5", "v5")]));
         assert!(idata.is_err())
     }
 
@@ -371,12 +388,12 @@ mod test {
         cf.max_body_size = 100;
         let cfg = empty_config(cf);
         let idata = mk_idata(&cfg);
-        let idata = add_header(idata, hashmap(&[("content-length", "90"), ("k4", "v4"), ("k5", "v5")])).unwrap();
-        let idata = add_body(idata, vec![4, 5, 6, 8]).unwrap();
+        let idata = add_headers(idata, hashmap(&[("content-length", "90"), ("k4", "v4"), ("k5", "v5")])).unwrap();
+        let idata = add_body(idata, &[4, 5, 6, 8]).unwrap();
         let mut emptybody: Vec<u8> = Vec::new();
         emptybody.resize(50, 66);
-        let idata = add_body(idata, emptybody.clone()).unwrap();
-        let idata = add_body(idata, emptybody);
+        let idata = add_body(idata, &emptybody).unwrap();
+        let idata = add_body(idata, &emptybody);
         assert!(idata.is_err())
     }
 }
