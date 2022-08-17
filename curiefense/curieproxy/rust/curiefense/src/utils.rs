@@ -475,6 +475,7 @@ pub fn map_request(
     accepted_types: &[ContentType],
     referer_as_uri: bool,
     max_depth: usize, // if set to 0, the body will not be parsed
+    ignore_body: bool,
     raw: &RawRequest,
 ) -> RequestInfo {
     let host = raw.get_host();
@@ -490,7 +491,7 @@ pub fn map_request(
         &raw.meta.path,
         headers.get_str("content-type"),
         accepted_types,
-        raw.mbody,
+        if ignore_body { None } else { raw.mbody },
         max_depth,
     );
     if referer_as_uri {
@@ -672,7 +673,7 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(&mut logs, &[], &[], true, 100, &raw);
+        let ri = map_request(&mut logs, &[], &[], true, 100, false, &raw);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

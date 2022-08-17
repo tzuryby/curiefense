@@ -82,6 +82,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
         0,
+        secpolicy.content_filter_profile.ignore_body,
         &rawrequest,
     );
     (
@@ -144,6 +145,12 @@ pub fn add_header(idata: IData, new_headers: HashMap<String, String>) -> Result<
 
 pub fn add_body(idata: IData, new_body: Vec<u8>) -> Result<IData, (Logs, AnalyzeResult)> {
     let mut dt = idata;
+
+    // ignore body when requested, even when the content filter is not active
+    if dt.secpol.content_filter_profile.ignore_body {
+        return Ok(dt);
+    }
+
     let cur_body_size = dt.body.as_ref().map(|v| v.len()).unwrap_or(0);
     let new_size = cur_body_size + new_body.len();
     let max_size = dt.secpol.content_filter_profile.max_body_size;
@@ -180,6 +187,7 @@ pub async fn finalize<GH: Grasshopper>(
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
         secpolicy.content_filter_profile.max_body_depth,
+        secpolicy.content_filter_profile.ignore_body,
         &rawrequest,
     );
 

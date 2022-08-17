@@ -324,6 +324,8 @@ pub struct RawContentFilterProfile {
     pub masking_seed: String,
     #[serde(default)]
     pub content_type: Vec<ContentType>,
+    #[serde(default)]
+    pub ignore_body: bool,
     pub max_body_size: Option<usize>,
     pub max_body_depth: Option<usize>,
     #[serde(default)]

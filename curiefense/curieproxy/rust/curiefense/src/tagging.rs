@@ -276,6 +276,7 @@ mod tests {
             &[],
             false,
             500,
+            false,
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),
                 headers,

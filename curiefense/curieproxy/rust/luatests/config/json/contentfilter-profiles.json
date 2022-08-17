@@ -44,6 +44,47 @@
   {
     "action": "b403",
     "active": [
+      "cf-rule-risk:5",
+      "cf-rule-risk:4"
+    ],
+    "args": {
+      "max_count": 512,
+      "max_length": 1024,
+      "names": [],
+      "regex": []
+    },
+    "cookies": {
+      "max_count": 42,
+      "max_length": 1024,
+      "names": [],
+      "regex": []
+    },
+    "decoding": {
+      "base64": true
+    },
+    "headers": {
+      "max_count": 42,
+      "max_length": 1024,
+      "names": [],
+      "regex": []
+    },
+    "id": "rl45ignorebody",
+    "ignore": [],
+    "ignore_alphanum": false,
+    "ignore_body": true,
+    "masking_seed": "CHANGEME",
+    "name": "rl45ignorebody",
+    "path": {
+      "max_count": 42,
+      "max_length": 2048,
+      "names": [],
+      "regex": []
+    },
+    "report": []
+  },
+  {
+    "action": "b403",
+    "active": [
       "cf-rule-id:100016"
     ],
     "args": {
@@ -1219,7 +1260,9 @@
   },
   {
     "action": "blockheaders",
-    "tags": ["ire"],
+    "tags": [
+      "ire"
+    ],
     "args": {
       "names": [],
       "regex": [
@@ -1253,7 +1296,9 @@
   },
   {
     "action": "b403",
-    "tags": ["jsonmatched"],
+    "tags": [
+      "jsonmatched"
+    ],
     "args": {
       "names": [],
       "regex": []

@@ -19,7 +19,7 @@ pub mod utils;
 
 use analyze::CfRulesArg;
 use body::body_too_large;
-use config::{with_config};
+use config::with_config;
 use grasshopper::Grasshopper;
 use interface::{Action, ActionType, Decision};
 use interface::{AnalyzeResult, Tags};
@@ -117,7 +117,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     // check if the body is too large
                     // if the body is too large, we store the "too large" action for later use, and set the max depth to 0
                     let (body_too_large, max_depth) = if let Some(body) = raw.mbody {
-                        if body.len() > secpolicy.content_filter_profile.max_body_size {
+                        if body.len() > secpolicy.content_filter_profile.max_body_size
+                            && !secpolicy.content_filter_profile.ignore_body
+                        {
                             (
                                 Some(body_too_large(
                                     secpolicy.content_filter_profile.max_body_size,
@@ -139,6 +141,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         &secpolicy.content_filter_profile.content_type,
                         secpolicy.content_filter_profile.referer_as_uri,
                         max_depth,
+                        secpolicy.content_filter_profile.ignore_body,
                         &raw,
                     );
 
@@ -178,7 +181,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], false, 0, &raw),
+                    rinfo: map_request(logs, &[], &[], false, 0, true, &raw),
                     stats: Stats::default(),
                 });
             }
@@ -187,7 +190,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], false, 0, &raw),
+                    rinfo: map_request(logs, &[], &[], false, 0, true, &raw),
                     stats: Stats::default(),
                 });
             }

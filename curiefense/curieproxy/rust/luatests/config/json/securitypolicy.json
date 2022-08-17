@@ -46,6 +46,15 @@
                 "limit_ids": []
             },
             {
+                "match": "^/content-filter/rl45ignorebody",
+                "name": "rl45ignorebody",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "rl45ignorebody",
+                "content_filter_active": true,
+                "limit_ids": []
+            },
+            {
                 "match": "^/content-filter/reportpriority",
                 "name": "reportpriority",
                 "acl_profile": "__default__",

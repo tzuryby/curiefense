@@ -489,7 +489,7 @@ mod test {
             headers,
             meta,
         };
-        map_request(&mut logs, &[], &[], false, 500, &raw_request)
+        map_request(&mut logs, &[], &[], false, 500, false, &raw_request)
     }
 
     #[test]
@@ -685,6 +685,7 @@ mod test {
             &[crate::config::raw::ContentType::Json],
             true,
             50,
+            false,
             &raw_request,
         );
 
