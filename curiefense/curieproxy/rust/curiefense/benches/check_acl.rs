@@ -1,5 +1,6 @@
 use criterion::*;
 use rand::{distributions::Alphanumeric, Rng};
+use std::collections::HashSet;
 
 use curiefense::acl::check_acl;
 use curiefense::config::raw::AclProfile;
@@ -35,6 +36,7 @@ fn gen_profile(sz: usize) -> AclProfile {
         passthrough: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         force_deny: tags_vec(sz).into_iter().map(|p| p.0).collect(),
         action: SimpleAction::default(),
+        tags: HashSet::new(),
     }
 }
 

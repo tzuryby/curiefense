@@ -96,6 +96,7 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectjson",
+        "jsonmatched",
         "bot"
       ]
     }
@@ -144,6 +145,7 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectjson",
+        "jsonmatched",
         "bot"
       ]
     }

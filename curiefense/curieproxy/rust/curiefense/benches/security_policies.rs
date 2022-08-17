@@ -37,6 +37,7 @@ fn gen_bogus_config(sz: usize) -> Config {
         passthrough: HashSet::new(),
         force_deny: HashSet::new(),
         action: SimpleAction::default(),
+        tags: HashSet::new(),
     };
 
     let dummy_entries: Vec<Matching<SecurityPolicy>> = (0..sz)

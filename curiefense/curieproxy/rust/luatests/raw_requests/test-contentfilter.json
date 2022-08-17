@@ -2055,6 +2055,7 @@
         "aclname:default-acl",
         "contentfilterid:invertedre",
         "contentfiltername:inverted-regex",
+        "ire",
         "all",
         "sante",
         "container:1e219d8ed6b4",

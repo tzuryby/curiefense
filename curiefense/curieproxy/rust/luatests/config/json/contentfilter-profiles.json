@@ -1219,6 +1219,7 @@
   },
   {
     "action": "blockheaders",
+    "tags": ["ire"],
     "args": {
       "names": [],
       "regex": [
@@ -1252,6 +1253,7 @@
   },
   {
     "action": "b403",
+    "tags": ["jsonmatched"],
     "args": {
       "names": [],
       "regex": []

@@ -220,6 +220,8 @@ pub struct RawAclProfile {
     pub passthrough: HashSet<String>,
     pub force_deny: HashSet<String>,
     pub action: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +235,7 @@ pub struct AclProfile {
     pub passthrough: HashSet<String>,
     pub force_deny: HashSet<String>,
     pub action: SimpleAction,
+    pub tags: HashSet<String>,
 }
 
 impl AclProfile {
@@ -247,6 +250,7 @@ impl AclProfile {
             passthrough: HashSet::new(),
             force_deny: HashSet::new(),
             action: SimpleAction::default(),
+            tags: HashSet::new(),
         }
     }
 
@@ -272,6 +276,7 @@ impl AclProfile {
             passthrough: acl.passthrough,
             force_deny: acl.force_deny,
             action,
+            tags: acl.tags.into_iter().collect(),
         }
     }
 }
@@ -324,6 +329,8 @@ pub struct RawContentFilterProfile {
     #[serde(default)]
     pub referer_as_uri: bool,
     pub action: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

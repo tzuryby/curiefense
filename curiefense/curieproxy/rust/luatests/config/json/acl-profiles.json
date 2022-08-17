@@ -1,6 +1,7 @@
 [
   {
     "action": "b403",
+    "tags": ["aclmatched"],
     "allow": [],
     "allow_bot": [],
     "deny": [],

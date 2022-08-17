@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::acl::check_acl;
 use crate::config::contentfilter::ContentFilterRules;
 use crate::config::flow::FlowMap;
@@ -106,6 +108,10 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
             status: 403,
             ..Action::default()
         };
+        // add extra tags
+        for t in &securitypolicy.content_filter_profile.tags {
+            tags.insert(t, Location::Body);
+        }
         return InitResult::Res(AnalyzeResult {
             decision: Decision::action(action, vec![reason]),
             tags,
@@ -242,7 +248,14 @@ pub fn analyze_finish<GH: Grasshopper>(
         }
 
         if blocking {
-            let acl_block = |reasons, tags: &mut Tags| {
+            let acl_block = |reasons: Vec<BlockReason>, tags: &mut Tags| {
+                if !secpol.acl_profile.tags.is_empty() {
+                    // insert extra tags
+                    let locs: HashSet<Location> = reasons.iter().flat_map(|r| r.location.iter()).cloned().collect();
+                    for t in &secpol.acl_profile.tags {
+                        tags.insert_locs(t, locs.clone());
+                    }
+                }
                 secpol
                     .acl_profile
                     .action
@@ -293,6 +306,18 @@ pub fn analyze_finish<GH: Grasshopper>(
     let decision = match content_filter_result {
         Ok(()) => Decision::pass(brs),
         Err(cfblock) => {
+            // insert extra tags
+            if !secpol.content_filter_profile.tags.is_empty() {
+                let locs: HashSet<Location> = cfblock
+                    .reasons
+                    .iter()
+                    .flat_map(|r| r.location.iter())
+                    .cloned()
+                    .collect();
+                for t in &secpol.content_filter_profile.tags {
+                    tags.insert_locs(t, locs.clone());
+                }
+            }
             brs.extend(cfblock.reasons.into_iter().map(|mut reason| {
                 if !secpol.content_filter_active {
                     reason.decision.inactive();

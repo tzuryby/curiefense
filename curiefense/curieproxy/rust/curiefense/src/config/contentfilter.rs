@@ -37,6 +37,7 @@ pub struct ContentFilterProfile {
     pub max_body_depth: usize,
     pub referer_as_uri: bool,
     pub action: SimpleAction,
+    pub tags: HashSet<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +90,7 @@ impl ContentFilterProfile {
             max_body_depth: usize::MAX,
             referer_as_uri: false,
             action: SimpleAction::default(),
+            tags: HashSet::new(),
         }
     }
 }
@@ -286,6 +288,7 @@ fn convert_entry(
             max_body_depth,
             referer_as_uri: entry.referer_as_uri,
             action,
+            tags: entry.tags.into_iter().collect(),
         },
     ))
 }
