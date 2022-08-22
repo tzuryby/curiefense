@@ -273,42 +273,6 @@ impl Config {
         out
     }
 
-    fn load_config_file_object<A: serde::de::DeserializeOwned>(
-        logs: &mut Logs,
-        base: &Path,
-        fname: &str,
-    ) -> HashMap<String, A> {
-        let mut path = base.to_path_buf();
-        path.push(fname);
-        let fullpath = path.to_str().unwrap_or(fname).to_string();
-        let file = match std::fs::File::open(path) {
-            Ok(f) => f,
-            Err(rr) => {
-                logs.error(|| format!("when loading {}: {}", fullpath, rr));
-                return HashMap::new();
-            }
-        };
-        let values: HashMap<String, serde_json::Value> = match serde_json::from_reader(std::io::BufReader::new(file)) {
-            Ok(vs) => vs,
-            Err(rr) => {
-                // if it is not a json array, abort early and do not resolve anything
-                logs.error(|| format!("when parsing {}: {}", fullpath, rr));
-                return HashMap::new();
-            }
-        };
-        let mut out = HashMap::new();
-        for (key, value) in values {
-            // for each entry, try to resolve it as a raw configuration value, failing otherwise
-            match serde_json::from_value(value) {
-                Err(rr) => logs.error(|| format!("when resolving entry from {}: {}", fullpath, rr)),
-                Ok(v) => {
-                    out.insert(key, v);
-                }
-            }
-        }
-        out
-    }
-
     pub fn load(logs: Logs, basepath: &str, last_mod: SystemTime) -> (Config, HashMap<String, ContentFilterRules>) {
         let mut logs = logs;
         let mut bjson = PathBuf::from(basepath);
@@ -332,7 +296,7 @@ impl Config {
             Ok(manifest) => manifest.meta.version,
         };
 
-        let rawactions = Config::load_config_file_object(&mut logs, &bjson, "actions.json");
+        let rawactions = Config::load_config_file(&mut logs, &bjson, "actions.json");
         let securitypolicy = Config::load_config_file(&mut logs, &bjson, "securitypolicy.json");
         let globalfilters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
         let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");

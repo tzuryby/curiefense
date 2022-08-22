@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use curiefense::{
     config::{flow::FlowMap, globalfilter::GlobalFilterSection, with_config},
     grasshopper::DynGrasshopper,
-    incremental::{add_body, finalize, inspect_init, IData, IPInfo, add_headers},
+    incremental::{add_body, add_headers, finalize, inspect_init, IData, IPInfo},
     interface::{jsonlog, AnalyzeResult, Location},
     logs::{LogLevel, Logs},
     utils::RequestMeta,

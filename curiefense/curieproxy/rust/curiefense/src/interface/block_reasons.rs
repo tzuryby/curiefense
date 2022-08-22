@@ -44,11 +44,7 @@ impl std::fmt::Display for Initiator {
             GlobalFilter { id, name } => write!(f, "global filter {}[{}]", name, id),
             Acl { tags, stage } => write!(f, "acl {:?} {:?}", stage, tags),
             ContentFilter { ruleid, risk_level } => write!(f, "content filter {}[lvl{}]", ruleid, risk_level),
-            Limit {
-                id,
-                name,
-                threshold,
-            } => write!(f, "rate limit {}[{}] threshold={}", name, id, threshold),
+            Limit { id, name, threshold } => write!(f, "rate limit {}[{}] threshold={}", name, id, threshold),
             Flow { id, name, key: _ } => write!(f, "flow control {}[{}]", name, id),
             BodyTooDeep { actual: _, expected } => write!(f, "body too deep threshhold={}", expected),
             BodyMissing => write!(f, "body is missing"),
@@ -127,11 +123,7 @@ impl Initiator {
                 map.serialize_entry("id", id)?;
                 map.serialize_entry("name", name)?;
             }
-            Initiator::Limit {
-                id,
-                name,
-                threshold,
-            } => {
+            Initiator::Limit { id, name, threshold } => {
                 map.serialize_entry("id", id)?;
                 map.serialize_entry("name", name)?;
                 map.serialize_entry("threshold", threshold)?;

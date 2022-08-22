@@ -306,20 +306,21 @@ impl std::default::Default for Action {
 }
 
 impl SimpleAction {
-    pub fn resolve_actions(logs: &mut Logs, rawactions: HashMap<String, RawAction>) -> HashMap<String, Self> {
+    pub fn resolve_actions(logs: &mut Logs, rawactions: Vec<RawAction>) -> HashMap<String, Self> {
         let mut out = HashMap::new();
-        for (id, raction) in rawactions {
+        for raction in rawactions {
             match Self::resolve(&raction) {
-                Ok(action) => {
+                Ok((id, action)) => {
                     out.insert(id, action);
                 }
-                Err(r) => logs.error(|| format!("Could not resolve action {}: {}", id, r)),
+                Err(r) => logs.error(|| format!("Could not resolve action {}: {}", raction.id, r)),
             }
         }
         out
     }
 
-    fn resolve(rawaction: &RawAction) -> anyhow::Result<SimpleAction> {
+    fn resolve(rawaction: &RawAction) -> anyhow::Result<(String, SimpleAction)> {
+        let id = rawaction.id.clone();
         let atype = match rawaction.type_ {
             RawActionType::Skip => SimpleActionT::Skip,
             RawActionType::Monitor => SimpleActionT::Monitor,
@@ -351,12 +352,15 @@ impl SimpleAction {
             Some(rawaction.tags.iter().cloned().collect())
         };
 
-        Ok(SimpleAction {
-            atype,
-            status,
-            headers,
-            extra_tags,
-        })
+        Ok((
+            id,
+            SimpleAction {
+                atype,
+                status,
+                headers,
+                extra_tags,
+            },
+        ))
     }
 
     /// returns None when it is a challenge, Some(action) otherwise

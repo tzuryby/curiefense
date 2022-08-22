@@ -1,20 +1,23 @@
-{
-  "3lfpo6xe": {
+[
+  {
     "params": {
       "headers": {
         "location": "http://www.google.com"
       },
       "status": "456"
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "3lfpo6xe"
   },
-  "5ktcoafw": {
-    "type": "challenge"
+  {
+    "type": "challenge",
+    "id": "5ktcoafw"
   },
-  "a7ge3v0l": {
-    "type": "custom"
+  {
+    "type": "custom",
+    "id": "a7ge3v0l"
   },
-  "an6yhiyr": {
+  {
     "params": {
       "content": "{}",
       "headers": {
@@ -22,78 +25,82 @@
       },
       "status": "200"
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "an6yhiyr"
   },
-  "bh3gw11k": {
+  {
     "params": {
       "headers": {
         "location": "http://www.redir.com"
       },
       "status": "333"
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "bh3gw11k"
   },
-  "d5vnu3hs": {
+  {
     "params": {
       "content": "body"
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "d5vnu3hs"
   },
-  "default": {
-    "type": "custom"
+  {
+    "type": "custom",
+    "id": "default"
   },
-  "dxfyhx4n": {
+  {
     "params": {
       "content": "lol",
       "status": "123"
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "dxfyhx4n"
   },
-  "fq8faptj": {
+  {
     "params": {
       "headers": {
         "h1": "${ip} - ${args.dd} - ${args.ee}"
       }
     },
-    "type": "monitor"
+    "type": "monitor",
+    "id": "fq8faptj"
   },
-  "ijcy5mwz": {
-    "params": {
-      "action": {
-        "type": "custom"
-      },
-      "duration": "4"
-    },
-    "type": "ban"
+  {
+    "type": "monitor",
+    "id": "monitor"
   },
-  "monitor": {
-    "type": "monitor"
-  },
-  "sk9lz9q4": {
+  {
     "params": {
       "headers": {
         "location": "/1234"
       }
     },
-    "type": "custom"
+    "type": "custom",
+    "id": "sk9lz9q4"
   },
-  "ye8qyg0h": {
-    "type": "skip"
+  {
+    "type": "skip",
+    "id": "ye8qyg0h"
   },
-  "blockheaders": {
-    "tags": ["myextratag"],
+  {
+    "tags": [
+      "myextratag"
+    ],
     "type": "custom",
     "params": {
       "status": "403",
       "headers": {
         "h1": "${ip}"
       }
-    }
+    },
+    "id": "blockheaders"
   },
-  "b403": {
+  {
     "type": "custom",
     "params": {
       "status": "403"
-    }
+    },
+    "id": "b403"
   }
-}
+]

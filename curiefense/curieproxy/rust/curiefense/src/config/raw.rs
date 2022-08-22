@@ -156,6 +156,7 @@ pub struct RawLimitSelector {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawAction {
+    pub id: String,
     #[serde(rename = "type", default)]
     pub type_: RawActionType,
     #[serde(default)]
@@ -188,7 +189,6 @@ pub struct RawActionParams {
     pub status: Option<String>,
     #[serde(default = "get_false")]
     pub block_mode: bool,
-    pub action: Option<Box<RawAction>>,
     #[serde(default)]
     pub headers: Option<HashMap<String, String>>,
     pub content: Option<String>,
@@ -200,7 +200,6 @@ impl std::default::Default for RawActionParams {
         RawActionParams {
             status: None,
             block_mode: true,
-            action: None,
             headers: None,
             content: None,
             duration: None,
