@@ -35,6 +35,8 @@
         "geo-asn:7018",
         "tagbyip",
         "contentfilterid:--default--",
+        "status:503",
+        "status-class:5xx",
         "bot"
       ]
     }

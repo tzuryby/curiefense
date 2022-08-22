@@ -50,6 +50,8 @@
         "sante",
         "deny",
         "denybot",
+        "status:403",
+        "status-class:4xx",
         "incl000000001"
       ]
     }
@@ -104,6 +106,8 @@
         "human",
         "sante",
         "deny",
+        "status:403",
+        "status-class:4xx",
         "denybot"
       ]
     }

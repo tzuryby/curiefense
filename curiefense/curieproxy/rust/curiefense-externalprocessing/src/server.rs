@@ -3,7 +3,7 @@ use curiefense::{
     config::{flow::FlowMap, globalfilter::GlobalFilterSection, with_config},
     grasshopper::DynGrasshopper,
     incremental::{add_body, add_headers, finalize, inspect_init, IData, IPInfo},
-    interface::{jsonlog, AnalyzeResult, Location},
+    interface::{jsonlog, AnalyzeResult},
     logs::{LogLevel, Logs},
     utils::RequestMeta,
 };
@@ -218,7 +218,7 @@ impl MyEP {
             }
         }
 
-        let (mut dec, logs) = finalize(idata, Some(&DynGrasshopper {}), &globalfilters, &flows, None).await;
+        let (dec, logs) = finalize(idata, Some(&DynGrasshopper {}), &globalfilters, &flows, None).await;
 
         let stage = if headers_only {
             ProcessingStage::Headers
@@ -260,12 +260,6 @@ impl MyEP {
             } else {
                 Some(0)
             };
-            if let Some(cde) = code {
-                dec.tags
-                    .insert_qualified("status", &format!("{}", cde), Location::Request);
-                dec.tags
-                    .insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
-            }
             self.send_action(ProcessingStage::Reply, tx, &dec, &logs, code).await;
         }
         Ok(())

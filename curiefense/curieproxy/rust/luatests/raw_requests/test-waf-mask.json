@@ -28,6 +28,8 @@
         "cf-rule-subcategory:libinjection-xss",
         "cf-rule-risk:libinjection",
         "cf-rule-id:libinjection-xss",
+        "status:403",
+        "status-class:4xx",
         "aclname:default-acl"
       ],
       "action": "custom_response",

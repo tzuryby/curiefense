@@ -129,6 +129,10 @@ pub fn jsonlog(
             }
         }
     }
+    if let Some(cde) = rcode {
+        tgs.insert_qualified("status", &format!("{}", cde), Location::Request);
+        tgs.insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
+    }
     let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };

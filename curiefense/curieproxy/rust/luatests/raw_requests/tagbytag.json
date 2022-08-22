@@ -35,6 +35,8 @@
         "geo-subregion:bne",
         "geo-region:eng",
         "geo-continent-name:europe",
+        "status:503",
+        "status-class:5xx",
         "geo-org:virgin-media-limited"
       ]
     }

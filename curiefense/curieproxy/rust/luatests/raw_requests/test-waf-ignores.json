@@ -68,6 +68,8 @@
         "cf-rule-risk:1",
         "cf-rule-id:100099",
         "cf-rule-subcategory:generic",
+        "status:403",
+        "status-class:4xx",
         "waf"
       ],
       "action": "custom_response",
@@ -114,6 +116,8 @@
         "cf-rule-risk:1",
         "cf-rule-id:100099",
         "cf-rule-subcategory:generic",
+        "status:403",
+        "status-class:4xx",
         "waf"
       ],
       "action": "custom_response",
@@ -276,6 +280,8 @@
         "cf-rule-category:sqli",
         "sqli",
         "cf-rule-risk:5",
+        "status:403",
+        "status-class:4xx",
         "waf"
       ],
       "action": "custom_response",

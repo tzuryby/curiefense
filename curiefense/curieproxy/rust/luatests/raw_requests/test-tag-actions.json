@@ -24,6 +24,8 @@
         "geo-country:united-states",
         "contentfiltername:default-contentfilter",
         "bot",
+        "status:503",
+        "status-class:5xx",
         "ip:23-129-64-253"
       ],
       "action": "custom_response",
@@ -63,6 +65,8 @@
         "geo-country:united-states",
         "contentfiltername:default-contentfilter",
         "bot",
+        "status:123",
+        "status-class:1xx",
         "ip:23-129-64-253"
       ],
       "action": "custom_response",
@@ -102,6 +106,8 @@
         "securitypolicy:default-entry",
         "geo-country:united-states",
         "bot",
+        "status:503",
+        "status-class:5xx",
         "ip:23-129-64-253"
       ],
       "action": "custom_response",
@@ -141,6 +147,8 @@
         "securitypolicy:default-entry",
         "geo-country:united-states",
         "bot",
+        "status:456",
+        "status-class:4xx",
         "ip:23-129-64-253"
       ],
       "action": "custom_response",
@@ -180,6 +188,8 @@
         "securitypolicy:default-entry",
         "geo-country:united-states",
         "bot",
+        "status:503",
+        "status-class:5xx",
         "ip:23-129-64-253"
       ],
       "action": "custom_response",

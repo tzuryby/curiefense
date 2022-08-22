@@ -49,6 +49,8 @@
         "aclid:fromtags",
         "contentfilterid:expectjson",
         "deny",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -97,6 +99,8 @@
         "aclid:fromtags",
         "contentfilterid:expectjson",
         "jsonmatched",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -146,6 +150,8 @@
         "aclid:fromtags",
         "contentfilterid:expectjson",
         "jsonmatched",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -200,6 +206,8 @@
         "aclid:fromtags",
         "contentfilterid:expectxml",
         "deny",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -248,6 +256,8 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectxml",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -295,6 +305,8 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectxml",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -343,6 +355,8 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectxml",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -391,6 +405,8 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectall",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }
@@ -445,6 +461,8 @@
         "aclid:fromtags",
         "contentfilterid:expectall",
         "bot",
+        "status:403",
+        "status-class:4xx",
         "deny"
       ]
     }
@@ -499,6 +517,8 @@
         "aclid:fromtags",
         "contentfilterid:expectall",
         "bot",
+        "status:403",
+        "status-class:4xx",
         "deny"
       ]
     }
@@ -546,6 +566,8 @@
         "aclname:from-tags",
         "aclid:fromtags",
         "contentfilterid:expectall",
+        "status:403",
+        "status-class:4xx",
         "bot"
       ]
     }

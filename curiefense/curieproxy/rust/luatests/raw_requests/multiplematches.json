@@ -51,6 +51,8 @@
         "geo-org:nil",
         "cf-rule-category:sqli",
         "waf",
+        "status:403",
+        "status-class:4xx",
         "cf-rule-risk:5"
       ]
     }

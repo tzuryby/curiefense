@@ -71,6 +71,10 @@ def make_request(st: Set[str], b64: bool = False) -> Tuple[Any, str]:
         r["response"]["block_mode"] = True
         r["response"]["status"] = 247
         r["response"]["tags"].append("challenge-phase01")
+    if "status" in r["response"]:
+        r["response"]["tags"].append("status:%d" % r["response"]["status"])
+        r["response"]["tags"].append("status-class:%dxx" % (r["response"]["status"] / 100))
+
     return (r, name)
 
 
