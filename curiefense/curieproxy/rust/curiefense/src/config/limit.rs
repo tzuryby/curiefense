@@ -66,7 +66,7 @@ impl Limit {
             });
 
             thresholds.push(LimitThreshold {
-                limit: thr.limit.parse().with_context(|| "when converting the limit")?,
+                limit: thr.limit,
                 action,
             })
         }
@@ -76,10 +76,7 @@ impl Limit {
             Limit {
                 id,
                 name: rawlimit.name,
-                timeframe: rawlimit
-                    .timeframe
-                    .parse()
-                    .with_context(|| "when converting the timeframe")?,
+                timeframe: rawlimit.timeframe,
                 include: rawlimit.include.into_iter().collect(),
                 exclude: rawlimit.exclude.into_iter().collect(),
                 thresholds,

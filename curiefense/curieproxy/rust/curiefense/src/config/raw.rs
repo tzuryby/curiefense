@@ -124,7 +124,7 @@ pub struct RawGlobalFilterSSection {
 pub struct RawLimit {
     pub id: String,
     pub name: String,
-    pub timeframe: String,
+    pub timeframe: u64,
     #[serde(default)]
     pub key: Vec<HashMap<String, String>>,
     #[serde(default)]
@@ -138,7 +138,7 @@ pub struct RawLimit {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawLimitThreshold {
-    pub limit: String,
+    pub limit: u64,
     pub action: String,
 }
 
@@ -180,31 +180,12 @@ impl std::default::Default for RawActionType {
     }
 }
 
-fn get_false() -> bool {
-    false
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct RawActionParams {
-    pub status: Option<String>,
-    #[serde(default = "get_false")]
-    pub block_mode: bool,
+    pub status: Option<u32>,
     #[serde(default)]
     pub headers: Option<HashMap<String, String>>,
     pub content: Option<String>,
-    pub duration: Option<String>,
-}
-
-impl std::default::Default for RawActionParams {
-    fn default() -> Self {
-        RawActionParams {
-            status: None,
-            block_mode: true,
-            headers: None,
-            content: None,
-            duration: None,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -403,12 +384,6 @@ pub struct ContentFilterRule {
     pub subcategory: String,
     #[serde(default)]
     pub tags: HashSet<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ContentFilterGroup {
-    pub tags: Vec<String>,
-    pub signatures: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

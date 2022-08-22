@@ -333,14 +333,7 @@ impl SimpleAction {
             },
             RawActionType::Challenge => SimpleActionT::Challenge,
         };
-        let status = if let Some(sstatus) = &rawaction.params.status {
-            match sstatus.parse::<u32>() {
-                Ok(s) => s,
-                Err(rr) => return Err(anyhow::anyhow!("Unparseable status: {} -> {}", sstatus, rr)),
-            }
-        } else {
-            503
-        };
+        let status = rawaction.params.status.unwrap_or(503);
         let headers = rawaction.params.headers.as_ref().map(|hm| {
             hm.iter()
                 .map(|(k, v)| (k.to_string(), parse_request_template(v)))

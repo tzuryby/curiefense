@@ -4,7 +4,7 @@
       "headers": {
         "location": "http://www.google.com"
       },
-      "status": "456"
+      "status": 456
     },
     "type": "custom",
     "id": "3lfpo6xe"
@@ -23,7 +23,7 @@
       "headers": {
         "content-type": "application/json"
       },
-      "status": "200"
+      "status": 200
     },
     "type": "custom",
     "id": "an6yhiyr"
@@ -33,7 +33,7 @@
       "headers": {
         "location": "http://www.redir.com"
       },
-      "status": "333"
+      "status": 333
     },
     "type": "custom",
     "id": "bh3gw11k"
@@ -52,7 +52,7 @@
   {
     "params": {
       "content": "lol",
-      "status": "123"
+      "status": 123
     },
     "type": "custom",
     "id": "dxfyhx4n"
@@ -89,7 +89,7 @@
     ],
     "type": "custom",
     "params": {
-      "status": "403",
+      "status": 403,
       "headers": {
         "h1": "${ip}"
       }
@@ -99,8 +99,12 @@
   {
     "type": "custom",
     "params": {
-      "status": "403"
+      "status": 403
     },
     "id": "b403"
+  },
+  {
+    "id": "ijcy5mwz",
+    "type": "custom"
   }
 ]

@@ -1,7 +1,6 @@
 use crate::config::matchers::Matching;
 use crate::config::raw::{
-    ContentFilterGroup, ContentFilterRule, ContentType, RawContentFilterEntryMatch, RawContentFilterProfile,
-    RawContentFilterProperties,
+    ContentFilterRule, ContentType, RawContentFilterEntryMatch, RawContentFilterProfile, RawContentFilterProperties,
 };
 use crate::interface::{RawTags, SimpleAction};
 use crate::logs::Logs;
@@ -341,27 +340,8 @@ pub fn resolve_rules(
     logs: &mut Logs,
     profiles: &HashMap<String, ContentFilterProfile>,
     raws: Vec<ContentFilterRule>,
-    groups: Vec<ContentFilterGroup>,
 ) -> HashMap<String, ContentFilterRules> {
-    let mut groupmap: HashMap<String, HashSet<String>> = HashMap::new();
-    for group in groups {
-        for sig in group.signatures {
-            let entry = groupmap.entry(sig).or_default();
-            entry.extend(group.tags.iter().cloned());
-        }
-    }
-
     // extend the rule tags with the group tags
-    let all_rules: Vec<ContentFilterRule> = raws
-        .into_iter()
-        .map(|mut r| {
-            if let Some(tgs) = groupmap.get(&r.id) {
-                r.tags.extend(tgs.iter().cloned())
-            }
-            r
-        })
-        .collect();
-
     // should a given rule be kept for a given profile
     let rule_kept = |r: &ContentFilterRule, prof: &ContentFilterProfile| -> bool {
         let (spec_tags, all_tags) = rule_tags(r);
@@ -388,7 +368,7 @@ pub fn resolve_rules(
     };
 
     let build_from_profile = |prof: &ContentFilterProfile| -> anyhow::Result<ContentFilterRules> {
-        let ids: Vec<ContentFilterRule> = all_rules.iter().filter(|r| rule_kept(r, prof)).cloned().collect();
+        let ids: Vec<ContentFilterRule> = raws.iter().filter(|r| rule_kept(r, prof)).cloned().collect();
         if ids.is_empty() {
             return Err(anyhow::anyhow!("no rules were selected, empty profile"));
         }

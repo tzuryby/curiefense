@@ -303,7 +303,6 @@ impl Config {
         let acls = Config::load_config_file(&mut logs, &bjson, "acl-profiles.json");
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
-        let contentfiltergroups = Config::load_config_file(&mut logs, &bjson, "contentfilter-groups.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
 
         let container_name = std::fs::read_to_string("/etc/hostname")
@@ -313,12 +312,7 @@ impl Config {
         let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
         let content_filter_profiles = ContentFilterProfile::resolve(&mut logs, &actions, rawcontentfilterprofiles);
 
-        let hsdb = resolve_rules(
-            &mut logs,
-            &content_filter_profiles,
-            contentfilterrules,
-            contentfiltergroups,
-        );
+        let hsdb = resolve_rules(&mut logs, &content_filter_profiles, contentfilterrules);
 
         let config = Config::resolve(
             logs,
