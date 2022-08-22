@@ -138,17 +138,14 @@ pub struct LuaLimitCheck(pub LimitCheck);
 impl mlua::UserData for LuaLimitCheck {
     fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
         fields.add_field_method_get("key", |_, this| Ok(this.0.key.clone()));
-        fields.add_field_method_get("ban_key", |_, this| Ok(this.0.ban_key.clone()));
         fields.add_field_method_get("pairwith", |_, this| Ok(this.0.pairwith.clone()));
         fields.add_field_method_get("zero_limits", |_, this| Ok(this.0.zero_limits()));
         fields.add_field_method_get("timeframe", |_, this| Ok(this.0.limit.timeframe));
     }
     fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method("ban_for", |_, this, curcount| Ok(this.0.ban_for(curcount)));
-        methods.add_method("result", |_, this, (ban, curcount)| {
+        methods.add_method("result", |_, this, curcount| {
             Ok(LuaLimitResult(LimitResult {
                 limit: this.0.limit.clone(),
-                ban,
                 curcount,
             }))
         });

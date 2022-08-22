@@ -31,12 +31,3 @@ pub async fn redis_async_conn() -> anyhow::Result<redis::aio::ConnectionManager>
         Err(rr) => Err(anyhow::anyhow!("{}", rr)),
     }
 }
-
-pub fn get_ban_key(key: &str) -> String {
-    format!("{:X}", md5::compute(format!("limit-ban-hash{}", key)))
-}
-
-pub async fn is_banned<CNX: redis::aio::ConnectionLike>(cnx: &mut CNX, ban_key: &str) -> bool {
-    let q: redis::RedisResult<Option<u32>> = redis::cmd("GET").arg(ban_key).query_async(cnx).await;
-    q.unwrap_or(None).is_some()
-}

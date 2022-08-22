@@ -151,38 +151,26 @@ local function run_inspect_request(raw_request_map)
       local rlimits = {}
       for _, limit in pairs(limits) do
         local key = limit.key
-        local ban_key = limit.ban_key
-        if conn:get(ban_key) then
-          -- banned
-          table.insert(rlimits, limit:result(true, 0))
-        else
-          -- not banned
-          local curcount = 1
-          if not limit.zero_limits then
-            local pw = limit.pairwith
-            local expire
-            if pw then
-              conn:sadd(key, pw)
-              curcount = conn:scard(key)
-              expire = conn:ttl(key)
-            else
-              curcount = conn:incr(key)
-              expire = conn:ttl(key)
-            end
-            if curcount == nil then
-              curcount = 0
-            end
-            if expire == nil or expire < 0 then
-              conn:expire(key, limit.timeframe)
-            end
+        local curcount = 1
+        if not limit.zero_limits then
+          local pw = limit.pairwith
+          local expire
+          if pw then
+            conn:sadd(key, pw)
+            curcount = conn:scard(key)
+            expire = conn:ttl(key)
+          else
+            curcount = conn:incr(key)
+            expire = conn:ttl(key)
           end
-          local duration = limit:ban_for(curcount)
-          if duration then
-            conn:set(ban_key, 1)
-            conn:expire(ban_key, duration)
+          if curcount == nil then
+            curcount = 0
           end
-          table.insert(rlimits, limit:result(false, curcount))
+          if expire == nil or expire < 0 then
+            conn:expire(key, limit.timeframe)
+          end
         end
+        table.insert(rlimits, limit:result(curcount))
       end
 
       res = curiefense.inspect_request_process(r1, rflows, rlimits)

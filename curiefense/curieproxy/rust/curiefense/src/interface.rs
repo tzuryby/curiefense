@@ -205,7 +205,6 @@ pub fn jsonlog(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Action {
     pub atype: ActionType,
-    pub ban: bool,
     pub block_mode: bool,
     pub status: u32,
     pub headers: Option<HashMap<String, String>>,
@@ -219,14 +218,12 @@ pub enum SimpleActionT {
     Monitor,
     Custom { content: String },
     Challenge,
-    Ban(Box<SimpleAction>, u64), // duration, ttl
 }
 
 impl SimpleActionT {
     fn priority(&self) -> u32 {
         use SimpleActionT::*;
         match self {
-            Ban(sub, _) => sub.atype.priority(),
             Custom { content: _ } => 8,
             Challenge => 6,
             Monitor => 1,
@@ -242,7 +239,6 @@ impl SimpleActionT {
         match self {
             SimpleActionT::Skip => BDecision::Skip,
             SimpleActionT::Monitor => BDecision::Monitor,
-            SimpleActionT::Ban(sub, _) => sub.atype.to_bdecision(),
             SimpleActionT::Challenge | SimpleActionT::Custom { content: _ } => BDecision::Blocking,
         }
     }
@@ -301,7 +297,6 @@ impl std::default::Default for Action {
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             status: 503,
             headers: None,
             content: "request denied".to_string(),
@@ -328,22 +323,6 @@ impl SimpleAction {
         let atype = match rawaction.type_ {
             RawActionType::Skip => SimpleActionT::Skip,
             RawActionType::Monitor => SimpleActionT::Monitor,
-            RawActionType::Ban => SimpleActionT::Ban(
-                Box::new(
-                    rawaction
-                        .params
-                        .action
-                        .as_ref()
-                        .and_then(|x| SimpleAction::resolve(x).ok())
-                        .unwrap_or_default(),
-                ),
-                rawaction
-                    .params
-                    .duration
-                    .as_ref()
-                    .and_then(|s| s.parse::<u64>().ok())
-                    .unwrap_or(3600),
-            ),
             RawActionType::Custom => SimpleActionT::Custom {
                 content: rawaction
                     .params
@@ -393,10 +372,6 @@ impl SimpleAction {
         match &self.atype {
             SimpleActionT::Skip => action.atype = ActionType::Skip,
             SimpleActionT::Monitor => action.atype = ActionType::Monitor,
-            SimpleActionT::Ban(sub, _) => {
-                action = sub.to_action(rinfo, tags, is_human).unwrap_or_default();
-                action.ban = true;
-            }
             SimpleActionT::Custom { content } => {
                 action.atype = ActionType::Block;
                 action.content = content.clone();

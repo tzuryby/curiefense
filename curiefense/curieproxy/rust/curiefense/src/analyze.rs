@@ -207,7 +207,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     let masking_seed = &secpol.content_filter_profile.masking_seed;
 
     let stats = flow_process(info.stats, 0, &p2.flows, &mut tags);
-    let (limit_check, stats) = limit_process(logs, stats, 0, &p2.limits, &mut tags);
+    let (limit_check, stats) = limit_process(stats, 0, &p2.limits, &mut tags);
 
     if let SimpleDecision::Action(action, curbrs) = limit_check {
         brs.extend(curbrs);

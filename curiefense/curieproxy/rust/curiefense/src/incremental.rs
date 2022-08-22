@@ -142,7 +142,6 @@ pub fn add_header(idata: IData, key: String, value: String) -> Result<IData, (Lo
     let cf_block = || Action {
         atype: ActionType::Block,
         block_mode: true,
-        ban: false,
         status: 403,
         headers: None,
         content: "Access denied".to_string(),

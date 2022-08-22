@@ -347,7 +347,6 @@ pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             status: 403,
             headers: None,
             content: "Access denied".to_string(),
@@ -362,7 +361,6 @@ pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             status: 403,
             headers: None,
             content: "Access denied".to_string(),

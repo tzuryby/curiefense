@@ -133,39 +133,26 @@ function session_rust_nginx.inspect(handle)
 
             for _, limit in pairs(limits) do
                 local key = limit.key
-                -- it might be a good idea to extend the API to only check ban for limits that have ban actions
-                local ban_key = limit.ban_key
-                if red:get(ban_key) then
-                    -- banned
-                    table.insert(rlimits, limit:result(true, 0))
-                else
-                    -- not banned
-                    local curcount = 1
-                    if not limit.zero_limits then
-                        local pw = limit.pairwith
-                        local expire
-                        if pw then
-                            red:sadd(key, pw)
-                            curcount = red:scard(key)
-                            expire = red:ttl(key)
-                        else
-                            curcount = red:incr(key)
-                            expire = red:ttl(key)
-                        end
-                        if curcount == nil then
-                            curcount = 0
-                        end
-                        if expire == nil or expire < 0 then
-                            red:expire(key, limit.timeframe)
-                        end
+                local curcount = 1
+                if not limit.zero_limits then
+                    local pw = limit.pairwith
+                    local expire
+                    if pw then
+                        red:sadd(key, pw)
+                        curcount = red:scard(key)
+                        expire = red:ttl(key)
+                    else
+                        curcount = red:incr(key)
+                        expire = red:ttl(key)
                     end
-                    local duration = limit:ban_for(curcount)
-                    if duration then
-                        red:set(ban_key, 1)
-                        red:expire(ban_key, duration)
+                    if curcount == nil then
+                        curcount = 0
                     end
-                    table.insert(rlimits, limit:result(false, curcount))
+                    if expire == nil or expire < 0 then
+                        red:expire(key, limit.timeframe)
+                    end
                 end
+                table.insert(rlimits, limit:result(curcount))
             end
         end
 

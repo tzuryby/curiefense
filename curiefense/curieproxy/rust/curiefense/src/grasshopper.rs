@@ -108,7 +108,6 @@ pub fn gh_fail_decision(reason: &str) -> Decision {
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             headers: None,
             status: 500,
             content: "internal_error".to_string(),
@@ -154,7 +153,6 @@ pub fn challenge_phase01<GH: Grasshopper>(gh: &GH, ua: &str, reasons: Vec<BlockR
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             headers: Some(hdrs),
             status: 247,
             content,
@@ -191,7 +189,6 @@ pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, uri: &str, headers: &RequestF
         Action {
             atype: ActionType::Block,
             block_mode: true,
-            ban: false,
             headers: Some(nheaders),
             status: 248,
             content: "{}".to_string(),

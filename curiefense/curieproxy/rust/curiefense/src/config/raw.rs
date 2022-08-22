@@ -170,7 +170,6 @@ pub enum RawActionType {
     Skip,
     Monitor,
     Custom,
-    Ban,
     Challenge,
 }
 

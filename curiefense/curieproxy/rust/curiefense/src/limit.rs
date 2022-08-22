@@ -1,11 +1,10 @@
 use crate::interface::stats::{BStageFlow, BStageLimit, StatsCollect};
 use crate::logs::Logs;
-use crate::redis::{get_ban_key, is_banned};
 use redis::RedisResult;
 
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
-use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::redis::redis_async_conn;
 use crate::utils::{select_string, RequestInfo};
 
@@ -20,11 +19,7 @@ fn build_key(security_policy_name: &str, reqinfo: &RequestInfo, tags: &Tags, lim
 #[allow(clippy::too_many_arguments)]
 fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) -> SimpleDecision {
     tags.insert(&limit.name, Location::Request);
-    let action = if let SimpleActionT::Ban(subaction, _) = &threshold.action.atype {
-        *subaction.clone()
-    } else {
-        threshold.action.clone()
-    };
+    let action = threshold.action.clone();
     let decision = action.atype.to_bdecision();
     SimpleDecision::Action(
         action,
@@ -91,7 +86,6 @@ fn limit_match(tags: &Tags, elem: &Limit) -> bool {
 #[derive(Clone)]
 pub struct LimitCheck {
     pub key: String,
-    pub ban_key: String,
     pub pairwith: Option<String>,
     pub limit: Limit,
 }
@@ -99,20 +93,6 @@ pub struct LimitCheck {
 impl LimitCheck {
     pub fn zero_limits(&self) -> bool {
         self.limit.thresholds.iter().all(|t| t.limit == 0)
-    }
-    pub fn ban_for(&self, curcount: i64) -> Option<u64> {
-        self.limit
-            .thresholds
-            .iter()
-            .filter(|th| curcount > th.limit as i64)
-            .filter_map(|th| {
-                if let SimpleActionT::Ban(_, duration) = th.action.atype {
-                    Some(duration)
-                } else {
-                    None
-                }
-            })
-            .max()
     }
 }
 
@@ -129,7 +109,6 @@ pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[L
             None => continue,
             Some(k) => k,
         };
-        let ban_key = get_ban_key(&key);
         let pairwith = match &limit.pairwith {
             None => None,
             Some(sel) => match select_string(reqinfo, sel, tags) {
@@ -139,7 +118,6 @@ pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[L
         };
         out.push(LimitCheck {
             key,
-            ban_key,
             pairwith,
             limit: limit.clone(),
         })
@@ -150,7 +128,6 @@ pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[L
 #[derive(Clone)]
 pub struct LimitResult {
     pub limit: Limit,
-    pub ban: bool,
     pub curcount: i64,
 }
 
@@ -173,43 +150,17 @@ pub async fn limit_query<'t>(logs: &mut Logs, checks: Vec<LimitCheck>) -> Vec<Li
     let mut out = Vec::new();
 
     for check in checks {
-        if is_banned(&mut redis, &check.ban_key).await {
-            out.push(LimitResult {
-                limit: check.limit,
-                ban: true,
-                curcount: 0,
-            });
+        let curcount = if check.zero_limits() {
+            Ok(1)
         } else {
-            let curcount = if check.zero_limits() {
-                Ok(1)
-            } else {
-                redis_get_limit(&mut redis, &check.key, check.limit.timeframe, check.pairwith.as_deref()).await
-            };
-            match curcount {
-                Err(rr) => logs.error(|| rr.to_string()),
-                Ok(curcount) => {
-                    // check for banning
-                    if let Some(duration) = check.ban_for(curcount) {
-                        if let Err(rr) = redis::pipe()
-                            .cmd("SET")
-                            .arg(&check.ban_key)
-                            .arg(1)
-                            .cmd("EXPIRE")
-                            .arg(&check.ban_key)
-                            .arg(duration)
-                            .query_async::<_, ()>(&mut redis)
-                            .await
-                        {
-                            logs.error(|| format!("Redis error {}", rr));
-                        }
-                    }
-                    out.push(LimitResult {
-                        limit: check.limit,
-                        ban: false,
-                        curcount,
-                    })
-                }
-            }
+            redis_get_limit(&mut redis, &check.key, check.limit.timeframe, check.pairwith.as_deref()).await
+        };
+        match curcount {
+            Err(rr) => logs.error(|| rr.to_string()),
+            Ok(curcount) => out.push(LimitResult {
+                limit: check.limit,
+                curcount,
+            }),
         }
     }
 
@@ -218,7 +169,6 @@ pub async fn limit_query<'t>(logs: &mut Logs, checks: Vec<LimitCheck>) -> Vec<Li
 
 /// performs the redis requests and compute the proper reactions based on
 pub fn limit_process(
-    logs: &mut Logs,
     stats: StatsCollect<BStageFlow>,
     nlimits: usize,
     results: &[LimitResult],
@@ -226,18 +176,6 @@ pub fn limit_process(
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     let mut out = SimpleDecision::Pass;
     for result in results {
-        if result.ban {
-            logs.debug("is banned!");
-            tags.insert(&result.limit.name, Location::Request);
-            let ban_threshold: &LimitThreshold = result
-                .limit
-                .thresholds
-                .iter()
-                .find(|t| matches!(t.action.atype, SimpleActionT::Ban(_, _)))
-                .unwrap_or(&result.limit.thresholds[0]);
-            out = stronger_decision(out, limit_pure_react(tags, &result.limit, ban_threshold));
-        }
-
         if result.curcount > 0 {
             for threshold in &result.limit.thresholds {
                 // Only one action with highest limit larger than current
@@ -262,5 +200,5 @@ pub async fn limit_check(
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     let checks = limit_info(security_policy_name, reqinfo, limits, tags);
     let qresults = limit_query(logs, checks).await;
-    limit_process(logs, stats, limits.len(), &qresults, tags)
+    limit_process(stats, limits.len(), &qresults, tags)
 }
