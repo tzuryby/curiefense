@@ -332,23 +332,28 @@
               "4.3.2.1",
               "comment"
             ],
-            [
-              "method",
-              "POST|PUT",
-              ""
-            ],
-            [
-              "method",
-              "GET|HEAD",
-              "comment 02"
-            ],
-            [
-              "cookies",
-              [
-                "zooloo",
-                "gooloo"
+            {
+              "relation": "OR",
+              "entries": [
+                [
+                  "method",
+                  "POST|PUT",
+                  ""
+                ],
+                [
+                  "method",
+                  "GET|HEAD",
+                  "comment 02"
+                ],
+                [
+                  "cookies",
+                  [
+                    "zooloo",
+                    "gooloo"
+                  ]
+                ]
               ]
-            ]
+            }
           ],
           "relation": "OR"
         },
@@ -649,18 +654,13 @@
     "mdate": "2021-07-01T09:50:58.505Z",
     "name": "add headers",
     "rule": {
-      "relation": "OR",
+      "relation": "AND",
       "entries": [
-        {
-          "entries": [
-            [
-              "ip",
-              "82.13.8.87",
-              null
-            ]
-          ],
-          "relation": "OR"
-        }
+        [
+          "ip",
+          "82.13.8.87",
+          null
+        ]
       ]
     },
     "source": "self-managed",
@@ -675,21 +675,11 @@
     "id": "contenttype",
     "mdate": "2021-07-01T09:50:58.505Z",
     "name": "content type",
-    "rule": {
-      "relation": "OR",
-      "entries": [
-        {
-          "entries": [
-            [
-              "ip",
-              "82.13.8.88",
-              null
-            ]
-          ],
-          "relation": "OR"
-        }
-      ]
-    },
+    "rule": [
+      "ip",
+      "82.13.8.88",
+      null
+    ],
     "source": "self-managed",
     "tags": [
       "wcc"
