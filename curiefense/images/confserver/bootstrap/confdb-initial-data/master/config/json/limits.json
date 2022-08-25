@@ -18,9 +18,9 @@
     "thresholds": [
       {
         "action": "default",
-        "limit": "5"
+        "limit": 5
       }
     ],
-    "timeframe": "60"
+    "timeframe": 60
   }
 ]

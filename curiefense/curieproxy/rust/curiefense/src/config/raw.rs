@@ -50,9 +50,16 @@ pub struct RawGlobalFilterSection {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct RawGlobalFilterRule {
+#[serde(untagged)]
+pub enum RawGlobalFilterRule {
+    Rel(RawGlobalFilterRelation),
+    Entry(RawGlobalFilterEntry),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawGlobalFilterRelation {
     pub relation: Relation,
-    pub sections: Vec<RawGlobalFilterSSection>,
+    pub entries: Vec<RawGlobalFilterRule>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Copy)]
@@ -77,13 +84,13 @@ pub enum GlobalFilterEntryType {
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements
 #[derive(Debug, Serialize, Clone)]
-pub struct RawGlobalFilterSSectionEntry {
+pub struct RawGlobalFilterEntry {
     pub tp: GlobalFilterEntryType,
     pub vl: serde_json::Value,
     pub comment: Option<String>,
 }
 
-impl<'de> Deserialize<'de> for RawGlobalFilterSSectionEntry {
+impl<'de> Deserialize<'de> for RawGlobalFilterEntry {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -91,7 +98,7 @@ impl<'de> Deserialize<'de> for RawGlobalFilterSSectionEntry {
         struct MyTupleVisitor;
 
         impl<'de> Visitor<'de> for MyTupleVisitor {
-            type Value = RawGlobalFilterSSectionEntry;
+            type Value = RawGlobalFilterEntry;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 formatter.write_str("a global filter section entry")
@@ -106,18 +113,12 @@ impl<'de> Deserialize<'de> for RawGlobalFilterSSectionEntry {
                 // comment might not be present
                 let comment = seq.next_element().ok().flatten();
 
-                Ok(RawGlobalFilterSSectionEntry { tp, vl, comment })
+                Ok(RawGlobalFilterEntry { tp, vl, comment })
             }
         }
 
         deserializer.deserialize_seq(MyTupleVisitor)
     }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct RawGlobalFilterSSection {
-    pub relation: Relation,
-    pub entries: Vec<RawGlobalFilterSSectionEntry>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

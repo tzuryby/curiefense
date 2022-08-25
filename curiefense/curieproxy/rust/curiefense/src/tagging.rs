@@ -1,5 +1,5 @@
 use crate::config::globalfilter::{
-    GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterSSection, GlobalFilterSection, PairEntry, SingleEntry,
+    GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterRule, GlobalFilterSection, PairEntry, SingleEntry,
 };
 use crate::config::raw::Relation;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
@@ -14,24 +14,41 @@ struct MatchResult {
     matching: bool,
 }
 
-fn check_relation<A, F>(rinfo: &RequestInfo, tags: &Tags, rel: Relation, elems: &[A], checker: F) -> MatchResult
-where
-    F: Fn(&RequestInfo, &Tags, &A) -> MatchResult,
-{
-    let mut matched = HashSet::new();
-    let mut matching = match rel {
-        Relation::And => true,
-        Relation::Or => false,
-    };
-    for sub in elems {
-        let mtch = checker(rinfo, tags, sub);
-        matched.extend(mtch.matched);
-        matching = match rel {
-            Relation::And => matching && mtch.matching,
-            Relation::Or => matching || mtch.matching,
-        };
+fn check_rule(rinfo: &RequestInfo, tags: &Tags, rel: &GlobalFilterRule) -> MatchResult {
+    match rel {
+        GlobalFilterRule::Rel(rl) => match rl.relation {
+            Relation::And => {
+                let mut matched = HashSet::new();
+                for sub in &rl.entries {
+                    let res = check_rule(rinfo, tags, sub);
+                    if !res.matching {
+                        return MatchResult {
+                            matched: HashSet::new(),
+                            matching: false,
+                        };
+                    }
+                    matched.extend(res.matched);
+                }
+                MatchResult {
+                    matched,
+                    matching: true,
+                }
+            }
+            Relation::Or => {
+                for sub in &rl.entries {
+                    let res = check_rule(rinfo, tags, sub);
+                    if res.matching {
+                        return res;
+                    }
+                }
+                MatchResult {
+                    matched: HashSet::new(),
+                    matching: false,
+                }
+            }
+        },
+        GlobalFilterRule::Entry(e) => check_entry(rinfo, tags, e),
     }
-    MatchResult { matched, matching }
 }
 
 fn check_pair<F>(pr: &PairEntry, s: &RequestField, locf: F) -> Option<HashSet<Location>>
@@ -67,6 +84,8 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         bool(loc, mb.unwrap_or(false))
     }
     let r = match &sub.entry {
+        GlobalFilterEntryE::Always(false) => None,
+        GlobalFilterEntryE::Always(true) => Some(std::iter::once(Location::Request).collect()),
         GlobalFilterEntryE::Ip(addr) => mbool(Location::Ip, rinfo.rinfo.geoip.ip.map(|i| &i == addr)),
         GlobalFilterEntryE::Network(net) => mbool(Location::Ip, rinfo.rinfo.geoip.ip.map(|i| net.contains(&i))),
         GlobalFilterEntryE::Range4(net4) => bool(
@@ -136,10 +155,6 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
     }
 }
 
-fn check_subsection(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterSSection) -> MatchResult {
-    check_relation(rinfo, tags, sub.relation, &sub.entries, check_entry)
-}
-
 pub fn tag_request(
     stats: StatsCollect<BStageSecpol>,
     is_human: bool,
@@ -203,7 +218,7 @@ pub fn tag_request(
     }
     let mut matched = 0;
     for psection in globalfilters {
-        let mtch = check_relation(rinfo, &tags, psection.relation, &psection.sections, check_subsection);
+        let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
             matched += 1;
             let rtags = psection.tags.clone().with_locs(&mtch.matched);
@@ -235,6 +250,7 @@ pub fn tag_request(
 mod tests {
     use super::*;
     use crate::config::globalfilter::optimize_ipranges;
+    use crate::config::globalfilter::GlobalFilterRelation;
     use crate::logs::Logs;
     use crate::utils::map_request;
     use crate::utils::RawRequest;
@@ -351,7 +367,7 @@ mod tests {
         assert!(r.matching);
     }
 
-    fn mk_globalfilterentries(lst: &[&str]) -> Vec<GlobalFilterEntry> {
+    fn mk_globalfilterentries(lst: &[&str]) -> Vec<GlobalFilterRule> {
         lst.iter()
             .map(|e| match e.strip_prefix('!') {
                 None => GlobalFilterEntry {
@@ -363,27 +379,49 @@ mod tests {
                     entry: GlobalFilterEntryE::Network(sub.parse().unwrap()),
                 },
             })
+            .map(GlobalFilterRule::Entry)
             .collect()
     }
 
-    fn optimize(ss: &GlobalFilterSSection) -> GlobalFilterSSection {
-        GlobalFilterSSection {
+    fn optimize(ss: &GlobalFilterRule) -> GlobalFilterRule {
+        match ss {
+            GlobalFilterRule::Rel(rl) => {
+                let mut entries = optimize_ipranges(rl.relation, rl.entries.clone());
+                if entries.is_empty() {
+                    GlobalFilterRule::Entry(GlobalFilterEntry {
+                        negated: false,
+                        entry: GlobalFilterEntryE::Always(rl.relation == Relation::And),
+                    })
+                } else if entries.len() == 1 {
+                    entries.pop().unwrap()
+                } else {
+                    GlobalFilterRule::Rel(GlobalFilterRelation {
+                        relation: rl.relation,
+                        entries,
+                    })
+                }
+            }
+            GlobalFilterRule::Entry(e) => GlobalFilterRule::Entry(e.clone()),
+        }
+        /*
+        GlobalFilterSection {
             relation: ss.relation,
             entries: optimize_ipranges(ss.relation, ss.entries.clone()),
         }
+        */
     }
 
     fn check_iprange(rel: Relation, input: &[&str], samples: &[(&str, bool)]) {
         let entries = mk_globalfilterentries(input);
-        let ssection = GlobalFilterSSection { entries, relation: rel };
+        let ssection = GlobalFilterRule::Rel(GlobalFilterRelation { entries, relation: rel });
         let optimized = optimize(&ssection);
         let tags = Tags::default();
 
         let mut ri = mk_rinfo();
         for (ip, expected) in samples {
             ri.rinfo.geoip.ip = Some(ip.parse().unwrap());
-            assert_eq!(check_subsection(&ri, &tags, &ssection).matching, *expected);
-            assert_eq!(check_subsection(&ri, &tags, &optimized).matching, *expected);
+            assert_eq!(check_rule(&ri, &tags, &ssection).matching, *expected);
+            assert_eq!(check_rule(&ri, &tags, &optimized).matching, *expected);
         }
     }
 
@@ -446,5 +484,19 @@ mod tests {
             ("192.170.2.45", false),
         ];
         check_iprange(Relation::Or, &entries, &samples);
+    }
+
+    #[test]
+    fn optimization_works() {
+        let entries = mk_globalfilterentries(&["127.0.0.1/8", "192.168.0.1/24"]);
+        let ssection = GlobalFilterRule::Rel(GlobalFilterRelation {
+            entries,
+            relation: Relation::Or,
+        });
+        let optimized = optimize(&ssection);
+        match optimized {
+            GlobalFilterRule::Rel(r) => panic!("expected a single entry, but got {:?}", r),
+            GlobalFilterRule::Entry(_) => (),
+        }
     }
 }

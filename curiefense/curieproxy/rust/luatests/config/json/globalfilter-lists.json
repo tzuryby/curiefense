@@ -9,7 +9,7 @@
     "name": "header skip=true",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -40,7 +40,7 @@
     "name": "header foo=bar",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -71,7 +71,7 @@
     "name": "args deny",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -118,7 +118,7 @@
     "name": "args allow",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -157,7 +157,7 @@
     "name": "args allowbot",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -196,7 +196,7 @@
     "name": "args denybot",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -235,7 +235,7 @@
     "name": "args forcedeny",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -274,7 +274,7 @@
     "name": "args passthrough",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -312,7 +312,7 @@
     "name": "Sante test",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -389,7 +389,7 @@
     "name": "action challenge",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -420,7 +420,7 @@
     "name": "action response",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -451,7 +451,7 @@
     "name": "action default",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -482,7 +482,7 @@
     "name": "action redirect",
     "rule": {
       "relation": "AND",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -512,7 +512,7 @@
     "name": "foo",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -539,7 +539,7 @@
     "name": "tgb",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -566,7 +566,7 @@
     "name": "region match",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -593,7 +593,7 @@
     "name": "subregion match",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -620,7 +620,7 @@
     "name": "incl000000001",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -650,7 +650,7 @@
     "name": "add headers",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
@@ -677,7 +677,7 @@
     "name": "content type",
     "rule": {
       "relation": "OR",
-      "sections": [
+      "entries": [
         {
           "entries": [
             [
