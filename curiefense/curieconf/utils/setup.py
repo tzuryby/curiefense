@@ -17,7 +17,6 @@ setup(
         "pydash==5.0.2",
         "MarkupSafe==2.0.1",
         "flask==2.1.2",
-        "markupsafe==2.0.1",
         "flask-restx",
         "werkzeug==2.1.2",
     ],
