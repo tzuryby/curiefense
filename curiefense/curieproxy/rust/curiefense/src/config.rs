@@ -102,6 +102,7 @@ fn from_map<V: Clone>(mp: &HashMap<String, V>, k: &str) -> Result<V, String> {
 impl Config {
     fn resolve_security_policies(
         logs: &mut Logs,
+        hostmapid: String,
         rawmaps: Vec<RawSecurityPolicy>,
         limits: &HashMap<String, Limit>,
         acls: &HashMap<String, AclProfile>,
@@ -135,6 +136,7 @@ impl Config {
             }
             let mapname = rawmap.name.clone();
             let securitypolicy = SecurityPolicy {
+                hostmapid: hostmapid.clone(),
                 acl_active: rawmap.acl_active,
                 acl_profile,
                 content_filter_active: rawmap.content_filter_active,
@@ -185,32 +187,26 @@ impl Config {
 
         // build the entries while looking for the default entry
         for rawmap in rawmaps {
-            let (entries, default_entry) =
-                Config::resolve_security_policies(&mut logs, rawmap.map, &limits, &acls, &content_filter_profiles);
+            let (entries, default_entry) = Config::resolve_security_policies(
+                &mut logs,
+                rawmap.id,
+                rawmap.map,
+                &limits,
+                &acls,
+                &content_filter_profiles,
+            );
             if default_entry.is_none() {
-                logs.warning(
-                    format!(
-                        "HostMap entry '{}', id '{}' does not have a default entry",
-                        &rawmap.name, &rawmap.id
-                    )
-                    .as_str(),
-                );
+                logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
             }
             let mapname = rawmap.name.clone();
             let hostmap = HostMap {
-                id: rawmap.id,
                 name: rawmap.name,
                 entries,
                 default: default_entry,
             };
             if rawmap.match_ == "__default__" {
                 if default.is_some() {
-                    logs.error(|| {
-                        format!(
-                            "HostMap entry '{}', id '{}' has several default entries",
-                            hostmap.name, hostmap.id
-                        )
-                    });
+                    logs.error(|| format!("HostMap entry '{}' has several default entries", hostmap.name));
                 }
                 default = Some(hostmap);
             } else {

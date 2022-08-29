@@ -105,6 +105,8 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
     };
     let reqinfo = map_request(
         &mut logs,
+        "unk",
+        "unk",
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
@@ -215,6 +217,8 @@ pub async fn finalize<GH: Grasshopper>(
     };
     let reqinfo = map_request(
         &mut logs,
+        &secpolicy.hostmapid,
+        &secpolicy.name,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
@@ -268,7 +272,6 @@ mod test {
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             default: Some(HostMap {
-                id: "__default__".to_string(),
                 name: "default".to_string(),
                 entries: Vec::new(),
                 default: Some(Arc::new(SecurityPolicy {
@@ -278,6 +281,7 @@ mod test {
                     content_filter_active: true,
                     content_filter_profile: cf,
                     limits: Vec::new(),
+                    hostmapid: "__default__".to_string(),
                 })),
             }),
             last_mod: SystemTime::now(),

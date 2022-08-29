@@ -142,6 +142,20 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
             .and_then(|ccmp| check_single(cmp, ccmp.as_str(), Location::Ip)),
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
+        GlobalFilterEntryE::SecurityPolicy(id) => {
+            if &rinfo.rinfo.secpolid == id {
+                Some(std::iter::once(Location::Request).collect())
+            } else {
+                None
+            }
+        }
+        GlobalFilterEntryE::SecurityMap(id) => {
+            if &rinfo.rinfo.secpolmapid == id {
+                Some(std::iter::once(Location::Request).collect())
+            } else {
+                None
+            }
+        }
     };
     match r {
         Some(matched) => MatchResult {
@@ -288,6 +302,8 @@ mod tests {
         let mut logs = Logs::default();
         map_request(
             &mut logs,
+            "a",
+            "b",
             &[],
             &[],
             false,

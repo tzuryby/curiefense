@@ -489,7 +489,7 @@ mod test {
             headers,
             meta,
         };
-        map_request(&mut logs, &[], &[], false, 500, false, &raw_request)
+        map_request(&mut logs, "a", "b", &[], &[], false, 500, false, &raw_request)
     }
 
     #[test]
@@ -681,6 +681,8 @@ mod test {
         };
         let rinfo = map_request(
             &mut logs,
+            "a",
+            "b",
             &[crate::config::contentfilter::Transformation::Base64Decode],
             &[crate::config::raw::ContentType::Json],
             true,

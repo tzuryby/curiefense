@@ -9,7 +9,7 @@ use crate::logs::Logs;
 ///
 /// note that the url is matched using the url-decoded path!
 ///
-/// returns the matching security policy, along with the id of the selected host map
+/// returns the matching security policy, along with the name and id of the selected host map
 pub fn match_securitypolicy<'a>(
     host: &str,
     path: &str,

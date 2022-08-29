@@ -136,6 +136,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     // if the max depth is equal to 0, the body will not be parsed
                     let reqinfo = map_request(
                         slogs,
+                        &secpolicy.hostmapid,
+                        &secpolicy.name,
                         &secpolicy.content_filter_profile.decoding,
                         &secpolicy.content_filter_profile.content_type,
                         secpolicy.content_filter_profile.referer_as_uri,
@@ -180,7 +182,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], false, 0, true, &raw),
+                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
                     stats: Stats::default(),
                 });
             }
@@ -189,7 +191,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, &[], &[], false, 0, true, &raw),
+                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
                     stats: Stats::default(),
                 });
             }

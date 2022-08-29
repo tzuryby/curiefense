@@ -80,6 +80,8 @@ pub enum GlobalFilterEntryType {
     Company,
     Authority,
     Tag,
+    SecurityPolicy,
+    SecurityMap,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements

@@ -292,6 +292,8 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
+    pub secpolid: String,
+    pub secpolmapid: String,
 }
 
 #[derive(Debug, Clone)]
@@ -469,8 +471,11 @@ impl<'a> RawRequest<'a> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn map_request(
     logs: &mut Logs,
+    secpolid: &str,
+    secpolmapid: &str,
     dec: &[Transformation],
     accepted_types: &[ContentType],
     referer_as_uri: bool,
@@ -511,6 +516,8 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
+        secpolid: secpolid.to_string(),
+        secpolmapid: secpolmapid.to_string(),
     };
 
     RequestInfo {
@@ -673,7 +680,7 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(&mut logs, &[], &[], true, 100, false, &raw);
+        let ri = map_request(&mut logs, "a", "b", &[], &[], true, 100, false, &raw);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

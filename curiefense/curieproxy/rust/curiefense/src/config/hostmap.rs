@@ -8,7 +8,6 @@ use crate::config::raw::AclProfile;
 /// the default entry is statically encoded so that it is certain it exists
 #[derive(Debug, Clone)]
 pub struct HostMap {
-    pub id: String,
     pub name: String,
     pub entries: Vec<Matching<Arc<SecurityPolicy>>>,
     pub default: Option<Arc<SecurityPolicy>>,
@@ -17,6 +16,7 @@ pub struct HostMap {
 /// a map entry, with links to the acl and content filter profiles
 #[derive(Debug)]
 pub struct SecurityPolicy {
+    pub hostmapid: String,
     pub name: String,
     pub acl_active: bool,
     pub acl_profile: AclProfile,
