@@ -1,10 +1,12 @@
-{
-  "default": {
+[
+  {
+    "id": "default",
     "name": "default blocking action",
     "type": "default"
   },
-  "monitor": {
+  {
+    "id": "monitor",
     "name": "default monitoring action",
     "type": "monitor"
   }
-}
+]

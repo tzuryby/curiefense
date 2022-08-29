@@ -149,7 +149,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         brs = decision.reasons;
     }
 
-    let limit_checks = limit_info(&securitypolicy.name, &reqinfo, &securitypolicy.limits, &tags);
+    let limit_checks = limit_info(logs, &reqinfo, &securitypolicy.limits, &tags);
     let flow_checks = flow_info(logs, &p0.flows, &reqinfo, &tags);
     let info = AnalysisInfo {
         is_human,

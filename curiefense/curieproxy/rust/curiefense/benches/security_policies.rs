@@ -18,7 +18,6 @@ fn gen_bogus_config(sz: usize) -> Config {
             Matching::from_str(
                 &format!("^dummyhost_{}$", i),
                 HostMap {
-                    id: format!("abcd{}", i),
                     name: format!("Dummy hostmap {}", i),
                     entries: Vec::new(),
                     default: None,
@@ -52,6 +51,7 @@ fn gen_bogus_config(sz: usize) -> Config {
                     content_filter_active: false,
                     content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
                     limits: Vec::new(),
+                    hostmapid: "__default__".to_string(),
                 }),
             )
             .unwrap()
@@ -59,7 +59,6 @@ fn gen_bogus_config(sz: usize) -> Config {
         .collect();
 
     def.default = Some(HostMap {
-        id: "__default__".into(),
         name: "__default__".into(),
         entries: dummy_entries,
         default: Some(Arc::new(SecurityPolicy {
@@ -69,6 +68,7 @@ fn gen_bogus_config(sz: usize) -> Config {
             content_filter_active: false,
             content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
             limits: Vec::new(),
+            hostmapid: "__default__".into(),
         })),
     });
 

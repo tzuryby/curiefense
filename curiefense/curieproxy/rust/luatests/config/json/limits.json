@@ -38,7 +38,7 @@
     "thresholds": [
       {
         "action": "default",
-        "limit": 3
+        "limit": "3"
       }
     ],
     "timeframe": 3
@@ -335,6 +335,50 @@
       }
     ],
     "name": "Same location limit, B",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 1
+      }
+    ],
+    "timeframe": 20
+  },
+  {
+    "description": "Limit per hostname",
+    "exclude": [],
+    "id": "limithostname",
+    "include": [],
+    "key": [
+      {
+        "attrs": "secpolhost"
+      }
+    ],
+    "name": "Limit Hostname",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 1
+      }
+    ],
+    "timeframe": 20
+  },
+  {
+    "description": "Limit per url",
+    "exclude": [],
+    "id": "limiturl",
+    "include": [],
+    "key": [
+      {
+        "attrs": "secpolurl"
+      }
+    ],
+    "name": "Limit url",
     "pairwith": {
       "self": "self"
     },

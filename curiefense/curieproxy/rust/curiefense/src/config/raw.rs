@@ -6,6 +6,57 @@ use std::collections::{HashMap, HashSet};
 use crate::interface::SimpleAction;
 use crate::logs::Logs;
 
+/// a datatype used to represent u64 that are sometimes represented as strings
+#[derive(Debug, Clone, Copy)]
+pub struct Repru64 {
+    pub inner: u64,
+}
+
+impl<'de> Deserialize<'de> for Repru64 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ParseVisitor;
+
+        impl<'de> Visitor<'de> for ParseVisitor {
+            type Value = u64;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "expecting an unsigned integer")
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                s.parse()
+                    .map_err(|_| de::Error::invalid_value(serde::de::Unexpected::Str(s), &self))
+            }
+
+            fn visit_u64<E>(self, i: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(i)
+            }
+        }
+
+        deserializer
+            .deserialize_any(ParseVisitor)
+            .map(|inner| Repru64 { inner })
+    }
+}
+
+impl Serialize for Repru64 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.inner.serialize(serializer)
+    }
+}
+
 /// a mapping of the configuration file for security policy entries
 /// it is called "securitypolicy" in the lua code
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -80,8 +131,8 @@ pub enum GlobalFilterEntryType {
     Company,
     Authority,
     Tag,
-    SecurityPolicy,
-    SecurityMap,
+    SecpolIdHost,
+    SecpolIdUrl,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements
@@ -127,7 +178,7 @@ impl<'de> Deserialize<'de> for RawGlobalFilterEntry {
 pub struct RawLimit {
     pub id: String,
     pub name: String,
-    pub timeframe: u64,
+    pub timeframe: Repru64,
     #[serde(default)]
     pub key: Vec<HashMap<String, String>>,
     #[serde(default)]
@@ -141,7 +192,7 @@ pub struct RawLimit {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawLimitThreshold {
-    pub limit: u64,
+    pub limit: Repru64,
     pub action: String,
 }
 

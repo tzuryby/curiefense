@@ -66,7 +66,7 @@ impl Limit {
             });
 
             thresholds.push(LimitThreshold {
-                limit: thr.limit,
+                limit: thr.limit.inner,
                 action,
             })
         }
@@ -76,7 +76,7 @@ impl Limit {
             Limit {
                 id,
                 name: rawlimit.name,
-                timeframe: rawlimit.timeframe,
+                timeframe: rawlimit.timeframe.inner,
                 include: rawlimit.include.into_iter().collect(),
                 exclude: rawlimit.exclude.into_iter().collect(),
                 thresholds,

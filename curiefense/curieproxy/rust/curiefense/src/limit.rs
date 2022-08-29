@@ -8,8 +8,8 @@ use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision,
 use crate::redis::redis_async_conn;
 use crate::utils::{select_string, RequestInfo};
 
-fn build_key(security_policy_name: &str, reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
-    let mut key = security_policy_name.to_string() + &limit.id;
+fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
+    let mut key = limit.id.clone();
     for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, tags)) {
         key += &kpart?;
     }
@@ -97,13 +97,18 @@ impl LimitCheck {
 }
 
 /// generate information that needs to be checked in redis for limit checks
-pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[Limit], tags: &Tags) -> Vec<LimitCheck> {
+pub fn limit_info(
+    logs: &mut Logs,
+    reqinfo: &RequestInfo,
+    limits: &[Limit],
+    tags: &Tags,
+) -> Vec<LimitCheck> {
     let mut out = Vec::new();
     for limit in limits {
         if !limit_match(tags, limit) {
             continue;
         }
-        let key = match build_key(security_policy_name, reqinfo, tags, limit) {
+        let key = match build_key(reqinfo, tags, limit) {
             // if we can't build the key, it usually means that a header is missing.
             // If that is the case, we continue to the next limit.
             None => continue,
@@ -116,6 +121,7 @@ pub fn limit_info(security_policy_name: &str, reqinfo: &RequestInfo, limits: &[L
                 Some(x) => Some(x),
             },
         };
+        logs.debug(|| format!("checking limit[{}/{:?}] {:?}", key, pairwith, limit));
         out.push(LimitCheck {
             key,
             pairwith,
@@ -193,12 +199,11 @@ pub fn limit_process(
 pub async fn limit_check(
     logs: &mut Logs,
     stats: StatsCollect<BStageFlow>,
-    security_policy_name: &str,
     reqinfo: &RequestInfo,
     limits: &[Limit],
     tags: &mut Tags,
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
-    let checks = limit_info(security_policy_name, reqinfo, limits, tags);
+    let checks = limit_info(logs, reqinfo, limits, tags);
     let qresults = limit_query(logs, checks).await;
     limit_process(stats, limits.len(), &qresults, tags)
 }
