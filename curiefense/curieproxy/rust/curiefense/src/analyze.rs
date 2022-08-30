@@ -16,7 +16,7 @@ use crate::interface::{
 use crate::limit::{limit_build_query, limit_info, limit_process, limit_resolve_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::redis::redis_async_conn;
-use crate::utils::{BodyDecodingResult, RequestInfo, eat_errors};
+use crate::utils::{eat_errors, BodyDecodingResult, RequestInfo};
 
 pub enum CfRulesArg<'t> {
     Global,

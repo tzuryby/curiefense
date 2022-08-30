@@ -5,7 +5,7 @@ use redis::aio::ConnectionManager;
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
-use crate::utils::{select_string, RequestInfo, eat_errors};
+use crate::utils::{eat_errors, select_string, RequestInfo};
 
 fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
     let mut key = limit.id.clone();
