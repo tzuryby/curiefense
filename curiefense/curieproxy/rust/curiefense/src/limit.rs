@@ -5,7 +5,7 @@ use redis::aio::ConnectionManager;
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
-use crate::utils::{eat_errors, select_string, RequestInfo};
+use crate::utils::{select_string, RequestInfo};
 
 fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
     let mut key = limit.id.clone();
@@ -165,23 +165,4 @@ pub fn limit_process(
     }
 
     (out, stats.limit(nlimits, results.len()))
-}
-
-pub async fn limit_check(
-    logs: &mut Logs,
-    redis: &mut ConnectionManager,
-    stats: StatsCollect<BStageFlow>,
-    reqinfo: &RequestInfo,
-    limits: &[Limit],
-    tags: &mut Tags,
-) -> (SimpleDecision, StatsCollect<BStageLimit>) {
-    let checks = limit_info(logs, reqinfo, limits, tags);
-
-    let mut pipe = redis::pipe();
-    limit_build_query(&mut pipe, &checks);
-    let v: Vec<Option<i64>> = eat_errors(logs, pipe.query_async(redis).await);
-    let mut viter = v.into_iter();
-    let qresults = eat_errors(logs, limit_resolve_query(redis, &mut viter, checks).await);
-
-    limit_process(stats, limits.len(), &qresults, tags)
 }
