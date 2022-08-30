@@ -409,14 +409,10 @@ content_filter_rule_file_path = (
 ).resolve()
 with open(content_filter_rule_file_path) as json_file:
     content_filter_rule_schema = json.load(json_file)
-action_file_path = (
-    base_path / "./json/action.schema"
-).resolve()
+action_file_path = (base_path / "./json/action.schema").resolve()
 with open(action_file_path) as json_file:
     action_schema = json.load(json_file)
-dynamicrule_file_path = (
-    base_path / "./json/dynamic-rule.schema"
-).resolve()
+dynamicrule_file_path = (base_path / "./json/dynamic-rule.schema").resolve()
 with open(dynamicrule_file_path) as json_file:
     dynamic_rule_schema = json.load(json_file)
 
