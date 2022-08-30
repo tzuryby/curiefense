@@ -1,12 +1,11 @@
 use crate::interface::stats::{BStageFlow, BStageLimit, StatsCollect};
 use crate::logs::Logs;
-use redis::RedisResult;
+use redis::aio::ConnectionManager;
 
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
-use crate::redis::redis_async_conn;
-use crate::utils::{select_string, RequestInfo};
+use crate::utils::{select_string, RequestInfo, eat_errors};
 
 fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
     let mut key = limit.id.clone();
@@ -30,46 +29,6 @@ fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) 
             decision,
         )],
     )
-}
-
-async fn redis_get_limit<CNX: redis::aio::ConnectionLike>(
-    cnx: &mut CNX,
-    key: &str,
-    timeframe: u64,
-    pairwith: Option<&str>,
-) -> RedisResult<i64> {
-    let (mcurrent, mexpire): (Option<i64>, Option<i64>) = match &pairwith {
-        None => {
-            redis::pipe()
-                .cmd("INCR")
-                .arg(key)
-                .cmd("TTL")
-                .arg(key)
-                .query_async(cnx)
-                .await?
-        }
-        Some(pv) => {
-            redis::pipe()
-                .cmd("SADD")
-                .arg(key)
-                .arg(pv)
-                .ignore()
-                .cmd("SCARD")
-                .arg(key)
-                .cmd("TTL")
-                .arg(key)
-                .query_async(cnx)
-                .await?
-        }
-    };
-    let current = mcurrent.unwrap_or(0);
-    let expire = mexpire.unwrap_or(-1);
-
-    if expire < 0 {
-        let _: () = redis::cmd("EXPIRE").arg(key).arg(timeframe).query_async(cnx).await?;
-    }
-
-    Ok(current)
 }
 
 fn limit_match(tags: &Tags, elem: &Limit) -> bool {
@@ -97,12 +56,7 @@ impl LimitCheck {
 }
 
 /// generate information that needs to be checked in redis for limit checks
-pub fn limit_info(
-    logs: &mut Logs,
-    reqinfo: &RequestInfo,
-    limits: &[Limit],
-    tags: &Tags,
-) -> Vec<LimitCheck> {
+pub fn limit_info(logs: &mut Logs, reqinfo: &RequestInfo, limits: &[Limit], tags: &Tags) -> Vec<LimitCheck> {
     let mut out = Vec::new();
     for limit in limits {
         if !limit_match(tags, limit) {
@@ -137,40 +91,57 @@ pub struct LimitResult {
     pub curcount: i64,
 }
 
-pub async fn limit_query<'t>(logs: &mut Logs, checks: Vec<LimitCheck>) -> Vec<LimitResult> {
-    // early return to avoid redis connection
-    if checks.is_empty() {
-        logs.debug("no limits to check");
-        return Vec::new();
-    }
-
-    // we connect once for all limit tests
-    let mut redis = match redis_async_conn().await {
-        Ok(c) => c,
-        Err(rr) => {
-            logs.error(|| format!("Could not connect to the redis server {}", rr));
-            return Vec::new();
-        }
-    };
-
-    let mut out = Vec::new();
-
+pub fn limit_build_query(pipe: &mut redis::Pipeline, checks: &[LimitCheck]) {
     for check in checks {
-        let curcount = if check.zero_limits() {
-            Ok(1)
-        } else {
-            redis_get_limit(&mut redis, &check.key, check.limit.timeframe, check.pairwith.as_deref()).await
-        };
-        match curcount {
-            Err(rr) => logs.error(|| rr.to_string()),
-            Ok(curcount) => out.push(LimitResult {
-                limit: check.limit,
-                curcount,
-            }),
+        let key = &check.key;
+        if !check.zero_limits() {
+            match &check.pairwith {
+                None => {
+                    pipe.cmd("INCR").arg(key).cmd("TTL").arg(key);
+                }
+                Some(pv) => {
+                    pipe.cmd("SADD")
+                        .arg(key)
+                        .arg(pv)
+                        .ignore()
+                        .cmd("SCARD")
+                        .arg(key)
+                        .cmd("TTL")
+                        .arg(key);
+                }
+            };
         }
     }
+}
 
-    out
+pub async fn limit_resolve_query<I: Iterator<Item = Option<i64>>>(
+    redis: &mut ConnectionManager,
+    iter: &mut I,
+    checks: Vec<LimitCheck>,
+) -> anyhow::Result<Vec<LimitResult>> {
+    let mut out = Vec::new();
+    for check in checks {
+        let curcount = match iter.next() {
+            None => anyhow::bail!("Empty iterator when getting curcount for {:?}", check.limit),
+            Some(r) => r.unwrap_or(0),
+        };
+        let expire = match iter.next() {
+            None => anyhow::bail!("Empty iterator when getting expire for {:?}", check.limit),
+            Some(r) => r.unwrap_or(-1),
+        };
+        if expire < 0 {
+            let _: () = redis::cmd("EXPIRE")
+                .arg(&check.key)
+                .arg(&check.limit.timeframe)
+                .query_async(redis)
+                .await?;
+        }
+        out.push(LimitResult {
+            limit: check.limit,
+            curcount,
+        })
+    }
+    Ok(out)
 }
 
 /// performs the redis requests and compute the proper reactions based on
@@ -198,12 +169,19 @@ pub fn limit_process(
 
 pub async fn limit_check(
     logs: &mut Logs,
+    redis: &mut ConnectionManager,
     stats: StatsCollect<BStageFlow>,
     reqinfo: &RequestInfo,
     limits: &[Limit],
     tags: &mut Tags,
 ) -> (SimpleDecision, StatsCollect<BStageLimit>) {
     let checks = limit_info(logs, reqinfo, limits, tags);
-    let qresults = limit_query(logs, checks).await;
+
+    let mut pipe = redis::pipe();
+    limit_build_query(&mut pipe, &checks);
+    let v: Vec<Option<i64>> = eat_errors(logs, pipe.query_async(redis).await);
+    let mut viter = v.into_iter();
+    let qresults = eat_errors(logs, limit_resolve_query(redis, &mut viter, checks).await);
+
     limit_process(stats, limits.len(), &qresults, tags)
 }

@@ -7,15 +7,16 @@ use crate::config::flow::FlowMap;
 use crate::config::hostmap::SecurityPolicy;
 use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
-use crate::flow::{flow_info, flow_process, flow_query, FlowCheck, FlowResult};
+use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query, FlowCheck, FlowResult};
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
 use crate::interface::{
     AclStage, Action, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
 };
-use crate::limit::{limit_info, limit_process, limit_query, LimitCheck, LimitResult};
+use crate::limit::{limit_build_query, limit_info, limit_process, limit_resolve_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
-use crate::utils::{BodyDecodingResult, RequestInfo};
+use crate::redis::redis_async_conn;
+use crate::utils::{BodyDecodingResult, RequestInfo, eat_errors};
 
 pub enum CfRulesArg<'t> {
     Global,
@@ -171,17 +172,42 @@ impl APhase2 {
 }
 
 pub async fn analyze_query<'t>(logs: &mut Logs, p1: APhase1) -> APhase2 {
-    let info = p1.info;
-    let flow_results = match flow_query(p1.flows).await {
-        Err(rr) => {
-            logs.error(|| rr.to_string());
-            Vec::new()
-        }
-        Ok(r) => r,
+    let empty = |info| AnalysisPhase {
+        flows: Vec::new(),
+        limits: Vec::new(),
+        info,
     };
+
+    let info = p1.info;
+
+    if p1.flows.is_empty() && p1.limits.is_empty() {
+        return empty(info);
+    }
+
+    let mut redis = match redis_async_conn().await {
+        Ok(c) => c,
+        Err(rr) => {
+            logs.error(|| format!("Could not connect to the redis server {}", rr));
+            return empty(info);
+        }
+    };
+
+    let mut pipe = redis::pipe();
+    flow_build_query(&mut pipe, &p1.flows);
+    limit_build_query(&mut pipe, &p1.limits);
+    let res: Result<Vec<Option<i64>>, _> = pipe.query_async(&mut redis).await;
+    let mut lst = match res {
+        Ok(l) => l.into_iter(),
+        Err(rr) => {
+            logs.error(|| format!("{}", rr));
+            return empty(info);
+        }
+    };
+
+    let flow_results = eat_errors(logs, flow_resolve_query(&mut redis, &mut lst, p1.flows).await);
     logs.debug("flow checks done");
 
-    let limit_results = limit_query(logs, p1.limits).await;
+    let limit_results = eat_errors(logs, limit_resolve_query(&mut redis, &mut lst, p1.limits).await);
     logs.debug("limit checks done");
 
     AnalysisPhase {

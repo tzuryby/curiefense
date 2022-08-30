@@ -1,10 +1,12 @@
+use redis::aio::ConnectionManager;
+
 use crate::interface::stats::{BStageFlow, BStageMapped, StatsCollect};
 use crate::Logs;
 
 use crate::config::flow::{FlowElement, FlowMap, SequenceKey};
 use crate::config::matchers::RequestSelector;
 use crate::interface::{Location, Tags};
-use crate::utils::{check_selector_cond, select_string, RequestInfo};
+use crate::utils::{check_selector_cond, eat_errors, select_string, RequestInfo};
 
 fn session_sequence_key(ri: &RequestInfo) -> SequenceKey {
     SequenceKey(ri.rinfo.meta.method.to_string() + &ri.rinfo.host + &ri.rinfo.qinfo.qpath)
@@ -58,46 +60,6 @@ pub struct FlowCheck {
     pub tags: Vec<String>,
 }
 
-async fn check_flow<CNX: redis::aio::ConnectionLike>(cnx: &mut CNX, check: &FlowCheck) -> anyhow::Result<FlowResult> {
-    // first, read from REDIS how many steps already passed
-    let mlistlen: Option<usize> = redis::cmd("LLEN").arg(&check.redis_key).query_async(cnx).await?;
-    let listlen = mlistlen.unwrap_or(0);
-
-    let tp = if check.is_last {
-        if check.step as usize == listlen {
-            FlowResultType::LastOk
-        } else {
-            FlowResultType::LastBlock
-        }
-    } else {
-        if check.step as usize == listlen {
-            let (_, mexpire): ((), Option<i64>) = redis::pipe()
-                .cmd("LPUSH")
-                .arg(&check.redis_key)
-                .arg("foo")
-                .cmd("TTL")
-                .arg(&check.redis_key)
-                .query_async(cnx)
-                .await?;
-            let expire = mexpire.unwrap_or(-1);
-            if expire < 0 {
-                let _: () = redis::cmd("EXPIRE")
-                    .arg(&check.redis_key)
-                    .arg(check.timeframe)
-                    .query_async(cnx)
-                    .await?;
-            }
-        }
-        // never block if not the last step!
-        FlowResultType::NonLast
-    };
-    Ok(FlowResult {
-        tp,
-        name: check.name.clone(),
-        tags: check.tags.clone(),
-    })
-}
-
 pub fn flow_info(logs: &mut Logs, flows: &FlowMap, reqinfo: &RequestInfo, tags: &Tags) -> Vec<FlowCheck> {
     let sequence_key = session_sequence_key(reqinfo);
     match flows.get(&sequence_key) {
@@ -128,17 +90,58 @@ pub fn flow_info(logs: &mut Logs, flows: &FlowMap, reqinfo: &RequestInfo, tags: 
     }
 }
 
-pub async fn flow_query(checks: Vec<FlowCheck>) -> anyhow::Result<Vec<FlowResult>> {
-    if checks.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut cnx = crate::redis::redis_async_conn().await?;
+pub async fn flow_resolve_query<I: Iterator<Item = Option<i64>>>(
+    redis: &mut ConnectionManager,
+    iter: &mut I,
+    checks: Vec<FlowCheck>,
+) -> anyhow::Result<Vec<FlowResult>> {
     let mut out = Vec::new();
     for check in checks {
-        let r = check_flow(&mut cnx, &check).await?;
-        out.push(r);
+        let listlen = match iter.next() {
+            None => anyhow::bail!("Empty iterator when checking {}", check.name),
+            Some(l) => l.unwrap_or(0) as usize,
+        };
+        let tp = if check.is_last {
+            if check.step as usize == listlen {
+                FlowResultType::LastOk
+            } else {
+                FlowResultType::LastBlock
+            }
+        } else {
+            if check.step as usize == listlen {
+                let (_, mexpire): ((), Option<i64>) = redis::pipe()
+                    .cmd("LPUSH")
+                    .arg(&check.redis_key)
+                    .arg("foo")
+                    .cmd("TTL")
+                    .arg(&check.redis_key)
+                    .query_async(redis)
+                    .await?;
+                let expire = mexpire.unwrap_or(-1);
+                if expire < 0 {
+                    let _: () = redis::cmd("EXPIRE")
+                        .arg(&check.redis_key)
+                        .arg(check.timeframe)
+                        .query_async(redis)
+                        .await?;
+                }
+            }
+            // never block if not the last step!
+            FlowResultType::NonLast
+        };
+        out.push(FlowResult {
+            tp,
+            name: check.name.clone(),
+            tags: check.tags.clone(),
+        });
     }
     Ok(out)
+}
+
+pub fn flow_build_query(pipe: &mut redis::Pipeline, checks: &[FlowCheck]) {
+    for check in checks {
+        pipe.cmd("LLEN").arg(&check.redis_key);
+    }
 }
 
 pub fn flow_process(
@@ -166,15 +169,19 @@ pub fn flow_process(
 
 pub async fn flow_check(
     logs: &mut Logs,
+    redis: &mut ConnectionManager,
     stats: StatsCollect<BStageMapped>,
     flows: &FlowMap,
     reqinfo: &RequestInfo,
     tags: &mut Tags,
 ) -> (anyhow::Result<()>, StatsCollect<BStageFlow>) {
     let checks = flow_info(logs, flows, reqinfo, tags);
-    let results = match flow_query(checks).await {
-        Err(rr) => return (Err(rr), stats.no_flow()),
-        Ok(r) => r,
-    };
+
+    let mut pipe = redis::pipe();
+    flow_build_query(&mut pipe, &checks);
+    let v: Vec<Option<i64>> = eat_errors(logs, pipe.query_async(redis).await);
+    let mut viter = v.into_iter();
+    let results = eat_errors(logs, flow_resolve_query(redis, &mut viter, checks).await);
+
     (Ok(()), flow_process(stats, 0, &results, tags))
 }

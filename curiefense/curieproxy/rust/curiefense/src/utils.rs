@@ -594,6 +594,16 @@ pub fn masker(seed: &[u8], value: &str) -> String {
     format!("MASKED{{{}}}", &hash_str[0..8])
 }
 
+pub fn eat_errors<T: Default, R: std::fmt::Display>(logs: &mut Logs, rv: Result<T, R>) -> T {
+    match rv {
+        Err(rr) => {
+            logs.error(|| rr.to_string());
+            Default::default()
+        }
+        Ok(o) => o,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

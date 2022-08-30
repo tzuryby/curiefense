@@ -84,7 +84,7 @@ local function compare_tag_list(name, actual, expected)
   return good
 end
 
-local function run_inspect_request(raw_request_map)
+local function run_inspect_request_gen(raw_request_map, mode)
     local meta = {}
     local headers = {}
     for k, v in pairs(raw_request_map.headers) do
@@ -112,73 +112,81 @@ local function run_inspect_request(raw_request_map)
     if human ~= nil then
       res = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
     else
-      local r1 = curiefense.inspect_request_init(meta, headers, raw_request_map.body, ip)
-      if r1.error then
-        error(r1.error)
-      end
-      if r1.decided then
-        return r1
-      end
-      local flows = r1.flows
-      local conn = redis.connect(redishost, redisport)
+      if mode ~= "lua_async" then
+        res = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
+      else
+        local r1 = curiefense.inspect_request_init(meta, headers, raw_request_map.body, ip)
+        if r1.error then
+          error(r1.error)
+        end
+        if r1.decided then
+          return r1
+        end
+        local flows = r1.flows
+        local conn = redis.connect(redishost, redisport)
 
-      -- very naive and simple implementation of flow / limit checks
-      local rflows = {}
-      for _, flow in pairs(flows) do
-        local key = flow.key
-        local len = conn:llen(key)
-        local step = flow.step
-        local flowtype = "nonlast"
-        if flow.is_last then
-          if step == len then
-            flowtype = "lastok"
+        -- very naive and simple implementation of flow / limit checks
+        local rflows = {}
+        for _, flow in pairs(flows) do
+          local key = flow.key
+          local len = conn:llen(key)
+          local step = flow.step
+          local flowtype = "nonlast"
+          if flow.is_last then
+            if step == len then
+              flowtype = "lastok"
+            else
+              flowtype = "lastblock"
+            end
           else
-            flowtype = "lastblock"
-          end
-        else
-          if step == len then
-            conn:lpush(key, "foo")
-            local ttl = conn:ttl(key)
-            if ttl == nil or ttl < 0 then
-              conn:expire(key, flow.timeframe)
+            if step == len then
+              conn:lpush(key, "foo")
+              local ttl = conn:ttl(key)
+              if ttl == nil or ttl < 0 then
+                conn:expire(key, flow.timeframe)
+              end
             end
           end
+          table.insert(rflows, flow:result(flowtype))
         end
-        table.insert(rflows, flow:result(flowtype))
-      end
 
-      local limits = r1.limits
-      local rlimits = {}
-      for _, limit in pairs(limits) do
-        local key = limit.key
-        local curcount = 1
-        if not limit.zero_limits then
-          local pw = limit.pairwith
-          local expire
-          if pw then
-            conn:sadd(key, pw)
-            curcount = conn:scard(key)
-            expire = conn:ttl(key)
-          else
-            curcount = conn:incr(key)
-            expire = conn:ttl(key)
+        local limits = r1.limits
+        local rlimits = {}
+        for _, limit in pairs(limits) do
+          local key = limit.key
+          local curcount = 1
+          if not limit.zero_limits then
+            local pw = limit.pairwith
+            local expire
+            if pw then
+              conn:sadd(key, pw)
+              curcount = conn:scard(key)
+              expire = conn:ttl(key)
+            else
+              curcount = conn:incr(key)
+              expire = conn:ttl(key)
+            end
+            if curcount == nil then
+              curcount = 0
+            end
+            if expire == nil or expire < 0 then
+              conn:expire(key, limit.timeframe)
+            end
           end
-          if curcount == nil then
-            curcount = 0
-          end
-          if expire == nil or expire < 0 then
-            conn:expire(key, limit.timeframe)
-          end
+          table.insert(rlimits, limit:result(curcount))
         end
-        table.insert(rlimits, limit:result(curcount))
-      end
 
-      res = curiefense.inspect_request_process(r1, rflows, rlimits)
+        res = curiefense.inspect_request_process(r1, rflows, rlimits)
+      end
     end
     if res.error then
       error(res.error)
     end
     return res
+end
+
+local function run_inspect_request(raw_request_map)
+  return run_inspect_request_gen(raw_request_map, "lua_async")
 end
 
 local function show_logs(logs)
