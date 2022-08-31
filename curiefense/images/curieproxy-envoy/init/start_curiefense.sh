@@ -16,6 +16,7 @@ TADDRB="${TARGET_ADDRESS_B:-juicebox}"
 TPORTB="${TARGET_PORT_B:-3000}"
 XFF="${XFF_TRUSTED_HOPS:-1}"
 ENVOY_LOG_LEVEL="${ENVOY_LOG_LEVEL:-error}"
+FILEBEAT="${FILEBEAT:-yes}"
 
 sed -e "s/XFF_TRUSTED/$XFF/" /etc/envoy/envoy.yaml.head > /etc/envoy/envoy.yaml
 if [ -f /run/secrets/curieproxysslcrt ]; then
@@ -25,8 +26,15 @@ sed -e "s/TARGET_ADDRESS_A/$TADDRA/" -e "s/TARGET_PORT_A/$TPORTA/" -e "s/TARGET_
 
 while true
 do
-	# shellcheck disable=SC2086
-    /usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS #--concurrency 1 NO concurrency PICKS THE NUM OF CORES
+	if [ "$FILEBEAT" = "yes" ]
+	then
+		# shellcheck disable=SC2086
+		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS \
+			| grep --line-buffered -v '^-$' \
+			| /usr/bin/filebeat --path.config /etc
+	else
+		# shellcheck disable=SC2086
+		/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --service-cluster proxy --log-level "$ENVOY_LOG_LEVEL" $ENVOY_ARGS
+	fi
 	sleep 1
 done
-

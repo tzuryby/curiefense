@@ -1,9 +1,10 @@
 [
   {
     "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
       "x-forwarded-for": "23.129.64.253",
       ":method": "GET",
-      ":path": "/limits/ban-test",
+      ":path": "/limits/simple",
       ":authority": "localhost:30081"
     },
     "delay": 0,
@@ -11,9 +12,10 @@
   },
   {
     "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
       "x-forwarded-for": "23.129.64.253",
       ":method": "GET",
-      ":path": "/limits/ban-test",
+      ":path": "/limits/simple",
       ":authority": "localhost:30081"
     },
     "delay": 0,
@@ -21,9 +23,10 @@
   },
   {
     "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
       "x-forwarded-for": "23.129.64.253",
       ":method": "GET",
-      ":path": "/limits/ban-test",
+      ":path": "/limits/simple",
       ":authority": "localhost:30081"
     },
     "delay": 0,
@@ -31,30 +34,23 @@
   },
   {
     "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
       "x-forwarded-for": "23.129.64.253",
       ":method": "GET",
-      ":path": "/limits/ban-test",
+      ":path": "/limits/simple",
       ":authority": "localhost:30081"
     },
-    "delay": 3,
+    "delay": 0,
     "pass": false
   },
   {
     "headers": {
+      "x-request-id": "e6acdce3-e076-4f0d-9a22-9d82fe01ba60",
       "x-forwarded-for": "23.129.64.253",
       ":method": "GET",
-      ":path": "/limits/ban-test",
-      ":authority": "localhost:30081"
-    },
-    "delay": 2,
-    "pass": false
-  },
-  {
-    "headers": {
-      "x-forwarded-for": "23.129.64.253",
-      ":method": "GET",
-      ":path": "/limits/ban-test",
-      ":authority": "localhost:30081"
+      ":path": "/limits/simple",
+      ":authority": "localhost:30081",
+      "skip": "true"
     },
     "delay": 0,
     "pass": true

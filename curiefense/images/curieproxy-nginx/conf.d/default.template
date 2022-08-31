@@ -12,8 +12,7 @@ upstream backend_b {
 
 server {
     set $request_map '{}';
-    access_log logs/access.log curiefenselog;
-    access_log syslog:server=unix:/dev/log curiefenselog;
+    access_log /dev/stdout curiefenselog;
     error_log  logs/error.log  debug;
 
     listen 31081 default_server;

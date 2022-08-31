@@ -179,9 +179,7 @@ class LogHelper:
         self._es_url = es_url + "/_search"
 
     def check_log_pattern(self, pattern):
-        data = {
-            "query": {"bool": {"must": {"match": {"request.attributes.uri": pattern}}}}
-        }
+        data = {"query": {"bool": {"must": {"match": {"uri": pattern}}}}}
         res = requests.get(self._es_url, json=data)
         nbhits = res.json()["hits"]["total"]["value"]
         if nbhits == 1:
@@ -1480,11 +1478,11 @@ class TestSecurityPolicy:
             "/acl/", headers={"Long-header": "Overlong_header" * 100}
         )
 
-    def test_nondefault_aclfilter_passthroughall(self, target, securitypolicy_config):
-        assert target.is_reachable("/acl-passthroughall/")
-        assert target.is_reachable(
-            "/acl-passthroughall/", headers={"Long-header": "Overlong_header" * 100}
-        )
+    # def test_nondefault_aclfilter_passthroughall(self, target, securitypolicy_config):
+    #     assert target.is_reachable("/acl-passthroughall/")
+    #     assert target.is_reachable(
+    #         "/acl-passthroughall/", headers={"Long-header": "Overlong_header" * 100}
+    #     )
 
     def test_acl_content_filter(self, target, securitypolicy_config):
         assert not target.is_reachable("/acl-content-filter/")

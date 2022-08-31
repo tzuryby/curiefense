@@ -15,15 +15,14 @@ static_resources:
           use_remote_address: true
           skip_xff_append: false
           access_log:
-            name: "envoy.access_loggers.tcp_grpc"
+            name: envoy.file_access_log
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
-              common_config:
-                log_name: "test_GRPC_log"
-                transport_api_version: "v3"
-                grpc_service:
-                  envoy_grpc:
-                    cluster_name: grpc_log_cluster
+              "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
+              path: /dev/stdout
+              log_format:
+                text_format_source:
+                  inline_string: "%DYNAMIC_METADATA(com.reblaze.curiefense:request.info)%\n"
+                content_type: "application/json"
           route_config:
             name: local_route
             virtual_hosts:
@@ -46,6 +45,9 @@ static_resources:
                 local session = require "lua.session_envoy"
                 function envoy_on_request(handle)
                   session.inspect(handle)
+                end
+                function envoy_on_response(handle)
+                  session.on_response(handle)
                 end
           - name: envoy.filters.http.router
             typed_config: {}
@@ -96,6 +98,9 @@ static_resources:
                 local session = require "lua.session_envoy"
                 function envoy_on_request(handle)
                   session.inspect(handle)
+                end
+                function envoy_on_response(handle)
+                  session.on_response(handle)
                 end
           - name: envoy.filters.http.router
             typed_config: {}

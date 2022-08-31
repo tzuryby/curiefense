@@ -1,13 +1,15 @@
 use curiefense::config::contentfilter::ContentFilterProfile;
 use curiefense::config::hostmap::*;
+use curiefense::config::matchers::Matching;
 use curiefense::config::raw::AclProfile;
-use curiefense::config::utils::Matching;
 use curiefense::config::Config;
+use curiefense::interface::SimpleAction;
 use curiefense::logs::Logs;
 use curiefense::securitypolicy::match_securitypolicy;
 
 use criterion::*;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 fn gen_bogus_config(sz: usize) -> Config {
     let mut def = Config::empty();
@@ -16,7 +18,6 @@ fn gen_bogus_config(sz: usize) -> Config {
             Matching::from_str(
                 &format!("^dummyhost_{}$", i),
                 HostMap {
-                    id: format!("abcd{}", i),
                     name: format!("Dummy hostmap {}", i),
                     entries: Vec::new(),
                     default: None,
@@ -35,37 +36,40 @@ fn gen_bogus_config(sz: usize) -> Config {
         deny_bot: HashSet::new(),
         passthrough: HashSet::new(),
         force_deny: HashSet::new(),
+        action: SimpleAction::default(),
+        tags: HashSet::new(),
     };
 
-    let dummy_entries: Vec<Matching<SecurityPolicy>> = (0..sz)
+    let dummy_entries: Vec<Matching<Arc<SecurityPolicy>>> = (0..sz)
         .map(|i| {
             Matching::from_str(
                 &format!("/dummy/url/{}", i),
-                SecurityPolicy {
+                Arc::new(SecurityPolicy {
                     name: format!("Dummy securitypolicy {}", i),
                     acl_active: false,
                     acl_profile: acl_profile.clone(),
                     content_filter_active: false,
                     content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
                     limits: Vec::new(),
-                },
+                    hostmapid: "__default__".to_string(),
+                }),
             )
             .unwrap()
         })
         .collect();
 
     def.default = Some(HostMap {
-        id: "__default__".into(),
         name: "__default__".into(),
         entries: dummy_entries,
-        default: Some(SecurityPolicy {
+        default: Some(Arc::new(SecurityPolicy {
             name: "selected".into(),
             acl_active: false,
             acl_profile,
             content_filter_active: false,
             content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
             limits: Vec::new(),
-        }),
+            hostmapid: "__default__".into(),
+        })),
     });
 
     def

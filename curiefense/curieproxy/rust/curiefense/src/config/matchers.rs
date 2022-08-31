@@ -16,20 +16,8 @@ pub enum RequestSelector {
     Company,
     Authority,
     Tags,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-pub enum XDataSource {
-    CookieHeader,
-    Uri,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DataSource {
-    Root,
-    DecodedFrom(String),
-    FromBody,
-    X(XDataSource),
+    SecpolIdHost,
+    SecpolIdUrl,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +47,8 @@ pub fn decode_attribute(s: &str) -> Option<RequestSelector> {
         "company" => Some(RequestSelector::Company),
         "authority" => Some(RequestSelector::Authority),
         "tags" => Some(RequestSelector::Tags),
+        "secpolidurl" | "secpolurl" => Some(RequestSelector::SecpolIdUrl),
+        "secpolidhost" | "secpolhost" => Some(RequestSelector::SecpolIdHost),
         _ => None,
     }
 }
@@ -68,7 +58,9 @@ fn resolve_selector_type(k: &str) -> anyhow::Result<SelectorType> {
         "headers" => Ok(SelectorType::Headers),
         "cookies" => Ok(SelectorType::Cookies),
         "args" => Ok(SelectorType::Args),
+        "arguments" => Ok(SelectorType::Args),
         "attrs" => Ok(SelectorType::Attrs),
+        "attributes" => Ok(SelectorType::Attrs),
         _ => Err(anyhow::anyhow!("Unknown selector type {}", k)),
     }
 }

@@ -6,12 +6,15 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 pub mod decoders;
+pub mod templating;
+pub mod url;
 
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
+use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
-use crate::config::utils::{DataSource, RequestSelector, RequestSelectorCondition, XDataSource};
-use crate::interface::{Decision, Tags};
+use crate::interface::stats::Stats;
+use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
 use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
@@ -26,7 +29,8 @@ pub fn cookie_map(cookies: &mut RequestField, cookie: &str) {
         }
     }
     for (k, v) in cookie.split("; ").map(to_kv) {
-        cookies.add(k, DataSource::X(XDataSource::CookieHeader), v);
+        let loc = Location::CookieValue(k.clone(), v.clone());
+        cookies.add(k, loc, v);
     }
 }
 
@@ -43,18 +47,46 @@ pub fn map_headers(dec: &[Transformation], rawheaders: &HashMap<String, String>)
         if lk == "cookie" {
             cookie_map(&mut cookies, v);
         } else {
-            headers.add(lk, DataSource::Root, v.clone());
+            let loc = Location::HeaderValue(lk.clone(), v.clone());
+            headers.add(lk, loc, v.clone());
         }
     }
 
     (headers, cookies)
 }
 
-/// parses query parameters, such as
-fn parse_query_params(dec: &[Transformation], query: &str) -> RequestField {
-    let mut rf = RequestField::new(dec);
-    parse_urlencoded_params(&mut rf, query);
-    rf
+#[derive(Debug, Clone, Copy)]
+enum ParseUriMode {
+    Uri,
+    Referer,
+}
+
+impl ParseUriMode {
+    fn prefix(&self) -> &str {
+        match self {
+            ParseUriMode::Uri => "",
+            ParseUriMode::Referer => "ref:",
+        }
+    }
+
+    fn query_location(&self, k: String, v: String) -> Location {
+        match self {
+            ParseUriMode::Uri => Location::UriArgumentValue(k, v),
+            ParseUriMode::Referer => Location::RefererArgumentValue(k, v),
+        }
+    }
+
+    fn path_location(&self, p: usize, v: &str) -> Location {
+        match self {
+            ParseUriMode::Uri => Location::PathpartValue(p, v.to_string()),
+            ParseUriMode::Referer => Location::RefererPathpartValue(p, v.to_string()),
+        }
+    }
+}
+
+/// parses query parameters
+fn parse_query_params(rf: &mut RequestField, query: &str, mode: ParseUriMode) {
+    parse_urlencoded_params(rf, query, mode.prefix(), |s1, s2| mode.query_location(s1, s2));
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +94,39 @@ pub enum BodyDecodingResult {
     NoBody,
     ProperlyDecoded,
     DecodingFailed(String),
+}
+
+fn parse_uri(
+    args: &mut RequestField,
+    path_as_map: &mut RequestField,
+    path: &str,
+    mode: ParseUriMode,
+) -> (String, String) {
+    let prefix = mode.prefix();
+    let (qpath, query) = match path.splitn(2, '?').collect_tuple() {
+        Some((qpath, query)) => {
+            parse_query_params(args, query, mode);
+            (qpath.to_string(), query.to_string())
+        }
+        None => (path.to_string(), String::new()),
+    };
+    path_as_map.add(
+        format!("{}path", prefix),
+        match mode {
+            ParseUriMode::Uri => Location::Path,
+            ParseUriMode::Referer => Location::Header("referer".to_string()),
+        },
+        qpath.clone(),
+    );
+    for (i, p) in qpath.split('/').enumerate() {
+        if !p.is_empty() {
+            path_as_map.add(format!("{}part{}", prefix, i), mode.path_location(i, p), p.to_string());
+            if let DecodingResult::Changed(n) = urldecode_str(p) {
+                path_as_map.add(format!("{}part{}:urldecoded", prefix, i), mode.path_location(i, p), n);
+            }
+        }
+    }
+    (qpath, query)
 }
 
 /// parses the request uri, storing the path and query parts (if possible)
@@ -80,10 +145,10 @@ fn map_args(
         DecodingResult::NoChange => path.to_string(),
         DecodingResult::Changed(nuri) => nuri,
     };
-    let (qpath, query, mut args) = match path.splitn(2, '?').collect_tuple() {
-        Some((qpath, query)) => (qpath.to_string(), query.to_string(), parse_query_params(dec, query)),
-        None => (path.to_string(), String::new(), RequestField::new(dec)),
-    };
+    let mut args = RequestField::new(dec);
+    let mut path_as_map = RequestField::new(dec);
+    let (qpath, query) = parse_uri(&mut args, &mut path_as_map, path, ParseUriMode::Uri);
+    logs.debug("uri parsed");
 
     let body_decoding = if let Some(body) = mbody {
         if let Err(rr) = parse_body(logs, &mut args, max_depth, mcontent_type, accepted_types, body) {
@@ -91,7 +156,7 @@ fn map_args(
             // if the body could not be parsed, store it in an argument, as if it was text
             args.add(
                 "RAW_BODY".to_string(),
-                DataSource::Root,
+                Location::Body,
                 String::from_utf8_lossy(body).to_string(),
             );
             BodyDecodingResult::DecodingFailed(rr)
@@ -102,16 +167,6 @@ fn map_args(
         BodyDecodingResult::NoBody
     };
     logs.debug("body parsed");
-    let mut path_as_map =
-        RequestField::singleton(dec, "path".to_string(), DataSource::X(XDataSource::Uri), qpath.clone());
-    for (i, p) in qpath.split('/').enumerate() {
-        if !p.is_empty() {
-            path_as_map.add(format!("part{}", i), DataSource::X(XDataSource::Uri), p.to_string());
-            if let DecodingResult::Changed(n) = urldecode_str(p) {
-                path_as_map.add(format!("part{}:urldecoded", i), DataSource::X(XDataSource::Uri), n);
-            }
-        }
-    }
 
     QueryInfo {
         qpath,
@@ -203,11 +258,12 @@ impl GeoIp {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, arbitrary::Arbitrary)]
 pub struct RequestMeta {
     pub authority: Option<String>,
     pub method: String,
     pub path: String,
+    pub requestid: Option<String>,
     /// this field only exists for gradual Lua interop
     /// TODO: remove when complete
     pub extra: HashMap<String, String>,
@@ -217,6 +273,7 @@ impl RequestMeta {
     pub fn from_map(attrs: HashMap<String, String>) -> Result<Self, &'static str> {
         let mut mattrs = attrs;
         let authority = mattrs.remove("authority");
+        let requestid = mattrs.remove("x-request-id");
         let method = mattrs.remove("method").ok_or("missing method field")?;
         let path = mattrs.remove("path").ok_or("missing path field")?;
         Ok(RequestMeta {
@@ -224,6 +281,7 @@ impl RequestMeta {
             method,
             path,
             extra: mattrs,
+            requestid,
         })
     }
 }
@@ -234,6 +292,8 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
+    pub secpolidhost: String,
+    pub secpolidurl: String,
 }
 
 #[derive(Debug, Clone)]
@@ -245,17 +305,20 @@ pub struct RequestInfo {
 
 impl RequestInfo {
     pub fn into_json(self, tags: Tags) -> serde_json::Value {
-        let ipnum: Option<String> = self.rinfo.geoip.ip.as_ref().map(|i| match i {
-            IpAddr::V4(a) => u32::from_be_bytes(a.octets()).to_string(),
-            IpAddr::V6(a) => u128::from_be_bytes(a.octets()).to_string(),
-        });
+        let mut v = self.into_json_notags();
+        if let Some(m) = v.as_object_mut() {
+            m.insert("tags".to_string(), tags.to_json());
+        }
+        v
+    }
+
+    pub fn into_json_notags(self) -> serde_json::Value {
         let geo = self.rinfo.geoip.to_json();
         let mut attrs: HashMap<String, Option<String>> = [
             ("uri", Some(self.rinfo.qinfo.uri)),
             ("path", Some(self.rinfo.qinfo.qpath)),
             ("query", Some(self.rinfo.qinfo.query)),
             ("ip", Some(self.rinfo.geoip.ipstr)),
-            ("ipnum", ipnum),
             ("authority", Some(self.rinfo.host)),
             ("method", Some(self.rinfo.meta.method)),
         ]
@@ -268,30 +331,45 @@ impl RequestInfo {
             "cookies": self.cookies.to_json(),
             "args": self.rinfo.qinfo.args.to_json(),
             "path": self.rinfo.qinfo.path_as_map.to_json(),
-            "attrs": attrs,
-            "tags": tags,
+            "attributes": attrs,
             "geo": geo
         })
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InspectionResult {
     pub decision: Decision,
     pub rinfo: Option<RequestInfo>,
     pub tags: Option<Tags>,
     pub err: Option<String>,
     pub logs: Logs,
+    pub stats: Stats,
 }
 
 impl InspectionResult {
-    pub fn into_json(self) -> (String, Option<String>) {
-        // return the request map, but only if we have it !
-        let resp = match self.rinfo {
-            None => self.decision.to_json_raw(serde_json::Value::Null, self.logs),
-            Some(rinfo) => self.decision.to_json(rinfo, self.tags.unwrap_or_default(), self.logs),
+    pub fn log_json(&self) -> String {
+        let dtags = Tags::default();
+        let tags: &Tags = match &self.tags {
+            Some(t) => t,
+            None => &dtags,
         };
-        (resp, self.err)
+
+        match &self.rinfo {
+            None => "{}".to_string(),
+            Some(rinfo) => self.decision.log_json(rinfo, tags, &self.logs, &self.stats),
+        }
+    }
+
+    pub fn from_analyze(logs: Logs, dec: AnalyzeResult) -> Self {
+        InspectionResult {
+            decision: dec.decision,
+            tags: Some(dec.tags),
+            logs,
+            err: None,
+            rinfo: Some(dec.rinfo),
+            stats: dec.stats,
+        }
     }
 }
 
@@ -393,11 +471,16 @@ impl<'a> RawRequest<'a> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn map_request(
     logs: &mut Logs,
+    secpolidhost: &str,
+    secpolidurl: &str,
     dec: &[Transformation],
     accepted_types: &[ContentType],
+    referer_as_uri: bool,
     max_depth: usize, // if set to 0, the body will not be parsed
+    ignore_body: bool,
     raw: &RawRequest,
 ) -> RequestInfo {
     let host = raw.get_host();
@@ -407,15 +490,25 @@ pub fn map_request(
     logs.debug("headers mapped");
     let geoip = find_geoip(logs, raw.ipstr.clone());
     logs.debug("geoip computed");
-    let qinfo = map_args(
+    let mut qinfo = map_args(
         logs,
         dec,
         &raw.meta.path,
         headers.get_str("content-type"),
         accepted_types,
-        raw.mbody,
+        if ignore_body { None } else { raw.mbody },
         max_depth,
     );
+    if referer_as_uri {
+        if let Some(rf) = headers.get("referer") {
+            parse_uri(
+                &mut qinfo.args,
+                &mut qinfo.path_as_map,
+                url::drop_scheme(rf),
+                ParseUriMode::Referer,
+            );
+        }
+    }
     logs.debug("args mapped");
 
     let rinfo = RInfo {
@@ -423,6 +516,8 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
+        secpolidhost: secpolidhost.to_string(),
+        secpolidurl: secpolidurl.to_string(),
     };
 
     RequestInfo {
@@ -432,9 +527,9 @@ pub fn map_request(
     }
 }
 
-enum Selected<'a> {
-    OStr(String),
-    Str(&'a String),
+pub enum Selected<'a> {
+    OStr(String),    // owned
+    Str(&'a String), // ref
     U32(u32),
 }
 
@@ -442,7 +537,7 @@ enum Selected<'a> {
 ///
 /// the reason we return this selected type instead of something directly string-like is
 /// to avoid copies, because in the Asn case there is no way to return a reference
-fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<Selected<'a>> {
+pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<Selected<'a>> {
     match sel {
         RequestSelector::Args(k) => reqinfo.rinfo.qinfo.args.get(k).map(Selected::Str),
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
@@ -465,6 +560,8 @@ fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) ->
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
         RequestSelector::Tags => Some(Selected::OStr(tags.selector())),
+        RequestSelector::SecpolIdHost => Some(Selected::Str(&reqinfo.rinfo.secpolidhost)),
+        RequestSelector::SecpolIdUrl => Some(Selected::Str(&reqinfo.rinfo.secpolidurl)),
     }
 }
 
@@ -497,6 +594,16 @@ pub fn masker(seed: &[u8], value: &str) -> String {
     format!("MASKED{{{}}}", &hash_str[0..8])
 }
 
+pub fn eat_errors<T: Default, R: std::fmt::Display>(logs: &mut Logs, rv: Result<T, R>) -> T {
+    match rv {
+        Err(rr) => {
+            logs.error(|| rr.to_string());
+            Default::default()
+        }
+        Ok(o) => o,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,11 +628,31 @@ mod tests {
         let expected_args: RequestField = RequestField::from_iterator(
             &[],
             [
-                ("xa ", DataSource::X(XDataSource::Uri), "12"),
-                ("bbbb", DataSource::X(XDataSource::Uri), "12("),
-                ("cccc", DataSource::X(XDataSource::Uri), ""),
-                ("b64", DataSource::X(XDataSource::Uri), "YXJndW1lbnQ="),
-                ("b64:decoded", DataSource::DecodedFrom("b64".into()), "argument"),
+                (
+                    "xa ",
+                    Location::UriArgumentValue("xa ".to_string(), "12".to_string()),
+                    "12",
+                ),
+                (
+                    "bbbb",
+                    Location::UriArgumentValue("bbbb".to_string(), "12%28".to_string()),
+                    "12(",
+                ),
+                (
+                    "cccc",
+                    Location::UriArgumentValue("cccc".to_string(), "".to_string()),
+                    "",
+                ),
+                (
+                    "b64",
+                    Location::UriArgumentValue("b64".to_string(), "YXJndW1lbnQ%3D".to_string()),
+                    "YXJndW1lbnQ=",
+                ),
+                (
+                    "b64:decoded",
+                    Location::UriArgumentValue("b64".to_string(), "YXJndW1lbnQ%3D".to_string()),
+                    "argument",
+                ),
             ]
             .iter()
             .map(|(k, ds, v)| (k.to_string(), ds.clone(), v.to_string())),
@@ -544,5 +671,58 @@ mod tests {
         assert_eq!(qinfo.query, "");
 
         assert_eq!(qinfo.args, RequestField::new(&[]));
+    }
+
+    #[test]
+    fn referer_a() {
+        let raw = RawRequest {
+            ipstr: "1.2.3.4".to_string(),
+            headers: std::iter::once((
+                "referer".to_string(),
+                "http://another.site/with?arg1=a&arg2=b".to_string(),
+            ))
+            .collect(),
+            meta: RequestMeta {
+                authority: Some("main.site".to_string()),
+                method: "GET".to_string(),
+                path: "/this/is/the/path?arg1=x&arg2=y".to_string(),
+                requestid: None,
+                extra: HashMap::new(),
+            },
+            mbody: None,
+        };
+        let mut logs = Logs::new(crate::logs::LogLevel::Debug);
+        let ri = map_request(&mut logs, "a", "b", &[], &[], true, 100, false, &raw);
+        let actual_args = ri.rinfo.qinfo.args;
+        let actual_path = ri.rinfo.qinfo.path_as_map;
+        let mut expected_args = RequestField::new(&[]);
+        let mut expected_path = RequestField::new(&[]);
+        let p = |k: &str, v: &str| match k.strip_prefix("ref:") {
+            Some(p) => Location::RefererArgumentValue(p.to_string(), v.to_string()),
+            None => Location::UriArgumentValue(k.to_string(), v.to_string()),
+        };
+        for (k, v) in &[("arg1", "x"), ("arg2", "y"), ("ref:arg1", "a"), ("ref:arg2", "b")] {
+            expected_args.add(k.to_string(), p(k, v), v.to_string());
+        }
+        expected_path.add("path".to_string(), Location::Path, "/this/is/the/path".to_string());
+        for (p, v) in &[(1, "this"), (2, "is"), (3, "the"), (4, "path")] {
+            expected_path.add(
+                format!("part{}", p),
+                Location::PathpartValue(*p, v.to_string()),
+                v.to_string(),
+            );
+        }
+        expected_path.add(
+            "ref:path".to_string(),
+            Location::Header("referer".to_string()),
+            "/with".to_string(),
+        );
+        expected_path.add(
+            "ref:part1".to_string(),
+            Location::RefererPathpartValue(1, "with".to_string()),
+            "with".to_string(),
+        );
+        assert_eq!(expected_args, actual_args);
+        assert_eq!(expected_path, actual_path);
     }
 }

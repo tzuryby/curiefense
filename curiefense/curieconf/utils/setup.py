@@ -17,8 +17,7 @@ setup(
         "pydash==5.0.2",
         "MarkupSafe==2.0.1",
         "flask==2.1.2",
-        "markupsafe==2.0.1",
-        "flask-restx",
+        "flask-restx==0.5.1",
         "werkzeug==2.1.2",
     ],
     classifiers=[

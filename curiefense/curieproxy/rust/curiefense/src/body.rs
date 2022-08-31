@@ -10,13 +10,12 @@
 /// The main function, parse_body, is the only exported function.
 ///
 use multipart::server::Multipart;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::io::Read;
 use xmlparser::{ElementEnd, EntityDefinition, ExternalId, Token};
 
 use crate::config::raw::ContentType;
-use crate::config::utils::DataSource;
-use crate::interface::{Action, ActionType};
+use crate::interface::{Action, ActionType, BlockReason, Location};
 use crate::logs::Logs;
 use crate::requestfields::RequestField;
 use crate::utils::decoders::parse_urlencoded_params_bytes;
@@ -66,20 +65,20 @@ fn flatten_json(
             prefix.pop();
         }
         Value::String(str) => {
-            args.add(json_path(prefix), DataSource::FromBody, str);
+            args.add(json_path(prefix), Location::Body, str);
         }
         Value::Bool(b) => {
             args.add(
                 json_path(prefix),
-                DataSource::FromBody,
+                Location::Body,
                 (if b { "true" } else { "false" }).to_string(),
             );
         }
         Value::Number(n) => {
-            args.add(json_path(prefix), DataSource::FromBody, format!("{}", n));
+            args.add(json_path(prefix), Location::Body, format!("{}", n));
         }
         Value::Null => {
-            args.add(json_path(prefix), DataSource::FromBody, "null".to_string());
+            args.add(json_path(prefix), Location::Body, "null".to_string());
         }
     }
     Ok(())
@@ -136,7 +135,7 @@ fn close_xml_element(
             if idx == 0 {
                 // empty XML element, save it with an empty string
                 let path = xml_path(stack) + openname.as_str() + "1";
-                args.add(path, DataSource::FromBody, String::new());
+                args.add(path, Location::Body, String::new());
             }
             Ok(())
         }
@@ -156,11 +155,11 @@ fn xml_external_id(args: &mut RequestField, stack: &[(String, u64)], name: &str,
     match me {
         Some(ExternalId::System(spn)) => {
             let path = xml_path(stack) + "entity/" + name;
-            args.add(path, DataSource::FromBody, "SYSTEM ".to_string() + spn.as_str());
+            args.add(path, Location::Body, "SYSTEM ".to_string() + spn.as_str());
             let path_raw = xml_path(stack) + "entity_raw/" + name;
             args.add(
                 path_raw,
-                DataSource::FromBody,
+                Location::Body,
                 "<!DOCTYPE ".to_string() + name + " SYSTEM \"" + spn.as_str() + "\"",
             );
         }
@@ -168,13 +167,13 @@ fn xml_external_id(args: &mut RequestField, stack: &[(String, u64)], name: &str,
             let path = xml_path(stack) + "entity/" + name;
             args.add(
                 path,
-                DataSource::FromBody,
+                Location::Body,
                 "PUBLIC ".to_string() + spn1.as_str() + " " + spn2.as_str(),
             );
             let path_raw = xml_path(stack) + "entity_raw/" + name;
             args.add(
                 path_raw,
-                DataSource::FromBody,
+                Location::Body,
                 "<!DOCTYPE ".to_string() + name + " PUBLIC \"" + spn1.as_str() + "\" \"" + spn2.as_str() + "\"",
             );
         }
@@ -205,7 +204,7 @@ fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), 
             Token::EntityDeclaration { name, definition, .. } => match definition {
                 EntityDefinition::EntityValue(span) => args.add(
                     "_XMLENTITY_VALUE_".to_string() + name.as_str(),
-                    DataSource::FromBody,
+                    Location::Body,
                     span.to_string(),
                 ),
                 EntityDefinition::ExternalId(eid) => xml_external_id(args, &stack, "entity", Some(eid)),
@@ -226,18 +225,18 @@ fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), 
             },
             Token::Attribute { local, value, .. } => {
                 let path = xml_path(&stack) + local.as_str();
-                args.add(path, DataSource::FromBody, value.to_string());
+                args.add(path, Location::Body, value.to_string());
             }
             Token::Text { text } => {
                 let trimmed = text.trim();
                 if !trimmed.is_empty() {
                     xml_increment_last(&mut stack);
-                    args.add(xml_path(&stack), DataSource::FromBody, trimmed.to_string());
+                    args.add(xml_path(&stack), Location::Body, trimmed.to_string());
                 }
             }
             Token::Cdata { text, .. } => {
                 xml_increment_last(&mut stack);
-                args.add(xml_path(&stack), DataSource::FromBody, text.to_string());
+                args.add(xml_path(&stack), Location::Body, text.to_string());
             }
         }
     }
@@ -252,7 +251,7 @@ fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), 
 fn forms_body(args: &mut RequestField, body: &[u8]) -> Result<(), String> {
     // TODO: body is traversed twice here, this is inefficient
     if body.contains(&b'=') && body.iter().all(|x| *x > 0x20 && *x < 0x7f) {
-        parse_urlencoded_params_bytes(args, body);
+        parse_urlencoded_params_bytes(args, body, Location::BodyArgumentValue);
         Ok(())
     } else {
         Err("Body is not forms encoded".to_string())
@@ -270,7 +269,7 @@ fn multipart_form_encoded(boundary: &str, args: &mut RequestField, body: &[u8]) 
             let _ = entry.data.read_to_end(&mut content);
             let name = entry.headers.name.to_string();
             let scontent = String::from_utf8_lossy(&content);
-            args.add(name, DataSource::FromBody, scontent.to_string());
+            args.add(name, Location::Body, scontent.to_string());
         })
         .map_err(|rr| format!("Could not parse multipart body: {}", rr))
 }
@@ -343,38 +342,32 @@ pub fn parse_body(
     }
 }
 
-pub fn body_too_deep(expected: usize, actual: usize) -> Action {
-    Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        status: 403,
-        headers: None,
-        reason: json!({
-            "initiator": "body_max_depth",
-            "expected": expected,
-            "actual": actual
-        }),
-        content: "Access denied".to_string(),
-        extra_tags: None,
-    }
+pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
+    (
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            status: 403,
+            headers: None,
+            content: "Access denied".to_string(),
+            extra_tags: None,
+        },
+        BlockReason::body_too_deep(actual, expected),
+    )
 }
 
-pub fn body_too_large(expected: usize, actual: usize) -> Action {
-    Action {
-        atype: ActionType::Block,
-        block_mode: true,
-        ban: false,
-        status: 403,
-        headers: None,
-        reason: json!({
-            "initiator": "body_max_size",
-            "expected": expected,
-            "actual": actual
-        }),
-        content: "Access denied".to_string(),
-        extra_tags: None,
-    }
+pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
+    (
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            status: 403,
+            headers: None,
+            content: "Access denied".to_string(),
+            extra_tags: None,
+        },
+        BlockReason::body_too_large(actual, expected),
+    )
 }
 
 #[cfg(test)]
@@ -498,7 +491,7 @@ mod tests {
     fn arguments_collision() {
         let mut logs = Logs::default();
         let mut args = RequestField::new(&[]);
-        args.add("a".to_string(), DataSource::FromBody, "query_arg".to_string());
+        args.add("a".to_string(), Location::Body, "query_arg".to_string());
         parse_body(
             &mut logs,
             &mut args,
@@ -534,7 +527,7 @@ mod tests {
             Some("text/xml"),
             &[],
             br#"<a>&lt;em&gt;</a>"#,
-            &[("a1", "&lt;em&gt;"), ("a1:decoded", "<em>")],
+            &[("a1", "<em>")],
         );
     }
 
@@ -545,7 +538,7 @@ mod tests {
             Some("text/xml"),
             &[],
             br#"<a>&lt;em&gt</a>"#,
-            &[("a1", "&lt;em&gt"), ("a1:decoded", "<em&gt")],
+            &[("a1", "<em&gt")],
         );
     }
 
