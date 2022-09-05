@@ -125,6 +125,42 @@ fn lua_inspect_request(
 /// ****************************************
 
 /// This is the initialization function, that will return a list of items to check
+fn lua_inspect_init_hops(
+    lua: &Lua,
+    args: (
+        LuaValue, // meta
+        LuaValue, // headers
+        LuaValue, // optional body
+        LuaValue, // known ip
+        LuaValue, // hops
+    ),
+) -> LuaResult<LInitResult> {
+    let (meta, headers, body, ip, lhops) = args;
+    let hops = FromLua::from_lua(lhops, lua)?;
+    match lua_convert_args(lua, (meta, headers, body, ip)) {
+        Ok(lua_args) => {
+            let grasshopper = &DynGrasshopper {};
+            let ip = curiefense::incremental::extract_ip(hops, &lua_args.headers).unwrap_or(lua_args.str_ip);
+            let res = inspect_init(
+                "/cf-config/current/config",
+                lua_args.meta,
+                lua_args.headers,
+                lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
+                ip,
+                Some(grasshopper),
+            );
+            Ok(match res {
+                Ok((r, logs)) => match r {
+                    InitResult::Res(r) => LInitResult::P0Result(Box::new(InspectionResult::from_analyze(logs, r))),
+                    InitResult::Phase1(p1) => LInitResult::P1(logs, Box::new(p1)),
+                },
+                Err(s) => LInitResult::P0Error(s),
+            })
+        }
+        Err(rr) => Ok(LInitResult::P0Error(rr)),
+    }
+}
+
 fn lua_inspect_init(
     lua: &Lua,
     args: (
@@ -312,6 +348,7 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     // end-to-end inspection
     exports.set("inspect_request", lua.create_function(lua_inspect_request)?)?;
     exports.set("inspect_request_init", lua.create_function(lua_inspect_init)?)?;
+    exports.set("inspect_request_init_hops", lua.create_function(lua_inspect_init_hops)?)?;
     exports.set("inspect_request_process", lua.create_function(lua_inspect_process)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;

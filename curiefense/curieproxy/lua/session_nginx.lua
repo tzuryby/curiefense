@@ -4,6 +4,8 @@ local curiefense  = require "curiefense"
 local sfmt = string.format
 local redis = require "resty.redis"
 
+local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 1
+
 local function custom_response(handle, action_params)
     if not action_params then action_params = {} end
     local block_mode = action_params.block_mode
@@ -11,8 +13,10 @@ local function custom_response(handle, action_params)
 
     if not block_mode then
         handle.log(handle.DEBUG, "altering: " .. cjson.encode(action_params))
-        for k, v in pairs(action_params.headers) do
-            handle.req.set_header(k, v)
+        if action_params["headers"] and action_params["headers"] ~= cjson.null then
+            for k, v in pairs(action_params.headers) do
+                handle.req.set_header(k, v)
+            end
         end
         return
     end
@@ -55,12 +59,15 @@ local function make_safe_headers(rheaders)
     return headers
 end
 
-local function redis_connect()
+local function redis_connect(handle)
     local redishost = os.getenv("REDIS_HOST") or "redis"
     local redisport = os.getenv("REDIS_PORT") or 6379
     local red = redis:new()
-    red:set_timeouts(100, 100, 100) -- 100ms
-    red:connect(redishost, redisport)
+    red:set_timeout(100) -- 100ms
+    local _, err = red:connect(redishost, redisport)
+    if err then
+        handle.log(handle.ERR, err)
+    end
     return red
 end
 
@@ -87,8 +94,10 @@ function session_rust_nginx.inspect(handle)
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
 
-    local res = curiefense.inspect_request_init(
-        meta, headers, body_content, ip_str
+    handle.log(handle.DEBUG, HOPS)
+
+    local res = curiefense.inspect_request_init_hops(
+        meta, headers, body_content, ip_str, HOPS
     )
 
     if res.error then
@@ -106,7 +115,7 @@ function session_rust_nginx.inspect(handle)
         if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
             -- Redis required
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
-            local red = redis_connect()
+            local red = redis_connect(handle)
 
             for _, flow in pairs(flows) do
                 local key = flow.key

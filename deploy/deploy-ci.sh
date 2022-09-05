@@ -86,7 +86,7 @@ do
     sleep 20
 done
 
-while ! curl "http://$INGRESS_HOST:30000/api/v2/db/system/k/publishinfo/"|grep -qF 'file:///';
+while ! curl "http://$INGRESS_HOST:30000/api/v3/db/system/k/publishinfo/"|grep -qF 'file:///';
 do
     sleep 5
     if [[ $(date -u +%s) -ge $endtime ]];

@@ -130,7 +130,7 @@ pub async fn limit_resolve_query<I: Iterator<Item = Option<i64>>>(
             Some(r) => r.unwrap_or(-1),
         };
         if expire < 0 {
-            let _: () = redis::cmd("EXPIRE")
+            redis::cmd("EXPIRE")
                 .arg(&check.key)
                 .arg(&check.limit.timeframe)
                 .query_async(redis)

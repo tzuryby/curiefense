@@ -46,13 +46,13 @@ impl IData {
     fn ip(&self) -> String {
         match &self.ipinfo {
             IPInfo::Ip(s) => s.clone(),
-            IPInfo::Hops(hops) => extract_ip(*hops, &self.headers),
+            IPInfo::Hops(hops) => extract_ip(*hops, &self.headers).unwrap_or_else(|| "1.1.1.1".to_string()),
         }
     }
 }
 
 /// reproduces the original IP extraction algorithm, for envoy
-pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> String {
+pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> Option<String> {
     let detect_ip = |xff: &str| -> String {
         let splitted = xff.split(',').collect::<Vec<_>>();
         if trusted_hops < splitted.len() {
@@ -62,10 +62,7 @@ pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> Str
         }
         .to_string()
     };
-    headers
-        .get("x-forwarded-for")
-        .map(|s| detect_ip(s.as_str()))
-        .unwrap_or_else(|| "1.1.1.1".to_string())
+    headers.get("x-forwarded-for").map(|s| detect_ip(s.as_str()))
 }
 
 pub fn inspect_init(config: &Config, loglevel: LogLevel, meta: RequestMeta, ipinfo: IPInfo) -> Result<IData, String> {
