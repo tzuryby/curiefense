@@ -135,7 +135,7 @@ vec_globalfilter = {
     "notes": "; notes",
     "tags": ["blacklists", "spamhaus"],
     "rule": {
-        "sections": [
+        "entries": [
             {
                 "relation": "OR",
                 "entries": [
