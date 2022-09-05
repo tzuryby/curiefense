@@ -4,6 +4,11 @@
   "description": "Dynamic Rules",
   "type": "object",
   "properties": {
+    "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "Unique id"
+    },
     "name": {
       "type": "string",
       "minLength": 1,
@@ -46,6 +51,7 @@
   },
   "additionalProperties": true,
   "required": [
+    "id",
     "name",
     "description",
     "threshold",

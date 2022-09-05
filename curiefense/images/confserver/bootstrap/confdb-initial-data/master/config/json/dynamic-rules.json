@@ -1,5 +1,6 @@
 [
   {
+    "id": "testid",
     "name": "Ratelimit Violators",
     "description": "Capture violators of Rate limit rules for further banning",
     "threshold": 18,
