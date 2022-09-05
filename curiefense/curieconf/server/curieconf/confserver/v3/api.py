@@ -332,6 +332,15 @@ m_edit = api.model(
     },
 )
 
+m_basic_entry = api.model(
+    "Basic Document Entry",
+    {
+        "id": fields.String(required=True),
+        "name": fields.String(required=True),
+        "description": fields.String(required=True)
+    },
+)
+
 ### Publish
 
 m_bucket = api.model(
@@ -611,6 +620,7 @@ class DocumentResource(Resource):
         res = current_app.backend.documents_get(config, document)
         return marshal(res, models[document], skip_none=True)
 
+    @ns_configs.expect([m_basic_entry], validate=True)
     def post(self, config, document):
         "Create a new complete document"
         if document not in models:
@@ -621,6 +631,7 @@ class DocumentResource(Resource):
         )
         return res
 
+    @ns_configs.expect([m_basic_entry], validate=True)
     def put(self, config, document):
         "Update an existing document"
         if document not in models:
@@ -686,6 +697,7 @@ class EntriesResource(Resource):
         res = current_app.backend.entries_list(config, document)
         return res  # XXX: marshal
 
+    @ns_configs.expect(m_basic_entry, validate=True)
     def post(self, config, document):
         "Create an entry in a document"
         if document not in models:
@@ -704,6 +716,7 @@ class EntryResource(Resource):
         res = current_app.backend.entries_get(config, document, entry)
         return marshal(res, models[document], skip_none=True)
 
+    @ns_configs.expect(m_basic_entry, validate=True)
     def put(self, config, document, entry):
         "Update an entry in a document"
         if document not in models:
