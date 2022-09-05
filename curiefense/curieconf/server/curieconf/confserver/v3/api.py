@@ -367,6 +367,16 @@ def validateJson(json_data, schema_type):
         return False
     return True
 
+### DB Schema validation
+
+
+def validateDbJson(json_data, schema):
+    try:
+        validate(instance=json_data, schema=schema)
+    except jsonschema.exceptions.ValidationError as err:
+        print(str(err))
+        return False
+    return True
 
 ### Set git actor according to config & defined HTTP headers
 
@@ -717,22 +727,6 @@ class EntryResource(Resource):
         )
         return res
 
-
-@ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/edit/")
-class EntryEditResource(Resource):
-    def put(self, config, document, entry):
-        "Update an entry in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        data = marshal(request.json, m_edit, skip_none=True)
-        if type(data) is not list:
-            data = [data]
-        res = current_app.backend.entries_edit(
-            config, document, entry, data, get_gitactor()
-        )
-        return res
-
-
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/v/")
 class EntryListVersionResource(Resource):
     def get(self, config, document, entry):
@@ -850,6 +844,19 @@ class KeyResource(Resource):
 
     def put(self, nsname, key):
         "Create or update the value of a key"
+        # check if "reblaze/k/<key>" exists in system/schema-validation
+        keyName = nsname + "/k/" + key
+        schemas = current_app.backend.key_get("system", "schema-validation")
+        schema = None
+        # find schema if exists and validate the json input
+        for item in schemas.items():
+            if item[0] == keyName:
+                schema = item[1]
+                break
+        if schema:
+            isValid = validateDbJson(request.json, schema)
+            if isValid is False:
+                abort(500, "schema mismatched")
         return current_app.backend.key_set(nsname, key, request.json, get_gitactor())
 
     def delete(self, nsname, key):
