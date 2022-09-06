@@ -49,7 +49,7 @@ m_limit = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "timeframe": fields.Integer(required=True),
         "thresholds": fields.List(fields.Nested(m_threshold)),
         "include": fields.Raw(required=True),
@@ -106,7 +106,7 @@ m_contentfilterrule = api.model(
         "subcategory": fields.String(required=True),
         "risk": fields.Integer(required=True),
         "tags": fields.List(fields.String()),
-        "description": fields.String(required=True),
+        "description": fields.String(),
     },
 )
 
@@ -163,7 +163,7 @@ m_globalfilter = api.model(
         "name": fields.String(required=True),
         "source": fields.String(required=True),
         "mdate": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "active": fields.Boolean(required=True),
         "action": fields.Raw(required=True),
         "tags": fields.List(fields.String()),
@@ -184,7 +184,7 @@ m_flowcontrol = api.model(
         "tags": fields.List(fields.String()),
         "include": fields.List(fields.String()),
         "exclude": fields.List(fields.String()),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "active": fields.Boolean(required=True),
     },
 )
@@ -196,7 +196,7 @@ m_action = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "tags": fields.List(fields.String(required=True)),
         "params": fields.Raw(),
         "type": fields.String(required=True),
@@ -209,7 +209,7 @@ m_dynamicrule = api.model(
     "Dynamic Rule",
     {
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "threshold": fields.Integer(required=True),
         "timeframe": fields.Integer(required=True),
         "ttl": fields.Integer(required=True),
@@ -337,7 +337,7 @@ m_basic_entry = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True)
+        "description": fields.String()
     },
 )
 
@@ -626,6 +626,10 @@ class DocumentResource(Resource):
         if document not in models:
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
+        for entry in request.json:
+            isValid = validateJson(entry, document)
+            if isValid is False:
+                abort(500, "schema mismatched")
         res = current_app.backend.documents_create(
             config, document, data, get_gitactor()
         )
@@ -702,9 +706,13 @@ class EntriesResource(Resource):
         "Create an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        data = marshal(request.json, models[document], skip_none=True)
-        res = current_app.backend.entries_create(config, document, data, get_gitactor())
-        return res
+        isValid = validateJson(request.json, document)
+        if isValid:
+            data = marshal(request.json, models[document], skip_none=True)
+            res = current_app.backend.entries_create(config, document, data, get_gitactor())
+            return res
+        else:
+            abort(500, "schema mismatched")
 
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
