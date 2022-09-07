@@ -47,8 +47,8 @@ pub fn decode_attribute(s: &str) -> Option<RequestSelector> {
         "company" => Some(RequestSelector::Company),
         "authority" => Some(RequestSelector::Authority),
         "tags" => Some(RequestSelector::Tags),
-        "secpolid" | "securitypolicyid" => Some(RequestSelector::SecpolId),
-        "secpolentryid" | "securitypolicyentryid" => Some(RequestSelector::SecpolEntryId),
+        "secpolid" | "securitypolicyid" | "securitypolicy" => Some(RequestSelector::SecpolId),
+        "secpolentryid" | "securitypolicyentryid" | "securitypolicyentry" => Some(RequestSelector::SecpolEntryId),
         _ => None,
     }
 }
