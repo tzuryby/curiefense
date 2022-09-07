@@ -121,7 +121,7 @@ fn close_xml_element(
 ) -> Result<(), String> {
     match stack.pop() {
         None => {
-            return Err(format!("Invalid XML, extraneous element end: {:?}", close_name));
+            Err(format!("Invalid XML, extraneous element end: {:?}", close_name))
         }
         Some((openname, idx)) => {
             if let Some(local) = close_name {

@@ -119,7 +119,7 @@ pub async fn flow_resolve_query<I: Iterator<Item = Option<i64>>>(
                     .await?;
                 let expire = mexpire.unwrap_or(-1);
                 if expire < 0 {
-                    let _: () = redis::cmd("EXPIRE")
+                    redis::cmd("EXPIRE")
                         .arg(&check.redis_key)
                         .arg(check.timeframe)
                         .query_async(redis)
