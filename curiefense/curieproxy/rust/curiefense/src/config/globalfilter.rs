@@ -79,7 +79,7 @@ pub enum GlobalFilterEntryE {
     Authority(SingleEntry),
     Tag(SingleEntry),
     SecurityPolicyId(String),
-    SecurityPolicyMatchId(String),
+    SecurityPolicyEntryId(String),
 }
 
 /// tries to aggregate ip ranges
@@ -328,8 +328,8 @@ impl GlobalFilterSection {
                 GlobalFilterEntryType::SecurityPolicyId => {
                     single(|id| Ok(GlobalFilterEntryE::SecurityPolicyId(id.to_string())), val)
                 }
-                GlobalFilterEntryType::SecurityPolicyMatchId => {
-                    single(|id| Ok(GlobalFilterEntryE::SecurityPolicyMatchId(id.to_string())), val)
+                GlobalFilterEntryType::SecurityPolicyEntryId => {
+                    single(|id| Ok(GlobalFilterEntryE::SecurityPolicyEntryId(id.to_string())), val)
                 }
             }
         }

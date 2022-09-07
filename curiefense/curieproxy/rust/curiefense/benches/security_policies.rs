@@ -45,13 +45,19 @@ fn gen_bogus_config(sz: usize) -> Config {
             Matching::from_str(
                 &format!("/dummy/url/{}", i),
                 Arc::new(SecurityPolicy {
-                    name: format!("Dummy securitypolicy {}", i),
+                    policy: PolicyId {
+                        id: "__default__".to_string(),
+                        name: "__default__".to_string(),
+                    },
+                    entry: PolicyId {
+                        id: format!("id{}", i),
+                        name: format!("Dummy securitypolicy {}", i),
+                    },
                     acl_active: false,
                     acl_profile: acl_profile.clone(),
                     content_filter_active: false,
                     content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
                     limits: Vec::new(),
-                    hostmapid: "__default__".to_string(),
                 }),
             )
             .unwrap()
@@ -62,13 +68,19 @@ fn gen_bogus_config(sz: usize) -> Config {
         name: "__default__".into(),
         entries: dummy_entries,
         default: Some(Arc::new(SecurityPolicy {
-            name: "selected".into(),
+            policy: PolicyId {
+                id: "__default__".into(),
+                name: "__default__".into(),
+            },
+            entry: PolicyId {
+                id: "default".into(),
+                name: "selected".into(),
+            },
             acl_active: false,
             acl_profile,
             content_filter_active: false,
             content_filter_profile: ContentFilterProfile::default_from_seed("seed"),
             limits: Vec::new(),
-            hostmapid: "__default__".into(),
         })),
     });
 
@@ -82,9 +94,9 @@ fn forms_string_map(c: &mut Criterion) {
             let cfg = gen_bogus_config(size);
             b.iter(|| {
                 let mut logs = Logs::default();
-                let (_, umap) =
+                let umap =
                     match_securitypolicy("my.host.name", "/non/matching/path", black_box(&cfg), &mut logs).unwrap();
-                assert_eq!(umap.name, "selected");
+                assert_eq!(umap.entry.name, "selected");
             })
         });
     }

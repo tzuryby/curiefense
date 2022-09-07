@@ -143,14 +143,14 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
         GlobalFilterEntryE::SecurityPolicyId(id) => {
-            if &rinfo.rinfo.secpolid == id {
+            if &rinfo.rinfo.policyid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
-        GlobalFilterEntryE::SecurityPolicyMatchId(id) => {
-            if &rinfo.rinfo.secpolmatchid == id {
+        GlobalFilterEntryE::SecurityPolicyEntryId(id) => {
+            if &rinfo.rinfo.entryid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None

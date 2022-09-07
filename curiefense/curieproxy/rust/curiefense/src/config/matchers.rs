@@ -17,7 +17,7 @@ pub enum RequestSelector {
     Authority,
     Tags,
     SecpolId,
-    SecpolMatchId,
+    SecpolEntryId,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ pub fn decode_attribute(s: &str) -> Option<RequestSelector> {
         "authority" => Some(RequestSelector::Authority),
         "tags" => Some(RequestSelector::Tags),
         "secpolid" | "securitypolicyid" => Some(RequestSelector::SecpolId),
-        "secpolmatchid" | "securitypolicymatchid" => Some(RequestSelector::SecpolMatchId),
+        "secpolentryid" | "securitypolicyentryid" => Some(RequestSelector::SecpolEntryId),
         _ => None,
     }
 }

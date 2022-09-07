@@ -20,7 +20,7 @@ use crate::logs::Logs;
 use contentfilter::{resolve_rules, ContentFilterProfile, ContentFilterRules};
 use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
-use hostmap::{HostMap, SecurityPolicy};
+use hostmap::{HostMap, PolicyId, SecurityPolicy};
 use matchers::Matching;
 use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
 
@@ -102,7 +102,8 @@ fn from_map<V: Clone>(mp: &HashMap<String, V>, k: &str) -> Result<V, String> {
 impl Config {
     fn resolve_security_policies(
         logs: &mut Logs,
-        hostmapid: String,
+        policyid: &str,
+        policyname: &str,
         rawmaps: Vec<RawSecurityPolicy>,
         limits: &HashMap<String, Limit>,
         global_limits: &[Limit],
@@ -142,15 +143,21 @@ impl Config {
             }
             let mapname = rawmap.name.clone();
             let securitypolicy = SecurityPolicy {
-                hostmapid: hostmapid.clone(),
+                policy: PolicyId {
+                    id: policyid.to_string(),
+                    name: policyname.to_string(),
+                },
+                entry: PolicyId {
+                    id: rawmap.id.unwrap_or_else(|| mapname.clone()),
+                    name: rawmap.name,
+                },
                 acl_active: rawmap.acl_active,
                 acl_profile,
                 content_filter_active: rawmap.content_filter_active,
                 content_filter_profile,
                 limits: olimits,
-                name: rawmap.name,
             };
-            if rawmap.match_ == "__default__" || (rawmap.match_ == "/" && securitypolicy.name == "default") {
+            if rawmap.match_ == "__default__" || (rawmap.match_ == "/" && securitypolicy.entry.id == "default") {
                 if default.is_some() {
                     logs.warning("Multiple __default__ maps");
                 }
@@ -195,7 +202,8 @@ impl Config {
         for rawmap in rawmaps {
             let (entries, default_entry) = Config::resolve_security_policies(
                 &mut logs,
-                rawmap.id,
+                &rawmap.id,
+                &rawmap.name,
                 rawmap.map,
                 &limits,
                 &global_limits,

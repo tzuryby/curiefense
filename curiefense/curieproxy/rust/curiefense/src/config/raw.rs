@@ -74,6 +74,7 @@ pub struct RawHostMap {
 pub struct RawSecurityPolicy {
     #[serde(rename = "match")]
     pub match_: String,
+    pub id: Option<String>, // set to name if absent
     pub name: String,
     pub acl_profile: String,
     pub content_filter_profile: String,
@@ -132,7 +133,7 @@ pub enum GlobalFilterEntryType {
     Authority,
     Tag,
     SecurityPolicyId,
-    SecurityPolicyMatchId,
+    SecurityPolicyEntryId,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements
