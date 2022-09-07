@@ -142,15 +142,15 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
             .and_then(|ccmp| check_single(cmp, ccmp.as_str(), Location::Ip)),
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
-        GlobalFilterEntryE::SecpolIdHost(id) => {
-            if &rinfo.rinfo.secpolidhost == id {
+        GlobalFilterEntryE::SecurityPolicyId(id) => {
+            if &rinfo.rinfo.secpolid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
-        GlobalFilterEntryE::SecpolIdUrl(id) => {
-            if &rinfo.rinfo.secpolidurl == id {
+        GlobalFilterEntryE::SecurityPolicyMatchId(id) => {
+            if &rinfo.rinfo.secpolmatchid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None

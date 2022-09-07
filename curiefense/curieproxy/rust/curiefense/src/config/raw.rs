@@ -131,8 +131,8 @@ pub enum GlobalFilterEntryType {
     Company,
     Authority,
     Tag,
-    SecpolIdHost,
-    SecpolIdUrl,
+    SecurityPolicyId,
+    SecurityPolicyMatchId,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements
