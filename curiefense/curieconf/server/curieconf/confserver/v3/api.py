@@ -339,7 +339,7 @@ m_basic_entry = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String()
+        "description": fields.String(),
     },
 )
 
@@ -378,6 +378,7 @@ def validateJson(json_data, schema_type):
         return False
     return True
 
+
 ### DB Schema validation
 
 
@@ -388,6 +389,7 @@ def validateDbJson(json_data, schema):
         print(str(err))
         return False
     return True
+
 
 ### Set git actor according to config & defined HTTP headers
 
@@ -711,7 +713,9 @@ class EntriesResource(Resource):
         isValid = validateJson(request.json, document)
         if isValid:
             data = marshal(request.json, models[document], skip_none=True)
-            res = current_app.backend.entries_create(config, document, data, get_gitactor())
+            res = current_app.backend.entries_create(
+                config, document, data, get_gitactor()
+            )
             return res
         else:
             abort(500, "schema mismatched")
@@ -749,6 +753,7 @@ class EntryResource(Resource):
             config, document, entry, get_gitactor()
         )
         return res
+
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/v/")
 class EntryListVersionResource(Resource):
