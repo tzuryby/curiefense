@@ -50,6 +50,7 @@ m_limit = api.model(
         "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
+        "global": fields.Boolean(required=True),
         "timeframe": fields.Integer(required=True),
         "thresholds": fields.List(fields.Nested(m_threshold)),
         "include": fields.Raw(required=True),
