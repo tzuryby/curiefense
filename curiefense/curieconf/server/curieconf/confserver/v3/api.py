@@ -66,6 +66,7 @@ m_limit = api.model(
 m_secprofilemap = api.model(
     "Security Profile Map",
     {
+        "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
         "match": fields.String(required=True),
