@@ -113,6 +113,11 @@
             "description": "List of tags to apply",
             "type": "array",
             "items": { "type": "string" }
+        },
+        "global": {
+            "type": "boolean",
+            "title": "Global limit",
+            "description": "When true, this limit is added to all security profiles",
         }
     },
     "additionalProperties": false,

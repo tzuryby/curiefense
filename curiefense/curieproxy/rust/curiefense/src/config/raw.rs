@@ -188,6 +188,8 @@ pub struct RawLimit {
     #[serde(default)]
     pub exclude: Vec<String>,
     pub pairwith: HashMap<String, String>,
+    #[serde(default)]
+    pub global: bool, // global flag, if true this rule applies to all profiles
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

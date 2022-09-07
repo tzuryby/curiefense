@@ -105,6 +105,7 @@ impl Config {
         hostmapid: String,
         rawmaps: Vec<RawSecurityPolicy>,
         limits: &HashMap<String, Limit>,
+        global_limits: &[Limit],
         acls: &HashMap<String, AclProfile>,
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
     ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
@@ -128,6 +129,11 @@ impl Config {
                     }
                 };
             let mut olimits: Vec<Limit> = Vec::new();
+            for gl in global_limits {
+                if !rawmap.limit_ids.contains(&gl.id) {
+                    olimits.push(gl.clone());
+                }
+            }
             for lid in rawmap.limit_ids {
                 match from_map(limits, &lid) {
                     Ok(lm) => olimits.push(lm),
@@ -179,7 +185,7 @@ impl Config {
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
         let mut logs = logs;
 
-        let limits = Limit::resolve(&mut logs, actions, rawlimits);
+        let (limits, global_limits) = Limit::resolve(&mut logs, actions, rawlimits);
         let acls = rawacls
             .into_iter()
             .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, actions, a)))
@@ -192,6 +198,7 @@ impl Config {
                 rawmap.id,
                 rawmap.map,
                 &limits,
+                &global_limits,
                 &acls,
                 &content_filter_profiles,
             );
