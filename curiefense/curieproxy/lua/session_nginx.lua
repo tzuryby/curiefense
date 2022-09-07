@@ -94,8 +94,6 @@ function session_rust_nginx.inspect(handle)
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
 
-    handle.log(handle.DEBUG, HOPS)
-
     local res = curiefense.inspect_request_init_hops(
         meta, headers, body_content, ip_str, HOPS
     )
@@ -116,10 +114,35 @@ function session_rust_nginx.inspect(handle)
             -- Redis required
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
             local red = redis_connect(handle)
+            red:init_pipeline()
 
             for _, flow in pairs(flows) do
-                local key = flow.key
-                local len = red:llen(key)
+                red:llen(flow.key)
+            end
+            for _, limit in pairs(limits) do
+                local key = limit.key
+                if not limit.zero_limits then
+                    local pw = limit.pairwith
+                    if pw then
+                        red:sadd(key, pw)
+                        red:scard(key)
+                        red:ttl(key)
+                    else
+                        red:incr(key)
+                        red:ttl(key)
+                    end
+                end
+            end
+            local results, redis_err = red:commit_pipeline()
+            if not results then
+                handle.log(handle.ERR, "failed to run redis calls " .. redis_err)
+            end
+
+            local result_idx = 1
+
+            for _, flow in pairs(flows) do
+                local len = results[result_idx]
+                result_idx = result_idx + 1
                 local step = flow.step
                 local flowtype = "nonlast"
                 if flow.is_last then
@@ -130,10 +153,11 @@ function session_rust_nginx.inspect(handle)
                     end
                 else
                     if step == len then
+                        local key = flow.key
                         red:lpush(key, "foo")
                         local ttl = red:ttl(key)
                         if ttl == nil or ttl < 0 then
-                        red:expire(key, flow.timeframe)
+                            red:expire(key, flow.timeframe)
                         end
                     end
                 end
@@ -145,15 +169,13 @@ function session_rust_nginx.inspect(handle)
                 local curcount = 1
                 if not limit.zero_limits then
                     local pw = limit.pairwith
-                    local expire
                     if pw then
-                        red:sadd(key, pw)
-                        curcount = red:scard(key)
-                        expire = red:ttl(key)
-                    else
-                        curcount = red:incr(key)
-                        expire = red:ttl(key)
+                        result_idx = result_idx + 1
                     end
+                    curcount = results[result_idx]
+                    result_idx = result_idx + 1
+                    local expire = results[result_idx]
+                    result_idx = result_idx + 1
                     if curcount == nil then
                         curcount = 0
                     end
@@ -172,8 +194,6 @@ function session_rust_nginx.inspect(handle)
     end
 
     handle.ctx.request_map = res.request_map
-
-    handle.log(handle.INFO, cjson.encode(cjson.decode(res.request_map)["tags"]))
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", res.error))
