@@ -21,11 +21,11 @@
                 "arguments": { "type": "string" },
                 "attrs": {
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
                  },
                 "attributes":{
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
                  }
             }
         }
@@ -113,6 +113,11 @@
             "description": "List of tags to apply",
             "type": "array",
             "items": { "type": "string" }
+        },
+        "global": {
+            "type": "boolean",
+            "title": "Global limit",
+            "description": "When true, this limit is added to all security profiles",
         }
     },
     "additionalProperties": false,

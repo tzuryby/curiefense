@@ -15,7 +15,7 @@ pub fn match_securitypolicy<'a>(
     path: &str,
     cfg: &'a Config,
     logs: &mut Logs,
-) -> Option<(String, Arc<SecurityPolicy>)> {
+) -> Option<Arc<SecurityPolicy>> {
     // find the first matching hostmap, or use the default, if it exists
     let hostmap: &HostMap = cfg
         .securitypolicies
@@ -38,6 +38,6 @@ pub fn match_securitypolicy<'a>(
         }
         Some(x) => x.clone(),
     };
-    logs.debug(|| format!("Selected hostmap entry {}", securitypolicy.name));
-    Some((hostmap.name.clone(), securitypolicy))
+    logs.debug(|| format!("Selected hostmap entry {}", securitypolicy.entry.id));
+    Some(securitypolicy)
 }

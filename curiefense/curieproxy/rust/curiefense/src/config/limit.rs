@@ -85,22 +85,28 @@ impl Limit {
             },
         ))
     }
+
     pub fn resolve(
         logs: &mut Logs,
         actions: &HashMap<String, SimpleAction>,
         rawlimits: Vec<RawLimit>,
-    ) -> HashMap<String, Limit> {
+    ) -> (HashMap<String, Limit>, Vec<Limit>) {
         let mut out = HashMap::new();
+        let mut globals = Vec::new();
         for rl in rawlimits {
             let curid = rl.id.clone();
+            let global = rl.global;
             match Limit::convert(logs, actions, rl) {
                 Ok((nm, lm)) => {
+                    if global {
+                        globals.push(lm.clone())
+                    }
                     out.insert(nm, lm);
                 }
                 Err(rr) => logs.error(|| format!("limit id {}: {:?}", curid, rr)),
             }
         }
-        out
+        (out, globals)
     }
 }
 

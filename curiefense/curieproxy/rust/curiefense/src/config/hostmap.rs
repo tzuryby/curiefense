@@ -13,11 +13,17 @@ pub struct HostMap {
     pub default: Option<Arc<SecurityPolicy>>,
 }
 
+#[derive(Debug)]
+pub struct PolicyId {
+    pub id: String,
+    pub name: String,
+}
+
 /// a map entry, with links to the acl and content filter profiles
 #[derive(Debug)]
 pub struct SecurityPolicy {
-    pub hostmapid: String,
-    pub name: String,
+    pub policy: PolicyId,
+    pub entry: PolicyId,
     pub acl_active: bool,
     pub acl_profile: AclProfile,
     pub content_filter_active: bool,

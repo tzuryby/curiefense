@@ -292,8 +292,8 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
-    pub secpolidhost: String,
-    pub secpolidurl: String,
+    pub policyid: String,
+    pub entryid: String,
 }
 
 #[derive(Debug, Clone)]
@@ -474,8 +474,8 @@ impl<'a> RawRequest<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn map_request(
     logs: &mut Logs,
-    secpolidhost: &str,
-    secpolidurl: &str,
+    policyid: &str,
+    entryid: &str,
     dec: &[Transformation],
     accepted_types: &[ContentType],
     referer_as_uri: bool,
@@ -516,8 +516,8 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
-        secpolidhost: secpolidhost.to_string(),
-        secpolidurl: secpolidurl.to_string(),
+        policyid: policyid.to_string(),
+        entryid: entryid.to_string(),
     };
 
     RequestInfo {
@@ -560,8 +560,8 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
         RequestSelector::Tags => Some(Selected::OStr(tags.selector())),
-        RequestSelector::SecpolIdHost => Some(Selected::Str(&reqinfo.rinfo.secpolidhost)),
-        RequestSelector::SecpolIdUrl => Some(Selected::Str(&reqinfo.rinfo.secpolidurl)),
+        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.policyid)),
+        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.entryid)),
     }
 }
 

@@ -46,13 +46,13 @@ impl IData {
     fn ip(&self) -> String {
         match &self.ipinfo {
             IPInfo::Ip(s) => s.clone(),
-            IPInfo::Hops(hops) => extract_ip(*hops, &self.headers),
+            IPInfo::Hops(hops) => extract_ip(*hops, &self.headers).unwrap_or_else(|| "1.1.1.1".to_string()),
         }
     }
 }
 
 /// reproduces the original IP extraction algorithm, for envoy
-pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> String {
+pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> Option<String> {
     let detect_ip = |xff: &str| -> String {
         let splitted = xff.split(',').collect::<Vec<_>>();
         if trusted_hops < splitted.len() {
@@ -62,10 +62,7 @@ pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> Str
         }
         .to_string()
     };
-    headers
-        .get("x-forwarded-for")
-        .map(|s| detect_ip(s.as_str()))
-        .unwrap_or_else(|| "1.1.1.1".to_string())
+    headers.get("x-forwarded-for").map(|s| detect_ip(s.as_str()))
 }
 
 pub fn inspect_init(config: &Config, loglevel: LogLevel, meta: RequestMeta, ipinfo: IPInfo) -> Result<IData, String> {
@@ -78,7 +75,7 @@ pub fn inspect_init(config: &Config, loglevel: LogLevel, meta: RequestMeta, ipin
     );
     match mr {
         None => Err("could not find a matching security policy".to_string()),
-        Some((_, secpol)) => Ok(IData {
+        Some(secpol) => Ok(IData {
             logs,
             meta,
             headers: HashMap::new(),
@@ -217,8 +214,8 @@ pub async fn finalize<GH: Grasshopper>(
     };
     let reqinfo = map_request(
         &mut logs,
-        &secpolicy.hostmapid,
-        &secpolicy.name,
+        &secpolicy.policy.id,
+        &secpolicy.entry.id,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
@@ -246,7 +243,6 @@ pub async fn finalize<GH: Grasshopper>(
         APhase0 {
             stats,
             itags: tags,
-            secpolname: secpolicy.name.clone(),
             securitypolicy: secpolicy,
             reqinfo,
             is_human,
@@ -261,7 +257,11 @@ pub async fn finalize<GH: Grasshopper>(
 
 #[cfg(test)]
 mod test {
-    use crate::config::{contentfilter::ContentFilterProfile, hostmap::HostMap, raw::AclProfile};
+    use crate::config::{
+        contentfilter::ContentFilterProfile,
+        hostmap::{HostMap, PolicyId},
+        raw::AclProfile,
+    };
     use std::time::SystemTime;
 
     use super::*;
@@ -275,13 +275,19 @@ mod test {
                 name: "default".to_string(),
                 entries: Vec::new(),
                 default: Some(Arc::new(SecurityPolicy {
-                    name: "default".to_string(),
+                    policy: PolicyId {
+                        id: "__default__".to_string(),
+                        name: "default".to_string(),
+                    },
+                    entry: PolicyId {
+                        id: "default".to_string(),
+                        name: "default".to_string(),
+                    },
                     acl_active: false,
                     acl_profile: AclProfile::default(),
                     content_filter_active: true,
                     content_filter_profile: cf,
                     limits: Vec::new(),
-                    hostmapid: "__default__".to_string(),
                 })),
             }),
             last_mod: SystemTime::now(),

@@ -16,8 +16,8 @@ pub enum RequestSelector {
     Company,
     Authority,
     Tags,
-    SecpolIdHost,
-    SecpolIdUrl,
+    SecpolId,
+    SecpolEntryId,
 }
 
 #[derive(Debug, Clone)]
@@ -47,8 +47,8 @@ pub fn decode_attribute(s: &str) -> Option<RequestSelector> {
         "company" => Some(RequestSelector::Company),
         "authority" => Some(RequestSelector::Authority),
         "tags" => Some(RequestSelector::Tags),
-        "secpolidurl" | "secpolurl" => Some(RequestSelector::SecpolIdUrl),
-        "secpolidhost" | "secpolhost" => Some(RequestSelector::SecpolIdHost),
+        "secpolid" | "securitypolicyid" | "securitypolicy" => Some(RequestSelector::SecpolId),
+        "secpolentryid" | "securitypolicyentryid" | "securitypolicyentry" => Some(RequestSelector::SecpolEntryId),
         _ => None,
     }
 }

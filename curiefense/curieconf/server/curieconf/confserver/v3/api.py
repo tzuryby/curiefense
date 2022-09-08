@@ -619,7 +619,7 @@ class DocumentResource(Resource):
         for entry in request.json:
             isValid = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched")
+                abort(500, "schema mismatched " + str(entry))
         res = current_app.backend.documents_update(
             config, document, data, get_gitactor()
         )
