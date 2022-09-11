@@ -11,7 +11,6 @@ DOCUMENTS_PATH = {
     "ratelimits": "config/json/limits.json",
     "securitypolicies": "config/json/securitypolicy.json",
     "contentfilterrules": "config/json/contentfilter-rules.json",
-    "contentfiltergroups": "config/json/contentfilter-groups.json",
     "contentfilterprofiles": "config/json/contentfilter-profiles.json",
     "aclprofiles": "config/json/acl-profiles.json",
     "globalfilters": "config/json/globalfilter-lists.json",
@@ -49,7 +48,6 @@ def vconvert(conf_type_name, vfrom):
         "v1": {
             "urlmaps": "securitypolicies",
             "wafrules": "contentfilterrules",
-            "wafgroups": "contentfiltergroups",
             "wafpolicies": "contentfilterprofiles",
             "aclpolicies": "aclprofiles",
             "tagrules": "globalfilters",

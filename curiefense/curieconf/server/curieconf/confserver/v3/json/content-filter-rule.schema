@@ -55,5 +55,5 @@
             "description": "Subcategory of the rule"
         }
     },
-    "required": [ "id", "name", "operand", "description", "risk", "msg", "category", "subcategory" ]
+    "required": [ "id", "name", "operand", "risk", "msg", "category", "subcategory" ]
 }

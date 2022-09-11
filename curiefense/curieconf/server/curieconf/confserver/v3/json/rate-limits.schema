@@ -48,6 +48,11 @@
             "title": "Description",
             "description": "Description of entity shown in UI"
         },
+        "global": {
+            "type": "boolean",
+            "title": "Global Rule",
+            "description": "This rate limit is evaluated for every request"
+        },
         "timeframe": {
             "type": "integer",
             "title": "Time To Limit",
@@ -121,5 +126,5 @@
         }
     },
     "additionalProperties": false,
-    "required": [ "id", "name", "timeframe", "key", "thresholds" ]
+    "required": [ "id", "name", "global", "timeframe", "key", "thresholds" ]
 }
