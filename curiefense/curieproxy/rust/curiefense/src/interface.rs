@@ -232,7 +232,7 @@ impl SimpleActionT {
             Custom { content: _ } => 8,
             Challenge => 6,
             Monitor => 1,
-            Skip => 0,
+            Skip => 9,
         }
     }
 

@@ -3,7 +3,7 @@ use crate::config::globalfilter::{
 };
 use crate::config::raw::Relation;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
-use crate::interface::{BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use std::collections::HashSet;
@@ -231,6 +231,7 @@ pub fn tag_request(
         }
     }
     let mut matched = 0;
+    let mut decision = SimpleDecision::Pass;
     for psection in globalfilters {
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
@@ -238,26 +239,19 @@ pub fn tag_request(
             let rtags = psection.tags.clone().with_locs(&mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
-                if a.atype == SimpleActionT::Monitor || (a.atype == SimpleActionT::Challenge && is_human) {
-                    continue;
-                } else {
-                    return (
-                        tags.clone(),
-                        SimpleDecision::Action(
-                            a.clone(),
-                            vec![BlockReason::global_filter(
-                                psection.id.clone(),
-                                psection.name.clone(),
-                                a.atype.to_bdecision(),
-                            )],
-                        ),
-                        stats.mapped(globalfilters.len(), matched),
-                    );
-                }
+                let curdec = SimpleDecision::Action(
+                    a.clone(),
+                    vec![BlockReason::global_filter(
+                        psection.id.clone(),
+                        psection.name.clone(),
+                        a.atype.to_bdecision(),
+                    )],
+                );
+                decision = stronger_decision(decision, curdec);
             }
         }
     }
-    (tags, SimpleDecision::Pass, stats.mapped(globalfilters.len(), matched))
+    (tags, decision, stats.mapped(globalfilters.len(), matched))
 }
 
 #[cfg(test)]
