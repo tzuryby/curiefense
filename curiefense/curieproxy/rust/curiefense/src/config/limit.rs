@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::config::matchers::{
-    decode_request_selector_condition, resolve_selector_raw, RequestSelector, RequestSelectorCondition, SelectorType,
+    decode_request_selector_condition, RequestSelector, RequestSelectorCondition, SelectorType,
 };
 use crate::config::raw::{RawLimit, RawLimitSelector};
 use crate::interface::SimpleAction;
@@ -28,14 +28,6 @@ pub struct LimitThreshold {
     pub action: SimpleAction,
 }
 
-pub fn resolve_selector_map(sel: HashMap<String, String>) -> anyhow::Result<RequestSelector> {
-    if sel.len() != 1 {
-        return Err(anyhow::anyhow!("invalid selector {:?}", sel));
-    }
-    let (key, val) = sel.into_iter().next().unwrap();
-    resolve_selector_raw(&key, &val)
-}
-
 pub fn resolve_selectors(rawsel: RawLimitSelector) -> anyhow::Result<Vec<RequestSelectorCondition>> {
     let mk_selectors = |tp: SelectorType, mp: HashMap<String, String>| {
         mp.into_iter()
@@ -54,9 +46,13 @@ impl Limit {
         actions: &HashMap<String, SimpleAction>,
         rawlimit: RawLimit,
     ) -> anyhow::Result<(String, Limit)> {
-        let mkey: anyhow::Result<Vec<RequestSelector>> = rawlimit.key.into_iter().map(resolve_selector_map).collect();
+        let mkey: anyhow::Result<Vec<RequestSelector>> = rawlimit
+            .key
+            .into_iter()
+            .map(RequestSelector::resolve_selector_map)
+            .collect();
         let key = mkey.with_context(|| "when converting the key entry")?;
-        let pairwith = resolve_selector_map(rawlimit.pairwith).ok();
+        let pairwith = RequestSelector::resolve_selector_map(rawlimit.pairwith).ok();
         let mut thresholds: Vec<LimitThreshold> = Vec::new();
         let id = rawlimit.id;
         for thr in rawlimit.thresholds {

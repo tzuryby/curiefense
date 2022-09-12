@@ -489,7 +489,19 @@ mod test {
             headers,
             meta,
         };
-        map_request(&mut logs, "a", "b", &[], &[], false, 500, false, &raw_request)
+        map_request(
+            &mut logs,
+            "a",
+            "b",
+            &[],
+            b"CHANGEME",
+            &[],
+            &[],
+            false,
+            500,
+            false,
+            &raw_request,
+        )
     }
 
     #[test]
@@ -536,22 +548,22 @@ mod test {
                     (
                         "arg1",
                         &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
-                        "MASKED{fac00299}"
+                        "MASKED{e8efcceb}"
                     ),
                     (
                         "arg2",
                         &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
-                        "MASKED{62111533}"
+                        "MASKED{42541ec7}"
                     )
                 ]
             ),
             masked.rinfo.qinfo.args
         );
         assert_eq!(
-            "/foo?arg1=MASKED{fac00299}&arg2=MASKED{fd07346e}",
+            "/foo?arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}",
             masked.rinfo.meta.path
         );
-        assert_eq!("arg1=MASKED{fac00299}&arg2=MASKED{fd07346e}", masked.rinfo.qinfo.query);
+        assert_eq!("arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}", masked.rinfo.qinfo.query);
         let (logged, _) = jsonlog(
             &Decision::pass(Vec::new()),
             Some(&masked),
@@ -582,7 +594,7 @@ mod test {
                     (
                         "arg1",
                         &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
-                        "MASKED{fac00299}"
+                        "MASKED{e8efcceb}"
                     ),
                     (
                         "arg2",
@@ -611,7 +623,7 @@ mod test {
                     (
                         "arg1",
                         &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
-                        "MASKED{fac00299}"
+                        "MASKED{e8efcceb}"
                     ),
                     (
                         "arg2",
@@ -640,12 +652,12 @@ mod test {
                     (
                         "arg1",
                         &Location::UriArgumentValue("arg1".to_string(), "avalue1".to_string()),
-                        "MASKED{fac00299}"
+                        "MASKED{e8efcceb}"
                     ),
                     (
                         "arg2",
                         &Location::UriArgumentValue("arg2".to_string(), "a%20value2".to_string()),
-                        "MASKED{62111533}"
+                        "MASKED{42541ec7}"
                     )
                 ]
             ),
@@ -683,6 +695,8 @@ mod test {
             &mut logs,
             "a",
             "b",
+            &[],
+            b"CHANGEME",
             &[crate::config::contentfilter::Transformation::Base64Decode],
             &[crate::config::raw::ContentType::Json],
             true,

@@ -305,6 +305,8 @@ mod tests {
             "a",
             "b",
             &[],
+            b"CHANGEME",
+            &[],
             &[],
             false,
             500,

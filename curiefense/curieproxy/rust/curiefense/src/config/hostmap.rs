@@ -5,6 +5,8 @@ use crate::config::limit::Limit;
 use crate::config::matchers::Matching;
 use crate::config::raw::AclProfile;
 
+use super::matchers::RequestSelector;
+
 /// the default entry is statically encoded so that it is certain it exists
 #[derive(Debug, Clone)]
 pub struct HostMap {
@@ -29,4 +31,5 @@ pub struct SecurityPolicy {
     pub content_filter_active: bool,
     pub content_filter_profile: ContentFilterProfile,
     pub limits: Vec<Limit>,
+    pub session: Vec<RequestSelector>,
 }

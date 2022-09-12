@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use maxminddb::geoip2::model;
 use serde_json::json;
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha224};
 use std::collections::HashMap;
 use std::net::IpAddr;
 
@@ -301,6 +301,7 @@ pub struct RequestInfo {
     pub cookies: RequestField,
     pub headers: RequestField,
     pub rinfo: RInfo,
+    pub session: String,
 }
 
 impl RequestInfo {
@@ -476,6 +477,8 @@ pub fn map_request(
     logs: &mut Logs,
     policyid: &str,
     entryid: &str,
+    session_sel: &[RequestSelector],
+    seed: &[u8],
     dec: &[Transformation],
     accepted_types: &[ContentType],
     referer_as_uri: bool,
@@ -520,10 +523,34 @@ pub fn map_request(
         entryid: entryid.to_string(),
     };
 
-    RequestInfo {
+    let dummy_reqinfo = RequestInfo {
         cookies,
         headers,
         rinfo,
+        session: String::new(),
+    };
+
+    let raw_session = (if session_sel.is_empty() {
+        &[RequestSelector::Ip]
+    } else {
+        session_sel
+    })
+    .iter()
+    .filter_map(|s| select_string(&dummy_reqinfo, s, None))
+    .next()
+    .unwrap_or_else(|| "???".to_string());
+
+    let mut hasher = Sha224::new();
+    hasher.update(seed);
+    hasher.update(raw_session.as_bytes());
+    let bytes = hasher.finalize();
+    let session = format!("{:x}", bytes);
+
+    RequestInfo {
+        cookies: dummy_reqinfo.cookies,
+        headers: dummy_reqinfo.headers,
+        rinfo: dummy_reqinfo.rinfo,
+        session,
     }
 }
 
@@ -537,7 +564,7 @@ pub enum Selected<'a> {
 ///
 /// the reason we return this selected type instead of something directly string-like is
 /// to avoid copies, because in the Asn case there is no way to return a reference
-pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<Selected<'a>> {
+pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Option<&Tags>) -> Option<Selected<'a>> {
     match sel {
         RequestSelector::Args(k) => reqinfo.rinfo.qinfo.args.get(k).map(Selected::Str),
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
@@ -559,13 +586,13 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: &Tags
         RequestSelector::Authority => Some(Selected::Str(&reqinfo.rinfo.host)),
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
-        RequestSelector::Tags => Some(Selected::OStr(tags.selector())),
+        RequestSelector::Tags => tags.map(|tags| Selected::OStr(tags.selector())),
         RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.policyid)),
         RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.entryid)),
     }
 }
 
-pub fn select_string(reqinfo: &RequestInfo, sel: &RequestSelector, tags: &Tags) -> Option<String> {
+pub fn select_string(reqinfo: &RequestInfo, sel: &RequestSelector, tags: Option<&Tags>) -> Option<String> {
     selector(reqinfo, sel, tags).map(|r| match r {
         Selected::Str(s) => (*s).clone(),
         Selected::U32(n) => format!("{}", n),
@@ -576,7 +603,7 @@ pub fn select_string(reqinfo: &RequestInfo, sel: &RequestSelector, tags: &Tags) 
 pub fn check_selector_cond(reqinfo: &RequestInfo, tags: &Tags, sel: &RequestSelectorCondition) -> bool {
     match sel {
         RequestSelectorCondition::Tag(t) => tags.contains(t),
-        RequestSelectorCondition::N(sel, re) => match selector(reqinfo, sel, tags) {
+        RequestSelectorCondition::N(sel, re) => match selector(reqinfo, sel, Some(tags)) {
             None => false,
             Some(Selected::Str(s)) => re.is_match(s),
             Some(Selected::OStr(s)) => re.is_match(&s),
@@ -586,7 +613,7 @@ pub fn check_selector_cond(reqinfo: &RequestInfo, tags: &Tags, sel: &RequestSele
 }
 
 pub fn masker(seed: &[u8], value: &str) -> String {
-    let mut hasher = Sha256::new();
+    let mut hasher = Sha224::new();
     hasher.update(seed);
     hasher.update(value.as_bytes());
     let bytes = hasher.finalize();
@@ -692,7 +719,7 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(&mut logs, "a", "b", &[], &[], true, 100, false, &raw);
+        let ri = map_request(&mut logs, "a", "b", &[], b"CHANGEME", &[], &[], true, 100, false, &raw);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

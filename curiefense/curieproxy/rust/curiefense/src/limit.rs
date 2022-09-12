@@ -9,7 +9,7 @@ use crate::utils::{select_string, RequestInfo};
 
 fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
     let mut key = limit.id.clone();
-    for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, tags)) {
+    for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, Some(tags))) {
         key += &kpart?;
     }
     Some(format!("{:X}", md5::compute(key)))
@@ -70,7 +70,7 @@ pub fn limit_info(logs: &mut Logs, reqinfo: &RequestInfo, limits: &[Limit], tags
         };
         let pairwith = match &limit.pairwith {
             None => None,
-            Some(sel) => match select_string(reqinfo, sel, tags) {
+            Some(sel) => match select_string(reqinfo, sel, Some(tags)) {
                 None => continue,
                 Some(x) => Some(x),
             },
