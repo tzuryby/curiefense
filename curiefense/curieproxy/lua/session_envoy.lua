@@ -43,8 +43,10 @@ local function custom_response(handle, action_params)
     if not block_mode then
         handle:logDebug("altering the request")
         local headers = handle:headers()
-        for k, v in pairs(action_params.headers) do
-            headers:replace(k, v)
+        if type(action_params.headers) == "table" then
+            for k, v in pairs(action_params.headers) do
+                headers:replace(k, v)
+            end
         end
         return
     end
