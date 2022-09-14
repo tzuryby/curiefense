@@ -152,6 +152,7 @@ pub fn jsonlog(
     let val = match mrinfo {
         Some(info) => serde_json::json!({
             "timestamp": now,
+            "curiesession": info.session,
             "request_id": info.rinfo.meta.requestid,
             "security_config": {
                 "revision": stats.revision,
@@ -231,7 +232,7 @@ impl SimpleActionT {
             Custom { content: _ } => 8,
             Challenge => 6,
             Monitor => 1,
-            Skip => 0,
+            Skip => 9,
         }
     }
 
@@ -428,7 +429,7 @@ fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<TV
             TemplatePart::Var(TVar::Tag(tagname)) => {
                 out.push_str(if tags.contains(tagname) { "true" } else { "false" })
             }
-            TemplatePart::Var(TVar::Selector(sel)) => match selector(rinfo, sel, tags) {
+            TemplatePart::Var(TVar::Selector(sel)) => match selector(rinfo, sel, Some(tags)) {
                 None => out.push_str("nil"),
                 Some(Selected::OStr(s)) => out.push_str(&s),
                 Some(Selected::Str(s)) => out.push_str(s),

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::config::limit::{resolve_selector_map, resolve_selectors};
+use crate::config::limit::resolve_selectors;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::{RawFlowEntry, RawFlowStep, RawLimitSelector};
 use crate::logs::Logs;
@@ -54,7 +54,11 @@ pub struct FlowElement {
 
 impl FlowEntry {
     fn convert(rawentry: RawFlowEntry) -> anyhow::Result<FlowEntry> {
-        let mkey: anyhow::Result<Vec<RequestSelector>> = rawentry.key.into_iter().map(resolve_selector_map).collect();
+        let mkey: anyhow::Result<Vec<RequestSelector>> = rawentry
+            .key
+            .into_iter()
+            .map(RequestSelector::resolve_selector_map)
+            .collect();
         let msequence: anyhow::Result<Vec<FlowStep>> = rawentry.sequence.into_iter().map(FlowStep::convert).collect();
         let sequence = msequence?;
         let id = rawentry.id;

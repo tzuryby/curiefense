@@ -25,6 +25,7 @@ use matchers::Matching;
 use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
 
 use self::flow::FlowMap;
+use self::matchers::RequestSelector;
 use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
@@ -114,6 +115,7 @@ impl Config {
         let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
 
         for rawmap in rawmaps {
+            let mapname = rawmap.name.clone();
             let acl_profile: AclProfile = match acls.get(&rawmap.acl_profile) {
                 Some(p) => p.clone(),
                 None => {
@@ -138,10 +140,22 @@ impl Config {
             for lid in rawmap.limit_ids {
                 match from_map(limits, &lid) {
                     Ok(lm) => olimits.push(lm),
-                    Err(rr) => logs.error(format!("When resolving limits in rawmap {}, {}", rawmap.name, rr).as_str()),
+                    Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
                 }
             }
-            let mapname = rawmap.name.clone();
+            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
+                Ok(Vec::new())
+            } else {
+                rawmap
+                    .session
+                    .into_iter()
+                    .map(RequestSelector::resolve_selector_map)
+                    .collect()
+            };
+            let session = msession.unwrap_or_else(|rr| {
+                logs.error(|| format!("error when decoding session in {}, {}", mapname, rr));
+                Vec::new()
+            });
             let securitypolicy = SecurityPolicy {
                 policy: PolicyId {
                     id: policyid.to_string(),
@@ -151,6 +165,7 @@ impl Config {
                     id: rawmap.id.unwrap_or_else(|| mapname.clone()),
                     name: rawmap.name,
                 },
+                session,
                 acl_active: rawmap.acl_active,
                 acl_profile,
                 content_filter_active: rawmap.content_filter_active,

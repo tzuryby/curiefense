@@ -138,6 +138,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         slogs,
                         &secpolicy.policy.id,
                         &secpolicy.entry.id,
+                        &secpolicy.session,
+                        &secpolicy.content_filter_profile.masking_seed,
                         &secpolicy.content_filter_profile.decoding,
                         &secpolicy.content_filter_profile.content_type,
                         secpolicy.content_filter_profile.referer_as_uri,
@@ -179,19 +181,21 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
+                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
+                    rinfo,
                     stats: Stats::default(),
                 });
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
+                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
+                    rinfo,
                     stats: Stats::default(),
                 });
             }

@@ -74,6 +74,8 @@ pub struct RawHostMap {
 pub struct RawSecurityPolicy {
     #[serde(rename = "match")]
     pub match_: String,
+    #[serde(default)]
+    pub session: Vec<HashMap<String, String>>,
     pub id: Option<String>, // set to name if absent
     pub name: String,
     pub acl_profile: String,

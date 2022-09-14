@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 
-use crate::config::matchers::{decode_attribute, resolve_selector_raw, RequestSelector};
+use crate::config::matchers::RequestSelector;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TVar {
@@ -77,14 +77,14 @@ fn parse_tvar(input: &str) -> IResult<&str, TVar> {
     let (input, oselp2) = opt(preceded(tag("."), take_till1(|c| c == '}')))(input)?;
     match (selp1, oselp2) {
         (_, None) => {
-            if let Some(rs) = decode_attribute(selp1) {
+            if let Some(rs) = RequestSelector::decode_attribute(selp1) {
                 Ok((input, TVar::Selector(rs)))
             } else {
                 nom::combinator::fail(input)
             }
         }
         ("tags", Some(tagname)) => Ok((input, TVar::Tag(tagname.to_string()))),
-        (_, Some(selp2)) => match resolve_selector_raw(selp1, selp2) {
+        (_, Some(selp2)) => match RequestSelector::resolve_selector_raw(selp1, selp2) {
             Err(_) => nom::combinator::fail(input),
             Ok(t) => Ok((input, TVar::Selector(t))),
         },

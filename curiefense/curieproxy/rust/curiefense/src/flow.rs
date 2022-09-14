@@ -21,7 +21,7 @@ fn build_redis_key(
 ) -> Option<String> {
     let mut tohash = entry_id.to_string() + entry_name;
     for kpart in key.iter() {
-        tohash += &select_string(reqinfo, kpart, tags)?;
+        tohash += &select_string(reqinfo, kpart, Some(tags))?;
     }
     Some(format!("{:X}", md5::compute(tohash)))
 }

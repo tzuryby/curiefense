@@ -104,6 +104,8 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         &mut logs,
         "unk",
         "unk",
+        &secpolicy.session,
+        &secpolicy.content_filter_profile.masking_seed,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
@@ -216,6 +218,8 @@ pub async fn finalize<GH: Grasshopper>(
         &mut logs,
         &secpolicy.policy.id,
         &secpolicy.entry.id,
+        &secpolicy.session,
+        &secpolicy.content_filter_profile.masking_seed,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,
         secpolicy.content_filter_profile.referer_as_uri,
@@ -287,6 +291,7 @@ mod test {
                     acl_profile: AclProfile::default(),
                     content_filter_active: true,
                     content_filter_profile: cf,
+                    session: Vec::new(),
                     limits: Vec::new(),
                 })),
             }),
@@ -403,6 +408,12 @@ mod test {
         emptybody.resize(50, 66);
         let idata = add_body(idata, &emptybody).unwrap();
         let idata = add_body(idata, &emptybody);
-        assert!(idata.is_err())
+        match idata {
+            Ok(_) => panic!("should have failed"),
+            Err((_, ar)) => assert_eq!(
+                ar.rinfo.session,
+                "a1f8270abe976ebef4cca2cb3c16c4ab38ca9219818d241f0ecc3d21"
+            ),
+        }
     }
 }
