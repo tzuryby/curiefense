@@ -4,7 +4,7 @@ use curiefense::config::Config;
 use curiefense::grasshopper::{DummyGrasshopper, Grasshopper};
 use curiefense::incremental::{add_body, add_header, finalize, inspect_init, IData, IPInfo};
 use curiefense::inspect_generic_request_map_async;
-use curiefense::interface::{jsonlog, AnalyzeResult};
+use curiefense::interface::{jsonlog_block, AnalyzeResult};
 use curiefense::logs::{LogLevel, Logs};
 use curiefense::simple_executor::{new_executor_and_spawner, Executor, Progress, TaskCB};
 use curiefense::utils::{RawRequest, RequestMeta};
@@ -148,7 +148,7 @@ pub unsafe extern "C" fn curiefense_cfr_log(ptr: *mut CFResult, ln: *mut usize) 
     }
     let cfr = Box::from_raw(ptr);
     let out: String = match *cfr {
-        CFResult::OK(dec) => jsonlog(
+        CFResult::OK(dec) => jsonlog_block(
             &dec.result.decision,
             Some(&dec.result.rinfo),
             None,
@@ -473,7 +473,7 @@ pub unsafe extern "C" fn curiefense_stream_start(
         },
     };
     // create the requestinfo structure
-    let init_result = inspect_init(&iconfig.config, iconfig.loglevel, meta, IPInfo::Ip(ip));
+    let init_result = inspect_init(&iconfig.config, iconfig.loglevel, meta, IPInfo::Ip(ip), None);
     Box::into_raw(Box::new(match init_result {
         Ok(inner) => {
             *success = CFStreamStatus::CFSMore;

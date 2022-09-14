@@ -99,7 +99,7 @@ impl Decision {
         serde_json::to_string(&j).unwrap_or_else(|_| "{}".to_string())
     }
 
-    pub fn log_json(&self, rinfo: &RequestInfo, tags: &Tags, logs: &Logs, stats: &Stats) -> String {
+    pub async fn log_json(&self, rinfo: &RequestInfo, tags: &Tags, stats: &Stats, logs: &Logs) -> String {
         let (request_map, _) = jsonlog(
             self,
             Some(rinfo),
@@ -107,13 +107,15 @@ impl Decision {
             tags,
             stats,
             logs,
-        );
+        )
+        .await;
         serde_json::to_string(&request_map).unwrap_or_else(|_| "{}".to_string())
     }
 }
 
 // helper function that reproduces the envoy log format
-pub fn jsonlog(
+// this is the moment where we perform stats aggregation as we have the return code
+pub async fn jsonlog(
     dec: &Decision,
     mrinfo: Option<&RequestInfo>,
     rcode: Option<u32>,
@@ -121,7 +123,7 @@ pub fn jsonlog(
     stats: &Stats,
     logs: &Logs,
 ) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
-    let now = chrono::Utc::now();
+    let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
     let mut tgs = tags.clone();
     if let Some(action) = &dec.maction {
         if let Some(extra) = &action.extra_tags {
@@ -134,6 +136,11 @@ pub fn jsonlog(
         tgs.insert_qualified("status", &format!("{}", cde), Location::Request);
         tgs.insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
     }
+
+    if let Some(rinfo) = mrinfo {
+        aggregator::aggregate(dec, rcode, rinfo, tags).await;
+    }
+
     let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
@@ -201,6 +208,18 @@ pub fn jsonlog(
     };
 
     (val, now)
+}
+
+// blocking version
+pub fn jsonlog_block(
+    dec: &Decision,
+    mrinfo: Option<&RequestInfo>,
+    rcode: Option<u32>,
+    tags: &Tags,
+    stats: &Stats,
+    logs: &Logs,
+) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
+    async_std::task::block_on(jsonlog(dec, mrinfo, rcode, tags, stats, logs))
 }
 
 // an action, as formatted for outside consumption
