@@ -12,6 +12,7 @@ pub use self::block_reasons::*;
 pub use self::stats::*;
 pub use self::tagging::*;
 
+pub mod aggregator;
 pub mod block_reasons;
 pub mod stats;
 pub mod tagging;
@@ -145,7 +146,6 @@ pub fn jsonlog(
     };
     let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
     let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
-    let (flow_control, flow_control_active) = stats_counter(InitiatorKind::FlowControl);
     let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
     let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
 
@@ -181,8 +181,6 @@ pub fn jsonlog(
                 "acl_active": acl_active,
                 "global_filters": global_filters,
                 "global_filters_active": global_filters_active,
-                "flow_control": flow_control,
-                "flow_control_active": flow_control_active,
                 "rate_limit": rate_limit,
                 "rate_limit_active": rate_limit_active,
                 "content_filters": content_filters,
@@ -190,7 +188,6 @@ pub fn jsonlog(
             },
             "acl_triggers": get_trigger(&InitiatorKind::Acl),
             "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
-            "flow_control_triggers": get_trigger(&InitiatorKind::FlowControl),
             "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
             "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
             "proxy": {
