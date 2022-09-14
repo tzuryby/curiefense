@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use maxminddb::geoip2::model;
 use serde_json::json;
@@ -298,6 +299,7 @@ pub struct RInfo {
 
 #[derive(Debug, Clone)]
 pub struct RequestInfo {
+    pub timestamp: DateTime<Utc>,
     pub cookies: RequestField,
     pub headers: RequestField,
     pub rinfo: RInfo,
@@ -349,7 +351,7 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub fn log_json(&self) -> String {
+    pub async fn log_json(&self) -> String {
         let dtags = Tags::default();
         let tags: &Tags = match &self.tags {
             Some(t) => t,
@@ -358,8 +360,13 @@ impl InspectionResult {
 
         match &self.rinfo {
             None => "{}".to_string(),
-            Some(rinfo) => self.decision.log_json(rinfo, tags, &self.logs, &self.stats),
+            Some(rinfo) => self.decision.log_json(rinfo, tags, &self.stats, &self.logs).await,
         }
+    }
+
+    // blocking version of log_json
+    pub fn log_json_block(&self) -> String {
+        async_std::task::block_on(self.log_json())
     }
 
     pub fn from_analyze(logs: Logs, dec: AnalyzeResult) -> Self {
@@ -485,6 +492,7 @@ pub fn map_request(
     max_depth: usize, // if set to 0, the body will not be parsed
     ignore_body: bool,
     raw: &RawRequest,
+    ts: Option<DateTime<Utc>>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
@@ -524,6 +532,7 @@ pub fn map_request(
     };
 
     let dummy_reqinfo = RequestInfo {
+        timestamp: ts.unwrap_or_else(Utc::now),
         cookies,
         headers,
         rinfo,
@@ -547,6 +556,7 @@ pub fn map_request(
     let session = format!("{:x}", bytes);
 
     RequestInfo {
+        timestamp: dummy_reqinfo.timestamp,
         cookies: dummy_reqinfo.cookies,
         headers: dummy_reqinfo.headers,
         rinfo: dummy_reqinfo.rinfo,
@@ -719,7 +729,20 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(&mut logs, "a", "b", &[], b"CHANGEME", &[], &[], true, 100, false, &raw);
+        let ri = map_request(
+            &mut logs,
+            "a",
+            "b",
+            &[],
+            b"CHANGEME",
+            &[],
+            &[],
+            true,
+            100,
+            false,
+            &raw,
+            None,
+        );
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

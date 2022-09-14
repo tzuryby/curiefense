@@ -48,7 +48,7 @@ impl mlua::UserData for LuaInspectionResult {
         });
         fields.add_field_method_get("logs", |_, this| this.get_with(|r| r.logs.to_stringvec()));
         fields.add_field_method_get("response", |_, this| this.get_with(|r| r.decision.response_json()));
-        fields.add_field_method_get("request_map", |_, this| this.get_with(|r| r.log_json()));
+        fields.add_field_method_get("request_map", |_, this| this.get_with(|r| r.log_json_block()));
     }
 }
 
@@ -105,7 +105,7 @@ impl mlua::UserData for LInitResult {
         });
         fields.add_field_method_get("logs", |_, this| this.get_with(|r| r.logs.to_stringvec()));
         fields.add_field_method_get("response", |_, this| this.get_with(|r| r.decision.response_json()));
-        fields.add_field_method_get("request_map", |_, this| this.get_with(|r| r.log_json()));
+        fields.add_field_method_get("request_map", |_, this| this.get_with(|r| r.log_json_block()));
 
         fields.add_field_method_get("flows", |_, this| {
             Ok(match this {

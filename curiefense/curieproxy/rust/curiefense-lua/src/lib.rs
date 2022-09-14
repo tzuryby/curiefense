@@ -9,6 +9,7 @@ use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
 use curiefense::inspect_generic_request_map;
 use curiefense::inspect_generic_request_map_init;
+use curiefense::interface::aggregator::aggregated_values_block;
 use curiefense::logs::Logs;
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
@@ -354,6 +355,10 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
     // setting the HTTP status code
     exports.set("set_status_string", lua.create_function(lua_set_status_string)?)?;
+    exports.set(
+        "aggregated_values",
+        lua.create_function(|_, ()| Ok(aggregated_values_block()))?,
+    )?;
 
     Ok(exports)
 }

@@ -62,7 +62,7 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
 
         let mut logs = Logs::new(loglevel);
         let midata = with_config(configpath, &mut logs, |_, cfg| {
-            inspect_init(cfg, loglevel, meta, IPInfo::Hops(trustedhops as usize)).map(|o| {
+            inspect_init(cfg, loglevel, meta, IPInfo::Hops(trustedhops as usize), None).map(|o| {
                 // we have to clone all this data here :(
                 // that would not be necessary if we could avoid the autoreloading feature, but had a system for reloading the server when the configuration changes
                 let gf = cfg.globalfilters.clone();
@@ -311,7 +311,7 @@ impl MyEP {
                 &result.tags,
                 &result.stats,
                 logs,
-            );
+            ).await;
             for l in logs.to_stringvec() {
                 debug!("{}", l);
             }
