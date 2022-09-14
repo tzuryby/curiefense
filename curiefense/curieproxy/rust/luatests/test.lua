@@ -359,10 +359,14 @@ local function test_masking(request_path)
     local res = run_inspect_request(raw_request_map)
     local request_map = cjson.decode(res.request_map)
     for _, section in pairs({"arguments", "headers", "cookies"}) do
-      for k, value in pairs(request_map[section]) do
-        local p = string.find(value, secret)
+      for _, value in pairs(request_map[section]) do
+        local p = string.find(value["name"], secret)
         if p ~= nil then
-          error("Could find secret in " .. section .. "/" .. k)
+          error("Could find secret in " .. section .. "/" .. value["name"])
+        end
+        local p = string.find(value["value"], secret)
+        if p ~= nil then
+          error("Could find secret in " .. section .. "/" .. value["name"])
         end
       end
     end

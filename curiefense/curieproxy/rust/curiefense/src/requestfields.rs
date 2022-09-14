@@ -1,3 +1,5 @@
+use serde_json::Value;
+
 use crate::config::contentfilter::Transformation;
 use crate::interface::Location;
 use crate::utils::decoders::DecodingResult;
@@ -123,10 +125,15 @@ impl RequestField {
         self.fields.iter().map(|(k, (v, _))| (k.as_str(), v.as_str()))
     }
 
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::Value::Object(
+    pub fn to_json(&self) -> Value {
+        Value::Array(
             self.iter()
-                .map(|(k, v)| (k.to_string(), serde_json::Value::String(v.to_string())))
+                .map(|(k, v)| {
+                    let mut inner = serde_json::Map::new();
+                    inner.insert("name".into(), Value::String(k.to_string()));
+                    inner.insert("value".into(), Value::String(v.to_string()));
+                    Value::Object(inner)
+                })
                 .collect(),
         )
     }
