@@ -22,27 +22,6 @@ use userdata::LuaLimitResult;
 
 use userdata::LuaInspectionResult;
 
-/// Utility to add the return status to the log string
-fn lua_set_status_string(_lua: &Lua, args: (String, String)) -> LuaResult<String> {
-    let (data, code) = args;
-    match code.parse::<u32>() {
-        Err(_) => Ok(data),
-        Ok(cde) => match serde_json::from_str::<serde_json::Value>(&data) {
-            Err(_) => Ok(data),
-            Ok(mut value) => match value.as_object_mut() {
-                None => Ok(data),
-                Some(mp) => {
-                    mp.insert(
-                        "response_code".to_string(),
-                        serde_json::Value::Number(serde_json::Number::from(cde)),
-                    );
-                    Ok(serde_json::to_string(mp).unwrap_or(data))
-                }
-            },
-        },
-    }
-}
-
 // ******************************************
 // FULL CHECKS
 // ******************************************
@@ -353,8 +332,6 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     exports.set("inspect_request_process", lua.create_function(lua_inspect_process)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
-    // setting the HTTP status code
-    exports.set("set_status_string", lua.create_function(lua_set_status_string)?)?;
     exports.set(
         "aggregated_values",
         lua.create_function(|_, ()| Ok(aggregated_values_block()))?,

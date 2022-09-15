@@ -572,6 +572,7 @@ mod test {
             &Tags::default(),
             &Stats::default(),
             &Logs::default(),
+            HashMap::new(),
         ));
         let log_string = logged.to_string();
         if log_string.contains("avalue1") || log_string.contains("a value2") || log_string.contains("a%20value2") {
@@ -724,6 +725,7 @@ mod test {
             &Tags::default(),
             &Stats::default(),
             &Logs::default(),
+            HashMap::new(),
         ));
         let log_string = logged.to_string();
         if log_string.contains("SECRET") {

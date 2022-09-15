@@ -39,7 +39,7 @@ fn py_inspect_request(
         stats: dec.stats,
     };
     let response = res.decision.response_json();
-    let request_map = res.log_json_block();
+    let request_map = res.log_json_block(HashMap::new());
     let merr = res.err;
     match merr {
         Some(rr) => Err(PyTypeError::new_err(rr)),

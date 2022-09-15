@@ -311,7 +311,9 @@ impl MyEP {
                 &result.tags,
                 &result.stats,
                 logs,
-            ).await;
+                HashMap::new(),
+            )
+            .await;
             for l in logs.to_stringvec() {
                 debug!("{}", l);
             }

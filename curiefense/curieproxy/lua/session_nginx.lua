@@ -193,7 +193,7 @@ function session_rust_nginx.inspect(handle)
         end
     end
 
-    handle.ctx.request_map = res.request_map
+    handle.ctx.res = res
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", res.error))
@@ -214,9 +214,9 @@ end
 
 -- log block stage processing
 function session_rust_nginx.log(handle)
-    local request_map = handle.ctx.request_map
-    handle.ctx.request_map = nil
-    handle.var.request_map = request_map
+    local res = handle.ctx.res
+    handle.ctx.res = nil
+    handle.var.request_map = res:request_map({["test"]="value"})
 end
 
 return session_rust_nginx
