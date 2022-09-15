@@ -3,6 +3,7 @@ use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
+use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
 use serde::{Deserialize, Serialize};
@@ -168,7 +169,7 @@ pub async fn jsonlog(
     let mut proxy = proxy
         .into_iter()
         .map(|(k, v)| (k, serde_json::Value::String(v)))
-        .collect::<serde_json::Map<_, _>>();
+        .collect::<HashMap<_, _>>();
 
     let val = match mrinfo {
         Some(info) => {
@@ -216,7 +217,7 @@ pub async fn jsonlog(
                 "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
                 "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
                 "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
-                "proxy": proxy,
+                "proxy": NameValue::new(&proxy),
                 "reason": block_reason_desc,
                 "profiling": {},
                 "biometrics": {},

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::net::IpAddr;
 
 pub mod decoders;
+pub mod json;
 pub mod templating;
 pub mod url;
 
