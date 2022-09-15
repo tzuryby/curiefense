@@ -99,7 +99,14 @@ impl Decision {
         serde_json::to_string(&j).unwrap_or_else(|_| "{}".to_string())
     }
 
-    pub async fn log_json(&self, rinfo: &RequestInfo, tags: &Tags, stats: &Stats, logs: &Logs) -> String {
+    pub async fn log_json(
+        &self,
+        rinfo: &RequestInfo,
+        tags: &Tags,
+        stats: &Stats,
+        logs: &Logs,
+        proxy: HashMap<String, String>,
+    ) -> String {
         let (request_map, _) = jsonlog(
             self,
             Some(rinfo),
@@ -107,6 +114,7 @@ impl Decision {
             tags,
             stats,
             logs,
+            proxy,
         )
         .await;
         serde_json::to_string(&request_map).unwrap_or_else(|_| "{}".to_string())
@@ -122,6 +130,7 @@ pub async fn jsonlog(
     tags: &Tags,
     stats: &Stats,
     logs: &Logs,
+    proxy: HashMap<String, String>,
 ) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
     let mut tgs = tags.clone();
@@ -156,54 +165,63 @@ pub async fn jsonlog(
     let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
     let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
 
-    let val = match mrinfo {
-        Some(info) => serde_json::json!({
-            "timestamp": now,
-            "curiesession": info.session,
-            "request_id": info.rinfo.meta.requestid,
-            "security_config": {
-                "revision": stats.revision,
-                "acl_active": stats.secpol.acl_enabled,
-                "cf_active": stats.secpol.content_filter_enabled,
-                "cf_rules": stats.content_filter_total,
-                "rate_limit_rules": stats.secpol.limit_amount,
-                "global_filters_active": stats.secpol.globalfilters_amount
-            },
-            "arguments": info.rinfo.qinfo.args.to_json(),
-            "path": info.rinfo.qinfo.qpath,
-            "path_parts": info.rinfo.qinfo.path_as_map.to_json(),
-            "authority": info.rinfo.meta.authority,
-            "cookies": info.cookies.to_json(),
-            "headers": info.headers.to_json(),
-            "tags": tgs.to_json(),
-            "uri": info.rinfo.meta.path,
-            "ip": info.rinfo.geoip.ip,
-            "method": info.rinfo.meta.method,
-            "response_code": rcode,
-            "logs": logs.to_stringvec(),
+    let mut proxy = proxy
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::String(v)))
+        .collect::<serde_json::Map<_, _>>();
 
-            "processing_stage": stats.processing_stage,
-            "trigger_counters": {
-                "acl": acl,
-                "acl_active": acl_active,
-                "global_filters": global_filters,
-                "global_filters_active": global_filters_active,
-                "rate_limit": rate_limit,
-                "rate_limit_active": rate_limit_active,
-                "content_filters": content_filters,
-                "content_filters_active": content_filters_active,
-            },
-            "acl_triggers": get_trigger(&InitiatorKind::Acl),
-            "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
-            "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
-            "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
-            "proxy": {
-                "location": info.rinfo.geoip.location
-            },
-            "reason": block_reason_desc,
-            "profiling": {},
-            "biometrics": {},
-        }),
+    let val = match mrinfo {
+        Some(info) => {
+            proxy.insert(
+                "location".into(),
+                serde_json::to_value(&info.rinfo.geoip.location).unwrap_or(serde_json::Value::Null),
+            );
+            serde_json::json!({
+                "timestamp": now,
+                "curiesession": info.session,
+                "request_id": info.rinfo.meta.requestid,
+                "security_config": {
+                    "revision": stats.revision,
+                    "acl_active": stats.secpol.acl_enabled,
+                    "cf_active": stats.secpol.content_filter_enabled,
+                    "cf_rules": stats.content_filter_total,
+                    "rate_limit_rules": stats.secpol.limit_amount,
+                    "global_filters_active": stats.secpol.globalfilters_amount
+                },
+                "arguments": info.rinfo.qinfo.args.to_json(),
+                "path": info.rinfo.qinfo.qpath,
+                "path_parts": info.rinfo.qinfo.path_as_map.to_json(),
+                "authority": info.rinfo.meta.authority,
+                "cookies": info.cookies.to_json(),
+                "headers": info.headers.to_json(),
+                "tags": tgs.to_json(),
+                "uri": info.rinfo.meta.path,
+                "ip": info.rinfo.geoip.ip,
+                "method": info.rinfo.meta.method,
+                "response_code": rcode,
+                "logs": logs.to_stringvec(),
+
+                "processing_stage": stats.processing_stage,
+                "trigger_counters": {
+                    "acl": acl,
+                    "acl_active": acl_active,
+                    "global_filters": global_filters,
+                    "global_filters_active": global_filters_active,
+                    "rate_limit": rate_limit,
+                    "rate_limit_active": rate_limit_active,
+                    "content_filters": content_filters,
+                    "content_filters_active": content_filters_active,
+                },
+                "acl_triggers": get_trigger(&InitiatorKind::Acl),
+                "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
+                "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
+                "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
+                "proxy": proxy,
+                "reason": block_reason_desc,
+                "profiling": {},
+                "biometrics": {},
+            })
+        }
         None => serde_json::Value::Null,
     };
 
@@ -218,8 +236,9 @@ pub fn jsonlog_block(
     tags: &Tags,
     stats: &Stats,
     logs: &Logs,
+    proxy: HashMap<String, String>,
 ) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
-    async_std::task::block_on(jsonlog(dec, mrinfo, rcode, tags, stats, logs))
+    async_std::task::block_on(jsonlog(dec, mrinfo, rcode, tags, stats, logs, proxy))
 }
 
 // an action, as formatted for outside consumption

@@ -113,7 +113,8 @@ function session_rust_envoy.inspect(handle)
         meta, headers, body_content, ip_str
     )
 
-    log_request(handle, res.request_map)
+    -- optionally add a Map<String, String> that will be logged
+    log_request(handle, res:request_map(nil))
 
     if res.error then
         handle:logErr(sfmt("curiefense.inspect_request_map error %s", res.error))
