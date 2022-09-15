@@ -210,13 +210,18 @@ m_action = api.model(
 m_dynamicrule = api.model(
     "Dynamic Rule",
     {
+        "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
         "threshold": fields.Integer(required=True),
         "timeframe": fields.Integer(required=True),
         "ttl": fields.Integer(required=True),
-        "include": fields.List(fields.String()),
-        "exclude": fields.List(fields.String()),
+        "active": fields.Boolean(required=True),
+        "target": fields.String(required=True),
+        "include": fields.List(fields.String(required=True)),
+        "exclude": fields.List(fields.String(required=True)),
+        "tags": fields.List(fields.String(required=True)),
+        "action": fields.Raw(required=True),
     },
 )
 

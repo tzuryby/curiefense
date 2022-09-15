@@ -38,6 +38,18 @@
       "title": "TTL",
       "description": "The number if seconds this source will remain in quarantine"
     },
+    "active": {
+      "type": "boolean",
+      "minLength": 1,
+      "title": "Name",
+      "description": "Active state of the dynamic rule"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Name",
+      "description": "Target entity to block"
+    },
     "include": {
       "type": "array",
       "title": "Included tags",
@@ -47,6 +59,17 @@
       "type": "array",
       "title": "Exclude tags",
       "description": "Tags describing requests to exclude from the dynamic rule"
+    },
+    "tags": {
+        "title": "Tags List",
+        "description": "List of tags to apply",
+        "type": "array",
+        "items": { "type": "string" }
+    },
+    "action": {
+        "type": "string",
+        "title": "Rule Broken Action",
+        "description": "Action to take when receiving requests breaking this rule"
     }
   },
   "additionalProperties": true,
@@ -55,6 +78,10 @@
     "name",
     "threshold",
     "timeframe",
-    "ttl"
+    "ttl",
+    "active",
+    "target",
+    "tags",
+    "action"
   ]
 }
