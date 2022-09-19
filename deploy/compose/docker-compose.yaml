@@ -75,6 +75,10 @@ services:
       - TARGET_PORT_A=8080
       - TARGET_ADDRESS_B=juiceshop
       - TARGET_PORT_B=3000
+      - FILEBEAT
+      - FILEBEAT_LOG_LEVEL
+      - AGGREGATED_LOG_FILE
+      - ACCESS_LOG
     networks:
       curiemesh:
         aliases:
