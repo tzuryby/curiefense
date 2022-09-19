@@ -96,10 +96,16 @@ fn hyperscan_match(pattern: String, mmatch: Option<&str>) -> PyResult<Vec<MatchR
     }
 }
 
+#[pyfunction]
+fn aggregated_data() -> PyResult<String> {
+    Ok(curiefense::interface::aggregator::aggregated_values_block())
+}
+
 #[pymodule]
 fn curiefense(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_inspect_request, m)?)?;
     m.add_function(wrap_pyfunction!(rust_match, m)?)?;
     m.add_function(wrap_pyfunction!(hyperscan_match, m)?)?;
+    m.add_function(wrap_pyfunction!(aggregated_data, m)?)?;
     Ok(())
 }
