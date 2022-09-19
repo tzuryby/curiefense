@@ -420,7 +420,11 @@ impl AggregatedCounters {
                 "all" => (),
                 "bot" => self.bot += 1,
                 "human" => self.human += 1,
-                tg => self.top_tags.inc(tg.to_string()),
+                tg => {
+                    if !tg.starts_with("securitypolicy") && !tg.starts_with("ip:") {
+                        self.top_tags.inc(tg.to_string())
+                    }
+                }
             }
         }
 
