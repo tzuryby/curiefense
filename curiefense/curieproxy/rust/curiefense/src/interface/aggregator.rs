@@ -437,19 +437,6 @@ impl AggregatedCounters {
     }
 }
 
-pub async fn aggregate(dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, tags: &Tags) {
-    let seconds = rinfo.timestamp.timestamp();
-    let key = AggregationKey {
-        proxy: None,
-        secpolid: rinfo.rinfo.policyid.to_string(),
-        secpolentryid: rinfo.rinfo.entryid.to_string(),
-    };
-    let mut guard = AGGREGATED.lock().await;
-    let entry_secs = guard.entry(seconds).or_default();
-    let entry = entry_secs.entry(key).or_default();
-    entry.increment(dec, rcode, rinfo, tags);
-}
-
 /* missing:
 
   * d-bytes
@@ -584,21 +571,22 @@ fn serialize_entry(secs: i64, hdr: &AggregationKey, counters: &AggregatedCounter
     Value::Object(content)
 }
 
+fn prune_old_values<A>(mp: &mut BTreeMap<i64, A>) {
+    let keys: Vec<i64> = mp.keys().copied().collect();
+    if let Some(last_entry) = keys.last() {
+        for k in keys.iter() {
+            if *k < *last_entry - *SECONDS_KEPT {
+                mp.remove(k);
+            }
+        }
+    }
+}
+
 /// displays the Nth last seconds of aggregated data
 pub async fn aggregated_values() -> String {
     let mut guard = AGGREGATED.lock().await;
     // first, prune excess data
-    let keys: Vec<i64> = guard.keys().copied().collect();
-    match keys.last() {
-        None => return "[]".into(),
-        Some(last_entry) => {
-            for k in keys.iter() {
-                if *k < *last_entry - *SECONDS_KEPT {
-                    guard.remove(k);
-                }
-            }
-        }
-    }
+    prune_old_values(&mut guard);
 
     let entries: Vec<Value> = guard
         .iter()
@@ -614,4 +602,19 @@ pub async fn aggregated_values() -> String {
 /// non asynchronous version of aggregated_values
 pub fn aggregated_values_block() -> String {
     async_std::task::block_on(aggregated_values())
+}
+
+/// adds new data to the aggregator
+pub async fn aggregate(dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, tags: &Tags) {
+    let seconds = rinfo.timestamp.timestamp();
+    let key = AggregationKey {
+        proxy: None,
+        secpolid: rinfo.rinfo.policyid.to_string(),
+        secpolentryid: rinfo.rinfo.entryid.to_string(),
+    };
+    let mut guard = AGGREGATED.lock().await;
+    prune_old_values(&mut guard);
+    let entry_secs = guard.entry(seconds).or_default();
+    let entry = entry_secs.entry(key).or_default();
+    entry.increment(dec, rcode, rinfo, tags);
 }
