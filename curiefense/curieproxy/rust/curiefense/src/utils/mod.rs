@@ -311,7 +311,10 @@ impl RequestInfo {
     pub fn into_json(self, tags: Tags) -> serde_json::Value {
         let mut v = self.into_json_notags();
         if let Some(m) = v.as_object_mut() {
-            m.insert("tags".to_string(), tags.to_json());
+            m.insert(
+                "tags".to_string(),
+                serde_json::to_value(tags).unwrap_or(serde_json::Value::Null),
+            );
         }
         v
     }
