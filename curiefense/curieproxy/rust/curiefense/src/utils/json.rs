@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-
 use serde::Serialize;
-use serde_json::Value;
 
 /// newtype for the BT format
 pub struct NameValue<'t, K: Eq + std::hash::Hash, V> {
@@ -19,14 +17,16 @@ impl<'t, K: Eq + std::hash::Hash + std::fmt::Display, V: Serialize> Serialize fo
     where
         S: serde::Serializer,
     {
-        serializer.collect_seq(self.inner.iter().map(|(k, v)| {
-            let mut inner = serde_json::Map::new();
-            inner.insert("name".into(), Value::String(k.to_string()));
-            inner.insert(
-                "value".into(),
-                serde_json::to_value(v).unwrap_or_else(|rr| Value::String(rr.to_string())),
-            );
-            Value::Object(inner)
+        serializer.collect_seq(self.inner.iter().map(|(k, v)| BigTableKV {
+            name: k.to_string(),
+            value: v,
         }))
     }
+}
+
+/// newtype for big tables KV format
+#[derive(Serialize)]
+pub struct BigTableKV<K, V> {
+    pub name: K,
+    pub value: V,
 }

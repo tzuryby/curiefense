@@ -331,10 +331,10 @@ impl RequestInfo {
         .collect();
         attrs.extend(self.rinfo.meta.extra.into_iter().map(|(k, v)| (k, Some(v))));
         serde_json::json!({
-            "headers": self.headers.to_json(),
-            "cookies": self.cookies.to_json(),
-            "args": self.rinfo.qinfo.args.to_json(),
-            "path": self.rinfo.qinfo.path_as_map.to_json(),
+            "headers": self.headers,
+            "cookies": self.cookies,
+            "args": self.rinfo.qinfo.args,
+            "path": self.rinfo.qinfo.path_as_map,
             "attributes": attrs,
             "geo": geo
         })
