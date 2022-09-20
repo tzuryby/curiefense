@@ -37,6 +37,11 @@
                         "title": "Name",
                         "description": "Name of Security Policy entry shown in UI"
                     },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Entry for specific URLs"
+                    },
                     "match": {
                         "type": "string",
                         "title": "Match",
