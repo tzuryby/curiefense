@@ -16,7 +16,7 @@ fn py_inspect_request(
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
-) -> PyResult<(String, String)> {
+) -> PyResult<(String, Vec<u8>)> {
     let mut logs = Logs::default();
     logs.debug("Inspection init");
     let rmeta: RequestMeta = RequestMeta::from_map(meta).map_err(PyTypeError::new_err)?;

@@ -133,3 +133,12 @@ impl Logs {
         serde_json::to_value(&self.logs).unwrap_or_else(|rr| serde_json::Value::String(rr.to_string()))
     }
 }
+
+impl Serialize for Logs {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_seq(self.logs.iter().map(|l| l.to_string()))
+    }
+}

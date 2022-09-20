@@ -54,9 +54,14 @@ impl mlua::UserData for LuaInspectionResult {
 
     fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method("request_map", |lua, this, proxy: LuaValue| {
-            match FromLua::from_lua(proxy, lua) {
+            let emr = match FromLua::from_lua(proxy, lua) {
                 Err(_) | Ok(None) => this.get_with(|r| r.log_json_block(HashMap::new())),
                 Ok(Some(proxy)) => this.get_with(|r| r.log_json_block(proxy)),
+            };
+            match emr {
+                Err(rr) => Err(rr),
+                Ok(None) => Ok(None),
+                Ok(Some(v)) => Ok(Some(lua.create_string(&v)?)),
             }
         });
     }
@@ -142,9 +147,14 @@ impl mlua::UserData for LInitResult {
 
     fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_method("request_map", |lua, this, proxy: LuaValue| {
-            match FromLua::from_lua(proxy, lua) {
+            let emr = match FromLua::from_lua(proxy, lua) {
                 Err(_) | Ok(None) => this.get_with(|r| r.log_json_block(HashMap::new())),
                 Ok(Some(proxy)) => this.get_with(|r| r.log_json_block(proxy)),
+            };
+            match emr {
+                Err(rr) => Err(rr),
+                Ok(None) => Ok(None),
+                Ok(Some(v)) => Ok(Some(lua.create_string(&v)?)),
             }
         });
     }

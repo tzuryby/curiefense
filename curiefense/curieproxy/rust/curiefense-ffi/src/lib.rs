@@ -147,19 +147,20 @@ pub unsafe extern "C" fn curiefense_cfr_log(ptr: *mut CFResult, ln: *mut usize) 
         return std::ptr::null_mut();
     }
     let cfr = Box::from_raw(ptr);
-    let out: String = match *cfr {
-        CFResult::OK(dec) => jsonlog_block(
-            &dec.result.decision,
-            Some(&dec.result.rinfo),
-            None,
-            &dec.result.tags,
-            &dec.result.stats,
-            &dec.logs,
-            HashMap::new(),
-        )
-        .0
-        .to_string(),
-        CFResult::RR(rr) => rr,
+    let out: Vec<u8> = match *cfr {
+        CFResult::OK(dec) => {
+            jsonlog_block(
+                &dec.result.decision,
+                Some(&dec.result.rinfo),
+                None,
+                &dec.result.tags,
+                &dec.result.stats,
+                &dec.logs,
+                HashMap::new(),
+            )
+            .0
+        }
+        CFResult::RR(rr) => rr.as_bytes().to_vec(),
     };
     *ln = out.len();
     match CString::new(out) {

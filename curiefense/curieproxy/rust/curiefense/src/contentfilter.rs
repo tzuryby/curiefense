@@ -574,7 +574,7 @@ mod test {
             &Logs::default(),
             HashMap::new(),
         ));
-        let log_string = logged.to_string();
+        let log_string = String::from_utf8(logged).unwrap();
         if log_string.contains("avalue1") || log_string.contains("a value2") || log_string.contains("a%20value2") {
             panic!("log lacks masking: {}", log_string)
         }
@@ -727,7 +727,7 @@ mod test {
             &Logs::default(),
             HashMap::new(),
         ));
-        let log_string = logged.to_string();
+        let log_string = String::from_utf8(logged).unwrap();
         if log_string.contains("SECRET") {
             panic!("SECRET found in {}", log_string);
         }

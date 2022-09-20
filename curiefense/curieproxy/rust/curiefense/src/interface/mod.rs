@@ -107,7 +107,7 @@ impl Decision {
         stats: &Stats,
         logs: &Logs,
         proxy: HashMap<String, String>,
-    ) -> String {
+    ) -> Vec<u8> {
         let (request_map, _) = jsonlog(
             self,
             Some(rinfo),
@@ -118,7 +118,7 @@ impl Decision {
             proxy,
         )
         .await;
-        serde_json::to_string(&request_map).unwrap_or_else(|_| "{}".to_string())
+        request_map
     }
 }
 
@@ -132,7 +132,7 @@ pub async fn jsonlog(
     stats: &Stats,
     logs: &Logs,
     proxy: HashMap<String, String>,
-) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
+) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
     let mut tgs = tags.clone();
     if let Some(action) = &dec.maction {
@@ -178,7 +178,7 @@ pub async fn jsonlog(
                 serde_json::to_value(&info.rinfo.geoip.location).unwrap_or(serde_json::Value::Null),
             );
             serde_json::json!({
-                "timestamp": now,
+                "@timestamp": now,
                 "curiesession": info.session,
                 "request_id": info.rinfo.meta.requestid,
                 "security_config": {
@@ -200,7 +200,7 @@ pub async fn jsonlog(
                 "ip": info.rinfo.geoip.ip,
                 "method": info.rinfo.meta.method,
                 "response_code": rcode,
-                "logs": logs.to_stringvec(),
+                "logs": logs,
 
                 "processing_stage": stats.processing_stage,
                 "trigger_counters": {
@@ -226,7 +226,7 @@ pub async fn jsonlog(
         None => serde_json::Value::Null,
     };
 
-    (val, now)
+    (serde_json::to_vec(&val).unwrap_or_else(|_| b"{}".to_vec()), now)
 }
 
 // blocking version
@@ -238,7 +238,7 @@ pub fn jsonlog_block(
     stats: &Stats,
     logs: &Logs,
     proxy: HashMap<String, String>,
-) -> (serde_json::Value, chrono::DateTime<chrono::Utc>) {
+) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     async_std::task::block_on(jsonlog(dec, mrinfo, rcode, tags, stats, logs, proxy))
 }
 
