@@ -1,8 +1,7 @@
-use serde_json::Value;
-
 use crate::config::contentfilter::Transformation;
 use crate::interface::Location;
 use crate::utils::decoders::DecodingResult;
+use crate::utils::json::BigTableKV;
 use crate::utils::masker;
 use std::collections::HashSet;
 use std::collections::{hash_map, HashMap};
@@ -125,19 +124,6 @@ impl RequestField {
         self.fields.iter().map(|(k, (v, _))| (k.as_str(), v.as_str()))
     }
 
-    pub fn to_json(&self) -> Value {
-        Value::Array(
-            self.iter()
-                .map(|(k, v)| {
-                    let mut inner = serde_json::Map::new();
-                    inner.insert("name".into(), Value::String(k.to_string()));
-                    inner.insert("value".into(), Value::String(v.to_string()));
-                    Value::Object(inner)
-                })
-                .collect(),
-        )
-    }
-
     pub fn new(decoding: &[Transformation]) -> Self {
         RequestField {
             decoding: decoding.to_vec(),
@@ -177,5 +163,17 @@ impl RequestField {
                 })
                 .collect(),
         }
+    }
+}
+
+impl serde::Serialize for RequestField {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_seq(self.fields.iter().map(|(k, (v, _))| BigTableKV {
+            name: k.to_string(),
+            value: v,
+        }))
     }
 }
