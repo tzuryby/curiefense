@@ -17,21 +17,17 @@ pub mod simple_executor;
 pub mod tagging;
 pub mod utils;
 
-use analyze::CfRulesArg;
+use analyze::{APhase0, CfRulesArg};
 use body::body_too_large;
 use config::with_config;
 use grasshopper::Grasshopper;
-use interface::{Action, ActionType, Decision};
-use interface::{AnalyzeResult, Tags};
+use interface::stats::{SecpolStats, Stats, StatsCollect};
+use interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags};
 use logs::Logs;
 use securitypolicy::match_securitypolicy;
 use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
-
-use crate::analyze::APhase0;
-use crate::interface::stats::{SecpolStats, Stats, StatsCollect};
-use crate::interface::{BlockReason, Location};
 
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
