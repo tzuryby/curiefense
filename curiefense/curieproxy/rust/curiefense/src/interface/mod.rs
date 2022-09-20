@@ -6,6 +6,7 @@ use crate::logs::Logs;
 use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
+use serde::ser::SerializeSeq;
 use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 
@@ -174,19 +175,10 @@ pub fn jsonlog_rinfo(
     }
 
     let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
-    let mut proxy = proxy
-        .into_iter()
-        .map(|(k, v)| (k, serde_json::Value::String(v)))
-        .collect::<HashMap<_, _>>();
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
 
     let mut outbuffer = Vec::<u8>::new();
-
-    proxy.insert(
-        "location".into(),
-        serde_json::to_value(&rinfo.rinfo.geoip.location).unwrap_or(serde_json::Value::Null),
-    );
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
@@ -211,9 +203,36 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
     map_ser.serialize_entry("proxy", &NameValue::new(&proxy))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
-    let empty_map = serde_json::Value::Object(serde_json::Map::new());
-    map_ser.serialize_entry("profiling", &empty_map)?;
-    map_ser.serialize_entry("biometric", &empty_map)?;
+
+    // it's too bad one can't directly write the recursive structures from just the serializer object
+    // that's why there are several one shot structures for nested data:
+    struct LogProxy<'t> {
+        p: &'t HashMap<String, String>,
+        l: &'t Option<(f64, f64)>,
+    }
+    impl<'t> Serialize for LogProxy<'t> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut sq = serializer.serialize_seq(None)?;
+            for (name, value) in self.p {
+                sq.serialize_element(&crate::utils::json::BigTableKV { name, value })?;
+            }
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "location",
+                value: self.l,
+            })?;
+            sq.end()
+        }
+    }
+    map_ser.serialize_entry(
+        "proxy",
+        &LogProxy {
+            p: &proxy,
+            l: &rinfo.rinfo.geoip.location,
+        },
+    )?;
 
     struct SecurityConfig<'t>(&'t Stats);
     impl<'t> Serialize for SecurityConfig<'t> {
@@ -263,12 +282,21 @@ pub fn jsonlog_rinfo(
         }
     }
     map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
-    map_ser.end()?;
-    /*
-    serde_json::json!({
-        "trigger_counters": {
-        },
-    }) */
+
+    struct EmptyMap;
+    impl Serialize for EmptyMap {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mp = serializer.serialize_map(Some(0))?;
+            mp.end()
+        }
+    }
+    map_ser.serialize_entry("profiling", &EmptyMap)?;
+    map_ser.serialize_entry("biometric", &EmptyMap)?;
+
+    SerializeMap::end(map_ser)?;
     Ok(outbuffer)
 }
 
