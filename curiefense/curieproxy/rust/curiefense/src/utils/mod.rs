@@ -352,7 +352,7 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub async fn log_json(&self, proxy: HashMap<String, String>) -> String {
+    pub async fn log_json(&self, proxy: HashMap<String, String>) -> Vec<u8> {
         let dtags = Tags::default();
         let tags: &Tags = match &self.tags {
             Some(t) => t,
@@ -360,7 +360,7 @@ impl InspectionResult {
         };
 
         match &self.rinfo {
-            None => "{}".to_string(),
+            None => b"{}".to_vec(),
             Some(rinfo) => {
                 self.decision
                     .log_json(rinfo, tags, &self.stats, &self.logs, proxy)
@@ -370,7 +370,7 @@ impl InspectionResult {
     }
 
     // blocking version of log_json
-    pub fn log_json_block(&self, proxy: HashMap<String, String>) -> String {
+    pub fn log_json_block(&self, proxy: HashMap<String, String>) -> Vec<u8> {
         async_std::task::block_on(self.log_json(proxy))
     }
 
