@@ -6,7 +6,7 @@ use crate::logs::Logs;
 use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 
 pub use self::block_reasons::*;
@@ -134,6 +134,32 @@ pub async fn jsonlog(
     proxy: HashMap<String, String>,
 ) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
+    match mrinfo {
+        Some(rinfo) => {
+            aggregator::aggregate(dec, rcode, rinfo, tags).await;
+            match jsonlog_rinfo(dec, rinfo, rcode, tags, stats, logs, proxy, &now) {
+                Err(rr) => {
+                    println!("JSON creation error: {}", rr);
+                    (b"null".to_vec(), now)
+                }
+                Ok(y) => (y, now),
+            }
+        }
+        None => (b"null".to_vec(), now),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn jsonlog_rinfo(
+    dec: &Decision,
+    rinfo: &RequestInfo,
+    rcode: Option<u32>,
+    tags: &Tags,
+    stats: &Stats,
+    logs: &Logs,
+    proxy: HashMap<String, String>,
+    now: &chrono::DateTime<chrono::Utc>,
+) -> serde_json::Result<Vec<u8>> {
     let mut tgs = tags.clone();
     if let Some(action) = &dec.maction {
         if let Some(extra) = &action.extra_tags {
@@ -147,86 +173,103 @@ pub async fn jsonlog(
         tgs.insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
     }
 
-    if let Some(rinfo) = mrinfo {
-        aggregator::aggregate(dec, rcode, rinfo, tags).await;
-    }
-
     let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
-    let greasons = BlockReason::regroup(&dec.reasons);
-    let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
-
-    let stats_counter = |kd: InitiatorKind| -> (usize, usize) {
-        match greasons.get(&kd) {
-            None => (0, 0),
-            Some(v) => (v.len(), v.iter().filter(|r| r.decision == BDecision::Blocking).count()),
-        }
-    };
-    let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
-    let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
-    let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
-    let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
-
     let mut proxy = proxy
         .into_iter()
         .map(|(k, v)| (k, serde_json::Value::String(v)))
         .collect::<HashMap<_, _>>();
+    let greasons = BlockReason::regroup(&dec.reasons);
+    let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
 
-    let val = match mrinfo {
-        Some(info) => {
-            proxy.insert(
-                "location".into(),
-                serde_json::to_value(&info.rinfo.geoip.location).unwrap_or(serde_json::Value::Null),
-            );
-            serde_json::json!({
-                "@timestamp": now,
-                "curiesession": info.session,
-                "request_id": info.rinfo.meta.requestid,
-                "security_config": {
-                    "revision": stats.revision,
-                    "acl_active": stats.secpol.acl_enabled,
-                    "cf_active": stats.secpol.content_filter_enabled,
-                    "cf_rules": stats.content_filter_total,
-                    "rate_limit_rules": stats.secpol.limit_amount,
-                    "global_filters_active": stats.secpol.globalfilters_amount
-                },
-                "arguments": info.rinfo.qinfo.args,
-                "path": info.rinfo.qinfo.qpath,
-                "path_parts": info.rinfo.qinfo.path_as_map,
-                "authority": info.rinfo.meta.authority,
-                "cookies": info.cookies,
-                "headers": info.headers,
-                "tags": tgs.to_json(),
-                "uri": info.rinfo.meta.path,
-                "ip": info.rinfo.geoip.ip,
-                "method": info.rinfo.meta.method,
-                "response_code": rcode,
-                "logs": logs,
+    let mut outbuffer = Vec::<u8>::new();
 
-                "processing_stage": stats.processing_stage,
-                "trigger_counters": {
-                    "acl": acl,
-                    "acl_active": acl_active,
-                    "global_filters": global_filters,
-                    "global_filters_active": global_filters_active,
-                    "rate_limit": rate_limit,
-                    "rate_limit_active": rate_limit_active,
-                    "content_filters": content_filters,
-                    "content_filters_active": content_filters_active,
-                },
-                "acl_triggers": get_trigger(&InitiatorKind::Acl),
-                "rate_limit_triggers": get_trigger(&InitiatorKind::RateLimit),
-                "global_filter_triggers": get_trigger(&InitiatorKind::GlobalFilter),
-                "content_filter_triggers": get_trigger(&InitiatorKind::ContentFilter),
-                "proxy": NameValue::new(&proxy),
-                "reason": block_reason_desc,
-                "profiling": {},
-                "biometrics": {},
-            })
+    proxy.insert(
+        "location".into(),
+        serde_json::to_value(&rinfo.rinfo.geoip.location).unwrap_or(serde_json::Value::Null),
+    );
+    let mut ser = serde_json::Serializer::new(&mut outbuffer);
+    let mut map_ser = ser.serialize_map(None)?;
+    map_ser.serialize_entry("timestamp", now)?;
+    map_ser.serialize_entry("curiesession", &rinfo.session)?;
+    map_ser.serialize_entry("request_id", &rinfo.rinfo.meta.requestid)?;
+    map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
+    map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
+    map_ser.serialize_entry("path_parts", &rinfo.rinfo.qinfo.path_as_map)?;
+    map_ser.serialize_entry("authority", &rinfo.rinfo.meta.authority)?;
+    map_ser.serialize_entry("cookies", &rinfo.cookies)?;
+    map_ser.serialize_entry("headers", &rinfo.headers)?;
+    map_ser.serialize_entry("tags", &tgs)?;
+    map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
+    map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
+    map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
+    map_ser.serialize_entry("response_code", &rcode)?;
+    map_ser.serialize_entry("logs", logs)?;
+    map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
+    map_ser.serialize_entry("acl_triggers", get_trigger(&InitiatorKind::Acl))?;
+    map_ser.serialize_entry("rate_limit_triggers", get_trigger(&InitiatorKind::RateLimit))?;
+    map_ser.serialize_entry("global_filter_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
+    map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
+    map_ser.serialize_entry("proxy", &NameValue::new(&proxy))?;
+    map_ser.serialize_entry("reason", &block_reason_desc)?;
+    let empty_map = serde_json::Value::Object(serde_json::Map::new());
+    map_ser.serialize_entry("profiling", &empty_map)?;
+    map_ser.serialize_entry("biometric", &empty_map)?;
+
+    struct SecurityConfig<'t>(&'t Stats);
+    impl<'t> Serialize for SecurityConfig<'t> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut mp = serializer.serialize_map(None)?;
+            mp.serialize_entry("revision", &self.0.revision)?;
+            mp.serialize_entry("acl_active", &self.0.secpol.acl_enabled)?;
+            mp.serialize_entry("cf_active", &self.0.secpol.content_filter_enabled)?;
+            mp.serialize_entry("cf_rules", &self.0.content_filter_total)?;
+            mp.serialize_entry("rate_limit_rules", &self.0.secpol.limit_amount)?;
+            mp.serialize_entry("global_filters_active", &self.0.secpol.globalfilters_amount)?;
+            mp.end()
         }
-        None => serde_json::Value::Null,
-    };
+    }
+    map_ser.serialize_entry("security_config", &SecurityConfig(stats))?;
 
-    (serde_json::to_vec(&val).unwrap_or_else(|_| b"{}".to_vec()), now)
+    struct TriggerCounters<'t>(&'t HashMap<InitiatorKind, Vec<&'t BlockReason>>);
+    impl<'t> Serialize for TriggerCounters<'t> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let stats_counter = |kd: InitiatorKind| -> (usize, usize) {
+                match self.0.get(&kd) {
+                    None => (0, 0),
+                    Some(v) => (v.len(), v.iter().filter(|r| r.decision == BDecision::Blocking).count()),
+                }
+            };
+            let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
+            let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
+            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
+            let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
+
+            let mut mp = serializer.serialize_map(None)?;
+            mp.serialize_entry("acl", &acl)?;
+            mp.serialize_entry("acl_active", &acl_active)?;
+            mp.serialize_entry("global_filters", &global_filters)?;
+            mp.serialize_entry("global_filters_active", &global_filters_active)?;
+            mp.serialize_entry("rate_limit", &rate_limit)?;
+            mp.serialize_entry("rate_limit_active", &rate_limit_active)?;
+            mp.serialize_entry("content_filters", &content_filters)?;
+            mp.serialize_entry("content_filters_active", &content_filters_active)?;
+            mp.end()
+        }
+    }
+    map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
+    map_ser.end()?;
+    /*
+    serde_json::json!({
+        "trigger_counters": {
+        },
+    }) */
+    Ok(outbuffer)
 }
 
 // blocking version
@@ -461,7 +504,9 @@ fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<TV
     for p in template {
         match p {
             TemplatePart::Raw(s) => out.push_str(s),
-            TemplatePart::Var(TVar::Selector(RequestSelector::Tags)) => out.push_str(&tags.to_json().to_string()),
+            TemplatePart::Var(TVar::Selector(RequestSelector::Tags)) => {
+                out.push_str(&serde_json::to_string(&tags).unwrap_or_else(|_| "null".into()))
+            }
             TemplatePart::Var(TVar::Tag(tagname)) => {
                 out.push_str(if tags.contains(tagname) { "true" } else { "false" })
             }
