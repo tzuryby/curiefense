@@ -14,7 +14,7 @@ upstream backend_b {
 server {
     # todo: change to something on disk
     access_log ${AGGREGATED_STATS_LOGFILE} aggregationlog;
-    error_log  /logs/error.log  debug;
+    error_log  ${ERROR_LOG}  error;
 
     listen 127.0.0.1:8999;
 
@@ -33,7 +33,7 @@ server {
     resolver local=on;
     set $request_map '{}';
     access_log ${ACCESS_LOG} curiefenselog;
-    error_log  ${ERROR_LOG}  debug;
+    error_log  ${ERROR_LOG}  error;
 
     listen 31081 default_server;
     listen 31083 default_server ssl http2;
@@ -59,7 +59,7 @@ server {
     set $request_map '{}';
     access_log ${ACCESS_LOG} curiefenselog;
     access_log syslog:server=unix:/dev/log curiefenselog;
-    error_log  ${ERROR_LOG}  debug;
+    error_log  ${ERROR_LOG}  error;
 
     listen 31082 default_server;
     listen 31084 default_server ssl http2;
