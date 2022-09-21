@@ -21,6 +21,7 @@
         "limit": 5
       }
     ],
-    "timeframe": 60
+    "timeframe": 60,
+    "global": true
   }
 ]
