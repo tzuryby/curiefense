@@ -29,7 +29,6 @@ pub struct APhase0 {
     pub is_human: bool,
     pub itags: Tags,
     pub reqinfo: RequestInfo,
-    pub secpolname: String,
     pub securitypolicy: Arc<SecurityPolicy>,
     pub stats: StatsCollect<BStageMapped>,
 }
@@ -75,15 +74,14 @@ pub enum InitResult {
 pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APhase0) -> InitResult {
     let stats = p0.stats;
     let mut tags = p0.itags;
-    let secpolname = &p0.secpolname;
     let securitypolicy = p0.securitypolicy;
     let reqinfo = p0.reqinfo;
     let is_human = p0.is_human;
     let globalfilter_dec = p0.globalfilter_dec;
     let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
 
-    tags.insert_qualified("securitypolicy", secpolname, Location::Request);
-    tags.insert_qualified("securitypolicy-entry", &securitypolicy.name, Location::Request);
+    tags.insert_qualified("securitypolicy", &securitypolicy.policy.name, Location::Request);
+    tags.insert_qualified("securitypolicy-entry", &securitypolicy.entry.name, Location::Request);
     tags.insert_qualified("aclid", &securitypolicy.acl_profile.id, Location::Request);
     tags.insert_qualified("aclname", &securitypolicy.acl_profile.name, Location::Request);
     tags.insert_qualified(

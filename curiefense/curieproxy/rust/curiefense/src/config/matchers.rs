@@ -1,5 +1,5 @@
 use regex::Regex;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RequestSelector {
@@ -16,8 +16,8 @@ pub enum RequestSelector {
     Company,
     Authority,
     Tags,
-    SecpolIdHost,
-    SecpolIdUrl,
+    SecpolId,
+    SecpolEntryId,
 }
 
 #[derive(Debug, Clone)]
@@ -34,25 +34,6 @@ pub enum SelectorType {
     Attrs,
 }
 
-// all kind of selector related functions
-pub fn decode_attribute(s: &str) -> Option<RequestSelector> {
-    match s {
-        "ip" => Some(RequestSelector::Ip),
-        "path" => Some(RequestSelector::Path),
-        "query" => Some(RequestSelector::Query),
-        "uri" => Some(RequestSelector::Uri),
-        "country" => Some(RequestSelector::Country),
-        "method" => Some(RequestSelector::Method),
-        "asn" => Some(RequestSelector::Asn),
-        "company" => Some(RequestSelector::Company),
-        "authority" => Some(RequestSelector::Authority),
-        "tags" => Some(RequestSelector::Tags),
-        "secpolidurl" | "secpolurl" => Some(RequestSelector::SecpolIdUrl),
-        "secpolidhost" | "secpolhost" => Some(RequestSelector::SecpolIdHost),
-        _ => None,
-    }
-}
-
 fn resolve_selector_type(k: &str) -> anyhow::Result<SelectorType> {
     match k {
         "headers" => Ok(SelectorType::Headers),
@@ -65,17 +46,46 @@ fn resolve_selector_type(k: &str) -> anyhow::Result<SelectorType> {
     }
 }
 
-pub fn resolve_selector_raw(k: &str, v: &str) -> anyhow::Result<RequestSelector> {
-    let st = resolve_selector_type(k)?;
-    resolve_selector(st, v)
-}
+impl RequestSelector {
+    // all kind of selector related functions
+    pub fn decode_attribute(s: &str) -> Option<Self> {
+        match s {
+            "ip" => Some(RequestSelector::Ip),
+            "path" => Some(RequestSelector::Path),
+            "query" => Some(RequestSelector::Query),
+            "uri" => Some(RequestSelector::Uri),
+            "country" => Some(RequestSelector::Country),
+            "method" => Some(RequestSelector::Method),
+            "asn" => Some(RequestSelector::Asn),
+            "company" => Some(RequestSelector::Company),
+            "authority" => Some(RequestSelector::Authority),
+            "tags" => Some(RequestSelector::Tags),
+            "secpolid" | "securitypolicyid" | "securitypolicy" => Some(RequestSelector::SecpolId),
+            "secpolentryid" | "securitypolicyentryid" | "securitypolicyentry" => Some(RequestSelector::SecpolEntryId),
+            _ => None,
+        }
+    }
 
-pub fn resolve_selector(tp: SelectorType, v: &str) -> anyhow::Result<RequestSelector> {
-    match tp {
-        SelectorType::Headers => Ok(RequestSelector::Header(v.to_string())),
-        SelectorType::Cookies => Ok(RequestSelector::Cookie(v.to_string())),
-        SelectorType::Args => Ok(RequestSelector::Args(v.to_string())),
-        SelectorType::Attrs => decode_attribute(v).ok_or_else(|| anyhow::anyhow!("Unknown attribute {}", v)),
+    pub fn resolve_selector_raw(k: &str, v: &str) -> anyhow::Result<Self> {
+        let st = resolve_selector_type(k)?;
+        Self::resolve_selector(st, v)
+    }
+
+    pub fn resolve_selector(tp: SelectorType, v: &str) -> anyhow::Result<Self> {
+        match tp {
+            SelectorType::Headers => Ok(RequestSelector::Header(v.to_string())),
+            SelectorType::Cookies => Ok(RequestSelector::Cookie(v.to_string())),
+            SelectorType::Args => Ok(RequestSelector::Args(v.to_string())),
+            SelectorType::Attrs => Self::decode_attribute(v).ok_or_else(|| anyhow::anyhow!("Unknown attribute {}", v)),
+        }
+    }
+
+    pub fn resolve_selector_map(sel: HashMap<String, String>) -> anyhow::Result<Self> {
+        if sel.len() != 1 {
+            return Err(anyhow::anyhow!("invalid selector {:?}", sel));
+        }
+        let (key, val) = sel.into_iter().next().unwrap();
+        Self::resolve_selector_raw(&key, &val)
     }
 }
 
@@ -87,7 +97,7 @@ pub fn decode_request_selector_condition(
     if tp == SelectorType::Attrs && v == "tags" {
         Ok(RequestSelectorCondition::Tag(cond.to_string()))
     } else {
-        let sel = resolve_selector(tp, v)?;
+        let sel = RequestSelector::resolve_selector(tp, v)?;
         let re = Regex::new(cond)?;
         Ok(RequestSelectorCondition::N(sel, re))
     }

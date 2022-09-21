@@ -49,7 +49,8 @@ m_limit = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
+        "global": fields.Boolean(required=True),
         "timeframe": fields.Integer(required=True),
         "thresholds": fields.List(fields.Nested(m_threshold)),
         "include": fields.Raw(required=True),
@@ -65,6 +66,7 @@ m_limit = api.model(
 m_secprofilemap = api.model(
     "Security Profile Map",
     {
+        "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
         "match": fields.String(required=True),
@@ -106,7 +108,7 @@ m_contentfilterrule = api.model(
         "subcategory": fields.String(required=True),
         "risk": fields.Integer(required=True),
         "tags": fields.List(fields.String()),
-        "description": fields.String(required=True),
+        "description": fields.String(),
     },
 )
 
@@ -163,7 +165,7 @@ m_globalfilter = api.model(
         "name": fields.String(required=True),
         "source": fields.String(required=True),
         "mdate": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "active": fields.Boolean(required=True),
         "action": fields.Raw(required=True),
         "tags": fields.List(fields.String()),
@@ -184,7 +186,7 @@ m_flowcontrol = api.model(
         "tags": fields.List(fields.String()),
         "include": fields.List(fields.String()),
         "exclude": fields.List(fields.String()),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "active": fields.Boolean(required=True),
     },
 )
@@ -196,7 +198,7 @@ m_action = api.model(
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "tags": fields.List(fields.String(required=True)),
         "params": fields.Raw(),
         "type": fields.String(required=True),
@@ -208,13 +210,16 @@ m_action = api.model(
 m_dynamicrule = api.model(
     "Dynamic Rule",
     {
+        "id": fields.String(required=True),
         "name": fields.String(required=True),
-        "description": fields.String(required=True),
+        "description": fields.String(),
         "threshold": fields.Integer(required=True),
         "timeframe": fields.Integer(required=True),
         "ttl": fields.Integer(required=True),
-        "include": fields.List(fields.String()),
-        "exclude": fields.List(fields.String()),
+        "active": fields.Boolean(required=True),
+        "target": fields.String(required=True),
+        "include": fields.List(fields.String(required=True)),
+        "exclude": fields.List(fields.String(required=True)),
     },
 )
 
@@ -343,6 +348,15 @@ m_edit = api.model(
     },
 )
 
+m_basic_entry = api.model(
+    "Basic Document Entry",
+    {
+        "id": fields.String(required=True),
+        "name": fields.String(required=True),
+        "description": fields.String(),
+    },
+)
+
 ### Publish
 
 m_bucket = api.model(
@@ -373,6 +387,18 @@ m_db = api.model("db", {})
 def validateJson(json_data, schema_type):
     try:
         validate(instance=json_data, schema=schema_type_map[schema_type])
+    except jsonschema.exceptions.ValidationError as err:
+        print(str(err))
+        return False
+    return True
+
+
+### DB Schema validation
+
+
+def validateDbJson(json_data, schema):
+    try:
+        validate(instance=json_data, schema=schema)
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
         return False
@@ -612,16 +638,22 @@ class DocumentResource(Resource):
         res = current_app.backend.documents_get(config, document)
         return marshal(res, models[document], skip_none=True)
 
+    @ns_configs.expect([m_basic_entry], validate=True)
     def post(self, config, document):
         "Create a new complete document"
         if document not in models:
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
+        for entry in request.json:
+            isValid = validateJson(entry, document)
+            if isValid is False:
+                abort(500, "schema mismatched")
         res = current_app.backend.documents_create(
             config, document, data, get_gitactor()
         )
         return res
 
+    @ns_configs.expect([m_basic_entry], validate=True)
     def put(self, config, document):
         "Update an existing document"
         if document not in models:
@@ -630,7 +662,7 @@ class DocumentResource(Resource):
         for entry in request.json:
             isValid = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched")
+                abort(500, "schema mismatched " + str(entry))
         res = current_app.backend.documents_update(
             config, document, data, get_gitactor()
         )
@@ -687,13 +719,20 @@ class EntriesResource(Resource):
         res = current_app.backend.entries_list(config, document)
         return res  # XXX: marshal
 
+    @ns_configs.expect(m_basic_entry, validate=True)
     def post(self, config, document):
         "Create an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        data = marshal(request.json, models[document], skip_none=True)
-        res = current_app.backend.entries_create(config, document, data, get_gitactor())
-        return res
+        isValid = validateJson(request.json, document)
+        if isValid:
+            data = marshal(request.json, models[document], skip_none=True)
+            res = current_app.backend.entries_create(
+                config, document, data, get_gitactor()
+            )
+            return res
+        else:
+            abort(500, "schema mismatched")
 
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
@@ -705,6 +744,7 @@ class EntryResource(Resource):
         res = current_app.backend.entries_get(config, document, entry)
         return marshal(res, models[document], skip_none=True)
 
+    @ns_configs.expect(m_basic_entry, validate=True)
     def put(self, config, document, entry):
         "Update an entry in a document"
         if document not in models:
@@ -725,21 +765,6 @@ class EntryResource(Resource):
             abort(404, "document does not exist")
         res = current_app.backend.entries_delete(
             config, document, entry, get_gitactor()
-        )
-        return res
-
-
-@ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/edit/")
-class EntryEditResource(Resource):
-    def put(self, config, document, entry):
-        "Update an entry in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        data = marshal(request.json, m_edit, skip_none=True)
-        if type(data) is not list:
-            data = [data]
-        res = current_app.backend.entries_edit(
-            config, document, entry, data, get_gitactor()
         )
         return res
 
@@ -861,6 +886,20 @@ class KeyResource(Resource):
 
     def put(self, nsname, key):
         "Create or update the value of a key"
+        # check if "reblaze/k/<key>" exists in system/schema-validation
+        if nsname != "system":
+            keyName = nsname + "/k/" + key
+            schemas = current_app.backend.key_get("system", "schema-validation")
+            schema = None
+            # find schema if exists and validate the json input
+            for item in schemas.items():
+                if item[0] == keyName:
+                    schema = item[1]
+                    break
+            if schema:
+                isValid = validateDbJson(request.json, schema)
+                if isValid is False:
+                    abort(500, "schema mismatched")
         return current_app.backend.key_set(nsname, key, request.json, get_gitactor())
 
     def delete(self, nsname, key):

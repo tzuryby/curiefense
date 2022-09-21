@@ -105,11 +105,11 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let ((nm, securitypolicy), (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
+    let (securitypolicy, (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
-            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs).map(|(nm, um)| (nm, um));
+            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs);
             match mmapinfo {
-                Some((nm, secpolicy)) => {
+                Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
                     let pmax_depth = secpolicy.content_filter_profile.max_body_depth;
 
@@ -136,8 +136,10 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     // if the max depth is equal to 0, the body will not be parsed
                     let reqinfo = map_request(
                         slogs,
-                        &secpolicy.hostmapid,
-                        &secpolicy.name,
+                        &secpolicy.policy.id,
+                        &secpolicy.entry.id,
+                        &secpolicy.session,
+                        &secpolicy.content_filter_profile.masking_seed,
                         &secpolicy.content_filter_profile.decoding,
                         &secpolicy.content_filter_profile.content_type,
                         secpolicy.content_filter_profile.referer_as_uri,
@@ -163,7 +165,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
 
                     let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
-                    RequestMappingResult::Res(((nm, secpolicy), ntags, nflows, reqinfo, is_human))
+                    RequestMappingResult::Res((secpolicy, ntags, nflows, reqinfo, is_human))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
             }
@@ -179,19 +181,21 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
+                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
+                    rinfo,
                     stats: Stats::default(),
                 });
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
+                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
-                    rinfo: map_request(logs, "unk", "unk", &[], &[], false, 0, true, &raw),
+                    rinfo,
                     stats: Stats::default(),
                 });
             }
@@ -201,7 +205,6 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     Ok(APhase0 {
         stats,
         itags: tags,
-        secpolname: nm,
         securitypolicy,
         reqinfo,
         is_human,

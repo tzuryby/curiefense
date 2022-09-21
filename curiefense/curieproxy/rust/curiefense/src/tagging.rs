@@ -3,7 +3,7 @@ use crate::config::globalfilter::{
 };
 use crate::config::raw::Relation;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
-use crate::interface::{BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use std::collections::HashSet;
@@ -142,15 +142,15 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
             .and_then(|ccmp| check_single(cmp, ccmp.as_str(), Location::Ip)),
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
-        GlobalFilterEntryE::SecpolIdHost(id) => {
-            if &rinfo.rinfo.secpolidhost == id {
+        GlobalFilterEntryE::SecurityPolicyId(id) => {
+            if &rinfo.rinfo.policyid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
-        GlobalFilterEntryE::SecpolIdUrl(id) => {
-            if &rinfo.rinfo.secpolidurl == id {
+        GlobalFilterEntryE::SecurityPolicyEntryId(id) => {
+            if &rinfo.rinfo.entryid == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
@@ -231,6 +231,7 @@ pub fn tag_request(
         }
     }
     let mut matched = 0;
+    let mut decision = SimpleDecision::Pass;
     for psection in globalfilters {
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
@@ -238,26 +239,19 @@ pub fn tag_request(
             let rtags = psection.tags.clone().with_locs(&mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
-                if a.atype == SimpleActionT::Monitor || (a.atype == SimpleActionT::Challenge && is_human) {
-                    continue;
-                } else {
-                    return (
-                        tags.clone(),
-                        SimpleDecision::Action(
-                            a.clone(),
-                            vec![BlockReason::global_filter(
-                                psection.id.clone(),
-                                psection.name.clone(),
-                                a.atype.to_bdecision(),
-                            )],
-                        ),
-                        stats.mapped(globalfilters.len(), matched),
-                    );
-                }
+                let curdec = SimpleDecision::Action(
+                    a.clone(),
+                    vec![BlockReason::global_filter(
+                        psection.id.clone(),
+                        psection.name.clone(),
+                        a.atype.to_bdecision(),
+                    )],
+                );
+                decision = stronger_decision(decision, curdec);
             }
         }
     }
-    (tags, SimpleDecision::Pass, stats.mapped(globalfilters.len(), matched))
+    (tags, decision, stats.mapped(globalfilters.len(), matched))
 }
 
 #[cfg(test)]
@@ -304,6 +298,8 @@ mod tests {
             &mut logs,
             "a",
             "b",
+            &[],
+            b"CHANGEME",
             &[],
             &[],
             false,

@@ -684,5 +684,25 @@
     "tags": [
       "wcc"
     ]
+  },
+  {
+    "action": "monitor",
+    "active": true,
+    "description": "Return with content type",
+    "id": "contenttype",
+    "mdate": "2021-07-01T09:50:58.505Z",
+    "name": "content type",
+    "rule": [
+      "args",
+      [
+        "global",
+        "enabled"
+      ],
+      "gbl"
+    ],
+    "source": "self-managed",
+    "tags": [
+      "global-trigger"
+    ]
   }
 ]

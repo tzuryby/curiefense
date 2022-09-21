@@ -74,6 +74,9 @@ pub struct RawHostMap {
 pub struct RawSecurityPolicy {
     #[serde(rename = "match")]
     pub match_: String,
+    #[serde(default)]
+    pub session: Vec<HashMap<String, String>>,
+    pub id: Option<String>, // set to name if absent
     pub name: String,
     pub acl_profile: String,
     pub content_filter_profile: String,
@@ -131,8 +134,8 @@ pub enum GlobalFilterEntryType {
     Company,
     Authority,
     Tag,
-    SecpolIdHost,
-    SecpolIdUrl,
+    SecurityPolicyId,
+    SecurityPolicyEntryId,
 }
 
 /// a special datatype for deserializing tuples with 2 elements, and optional extra elements
@@ -188,6 +191,8 @@ pub struct RawLimit {
     #[serde(default)]
     pub exclude: Vec<String>,
     pub pairwith: HashMap<String, String>,
+    #[serde(default)]
+    pub global: bool, // global flag, if true this rule applies to all profiles
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

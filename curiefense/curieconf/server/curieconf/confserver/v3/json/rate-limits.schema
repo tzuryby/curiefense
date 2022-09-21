@@ -21,11 +21,11 @@
                 "arguments": { "type": "string" },
                 "attrs": {
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
                  },
                 "attributes":{
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
                  }
             }
         }
@@ -47,6 +47,11 @@
             "type": "string",
             "title": "Description",
             "description": "Description of entity shown in UI"
+        },
+        "global": {
+            "type": "boolean",
+            "title": "Global Rule",
+            "description": "This rate limit is evaluated for every request"
         },
         "timeframe": {
             "type": "integer",
@@ -116,5 +121,5 @@
         }
     },
     "additionalProperties": false,
-    "required": [ "id", "name", "timeframe", "key", "thresholds" ]
+    "required": [ "id", "name", "global", "timeframe", "key", "thresholds" ]
 }

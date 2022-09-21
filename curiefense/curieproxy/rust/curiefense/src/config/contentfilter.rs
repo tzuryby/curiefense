@@ -386,7 +386,7 @@ pub fn resolve_rules(
                 logs.debug(|| format!("Loaded profile {} with {} rules", v.id, p.ids.len()));
                 out.insert(v.id.to_string(), p);
             }
-            Err(rr) => logs.error(|| format!("When building profile {}, error: {}", v.id, rr)),
+            Err(rr) => logs.warning(|| format!("When building profile {}, error: {}", v.id, rr)),
         }
     }
 

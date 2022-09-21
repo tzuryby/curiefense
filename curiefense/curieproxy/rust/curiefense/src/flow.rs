@@ -6,7 +6,7 @@ use crate::Logs;
 use crate::config::flow::{FlowElement, FlowMap, SequenceKey};
 use crate::config::matchers::RequestSelector;
 use crate::interface::{Location, Tags};
-use crate::utils::{check_selector_cond, eat_errors, select_string, RequestInfo};
+use crate::utils::{check_selector_cond, select_string, RequestInfo};
 
 fn session_sequence_key(ri: &RequestInfo) -> SequenceKey {
     SequenceKey(ri.rinfo.meta.method.to_string() + &ri.rinfo.host + &ri.rinfo.qinfo.qpath)
@@ -21,7 +21,7 @@ fn build_redis_key(
 ) -> Option<String> {
     let mut tohash = entry_id.to_string() + entry_name;
     for kpart in key.iter() {
-        tohash += &select_string(reqinfo, kpart, tags)?;
+        tohash += &select_string(reqinfo, kpart, Some(tags))?;
     }
     Some(format!("{:X}", md5::compute(tohash)))
 }
@@ -119,7 +119,7 @@ pub async fn flow_resolve_query<I: Iterator<Item = Option<i64>>>(
                     .await?;
                 let expire = mexpire.unwrap_or(-1);
                 if expire < 0 {
-                    let _: () = redis::cmd("EXPIRE")
+                    redis::cmd("EXPIRE")
                         .arg(&check.redis_key)
                         .arg(check.timeframe)
                         .query_async(redis)
@@ -165,23 +165,4 @@ pub fn flow_process(
         }
     }
     stats.flow(flow_total, results.len())
-}
-
-pub async fn flow_check(
-    logs: &mut Logs,
-    redis: &mut ConnectionManager,
-    stats: StatsCollect<BStageMapped>,
-    flows: &FlowMap,
-    reqinfo: &RequestInfo,
-    tags: &mut Tags,
-) -> (anyhow::Result<()>, StatsCollect<BStageFlow>) {
-    let checks = flow_info(logs, flows, reqinfo, tags);
-
-    let mut pipe = redis::pipe();
-    flow_build_query(&mut pipe, &checks);
-    let v: Vec<Option<i64>> = eat_errors(logs, pipe.query_async(redis).await);
-    let mut viter = v.into_iter();
-    let results = eat_errors(logs, flow_resolve_query(redis, &mut viter, checks).await);
-
-    (Ok(()), flow_process(stats, 0, &results, tags))
 }

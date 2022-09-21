@@ -353,7 +353,7 @@
     "include": [],
     "key": [
       {
-        "attrs": "secpolhost"
+        "attrs": "securitypolicyid"
       }
     ],
     "name": "Limit Hostname",
@@ -375,7 +375,7 @@
     "include": [],
     "key": [
       {
-        "attrs": "secpolurl"
+        "attrs": "securitypolicyentryid"
       }
     ],
     "name": "Limit url",
@@ -389,5 +389,28 @@
       }
     ],
     "timeframe": 20
+  },
+  {
+    "description": "The global limit",
+    "exclude": [],
+    "global": true,
+    "id": "global_limit",
+    "include": ["global-trigger"],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "global limit",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 2
+      }
+    ],
+    "timeframe": 30
   }
 ]

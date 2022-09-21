@@ -403,6 +403,7 @@ local function test_ratelimit(request_path)
     else
       if res["action"] == "pass" then
         show_logs(request_map.logs)
+        print("response: " .. r.request_map)
         error("curiefense.session_limit_check should have blocked, but returned: " .. r.response)
       end
     end

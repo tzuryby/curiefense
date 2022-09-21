@@ -27,10 +27,20 @@
             "items": {
                 "type": "object",
                 "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "Id",
+                        "description": "Unique id"
+                    },
                     "name": {
                         "type": "string",
                         "title": "Name",
                         "description": "Name of Security Policy entry shown in UI"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "description": "Entry for specific URLs"
                     },
                     "match": {
                         "type": "string",
@@ -67,7 +77,8 @@
                             "type": "string"
                         }
                     }
-                }
+                },
+                "required": [ "id", "name", "match", "acl_profile", "acl_active", "content_filter_profile", "content_filter_active" ]
             }
         }
     },

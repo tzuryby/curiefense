@@ -4,6 +4,8 @@ local curiefense  = require "curiefense"
 local sfmt = string.format
 local redis = require "resty.redis"
 
+local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 1
+
 local function custom_response(handle, action_params)
     if not action_params then action_params = {} end
     local block_mode = action_params.block_mode
@@ -11,8 +13,10 @@ local function custom_response(handle, action_params)
 
     if not block_mode then
         handle.log(handle.DEBUG, "altering: " .. cjson.encode(action_params))
-        for k, v in pairs(action_params.headers) do
-            handle.req.set_header(k, v)
+        if action_params["headers"] and action_params["headers"] ~= cjson.null then
+            for k, v in pairs(action_params.headers) do
+                handle.req.set_header(k, v)
+            end
         end
         return
     end
@@ -55,12 +59,15 @@ local function make_safe_headers(rheaders)
     return headers
 end
 
-local function redis_connect()
+local function redis_connect(handle)
     local redishost = os.getenv("REDIS_HOST") or "redis"
     local redisport = os.getenv("REDIS_PORT") or 6379
     local red = redis:new()
-    red:set_timeouts(100, 100, 100) -- 100ms
-    red:connect(redishost, redisport)
+    red:set_timeout(100) -- 100ms
+    local _, err = red:connect(redishost, redisport)
+    if err then
+        handle.log(handle.ERR, err)
+    end
     return red
 end
 
@@ -87,8 +94,8 @@ function session_rust_nginx.inspect(handle)
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
 
-    local res = curiefense.inspect_request_init(
-        meta, headers, body_content, ip_str
+    local res = curiefense.inspect_request_init_hops(
+        meta, headers, body_content, ip_str, HOPS
     )
 
     if res.error then
@@ -106,11 +113,36 @@ function session_rust_nginx.inspect(handle)
         if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
             -- Redis required
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
-            local red = redis_connect()
+            local red = redis_connect(handle)
+            red:init_pipeline()
 
             for _, flow in pairs(flows) do
-                local key = flow.key
-                local len = red:llen(key)
+                red:llen(flow.key)
+            end
+            for _, limit in pairs(limits) do
+                local key = limit.key
+                if not limit.zero_limits then
+                    local pw = limit.pairwith
+                    if pw then
+                        red:sadd(key, pw)
+                        red:scard(key)
+                        red:ttl(key)
+                    else
+                        red:incr(key)
+                        red:ttl(key)
+                    end
+                end
+            end
+            local results, redis_err = red:commit_pipeline()
+            if not results then
+                handle.log(handle.ERR, "failed to run redis calls " .. redis_err)
+            end
+
+            local result_idx = 1
+
+            for _, flow in pairs(flows) do
+                local len = results[result_idx]
+                result_idx = result_idx + 1
                 local step = flow.step
                 local flowtype = "nonlast"
                 if flow.is_last then
@@ -121,10 +153,11 @@ function session_rust_nginx.inspect(handle)
                     end
                 else
                     if step == len then
+                        local key = flow.key
                         red:lpush(key, "foo")
                         local ttl = red:ttl(key)
                         if ttl == nil or ttl < 0 then
-                        red:expire(key, flow.timeframe)
+                            red:expire(key, flow.timeframe)
                         end
                     end
                 end
@@ -136,15 +169,13 @@ function session_rust_nginx.inspect(handle)
                 local curcount = 1
                 if not limit.zero_limits then
                     local pw = limit.pairwith
-                    local expire
                     if pw then
-                        red:sadd(key, pw)
-                        curcount = red:scard(key)
-                        expire = red:ttl(key)
-                    else
-                        curcount = red:incr(key)
-                        expire = red:ttl(key)
+                        result_idx = result_idx + 1
                     end
+                    curcount = results[result_idx]
+                    result_idx = result_idx + 1
+                    local expire = results[result_idx]
+                    result_idx = result_idx + 1
                     if curcount == nil then
                         curcount = 0
                     end
@@ -163,8 +194,6 @@ function session_rust_nginx.inspect(handle)
     end
 
     handle.ctx.request_map = res.request_map
-
-    handle.log(handle.INFO, cjson.encode(cjson.decode(res.request_map)["tags"]))
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", res.error))

@@ -5,11 +5,11 @@ use redis::aio::ConnectionManager;
 use crate::config::limit::Limit;
 use crate::config::limit::LimitThreshold;
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
-use crate::utils::{eat_errors, select_string, RequestInfo};
+use crate::utils::{select_string, RequestInfo};
 
 fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String> {
     let mut key = limit.id.clone();
-    for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, tags)) {
+    for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, Some(tags))) {
         key += &kpart?;
     }
     Some(format!("{:X}", md5::compute(key)))
@@ -70,7 +70,7 @@ pub fn limit_info(logs: &mut Logs, reqinfo: &RequestInfo, limits: &[Limit], tags
         };
         let pairwith = match &limit.pairwith {
             None => None,
-            Some(sel) => match select_string(reqinfo, sel, tags) {
+            Some(sel) => match select_string(reqinfo, sel, Some(tags)) {
                 None => continue,
                 Some(x) => Some(x),
             },
@@ -130,7 +130,7 @@ pub async fn limit_resolve_query<I: Iterator<Item = Option<i64>>>(
             Some(r) => r.unwrap_or(-1),
         };
         if expire < 0 {
-            let _: () = redis::cmd("EXPIRE")
+            redis::cmd("EXPIRE")
                 .arg(&check.key)
                 .arg(&check.limit.timeframe)
                 .query_async(redis)
@@ -165,23 +165,4 @@ pub fn limit_process(
     }
 
     (out, stats.limit(nlimits, results.len()))
-}
-
-pub async fn limit_check(
-    logs: &mut Logs,
-    redis: &mut ConnectionManager,
-    stats: StatsCollect<BStageFlow>,
-    reqinfo: &RequestInfo,
-    limits: &[Limit],
-    tags: &mut Tags,
-) -> (SimpleDecision, StatsCollect<BStageLimit>) {
-    let checks = limit_info(logs, reqinfo, limits, tags);
-
-    let mut pipe = redis::pipe();
-    limit_build_query(&mut pipe, &checks);
-    let v: Vec<Option<i64>> = eat_errors(logs, pipe.query_async(redis).await);
-    let mut viter = v.into_iter();
-    let qresults = eat_errors(logs, limit_resolve_query(redis, &mut viter, checks).await);
-
-    limit_process(stats, limits.len(), &qresults, tags)
 }

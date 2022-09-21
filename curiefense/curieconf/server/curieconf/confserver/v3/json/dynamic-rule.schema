@@ -4,6 +4,11 @@
   "description": "Dynamic Rules",
   "type": "object",
   "properties": {
+    "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "Unique id"
+    },
     "name": {
       "type": "string",
       "minLength": 1,
@@ -33,6 +38,18 @@
       "title": "TTL",
       "description": "The number if seconds this source will remain in quarantine"
     },
+    "active": {
+      "type": "boolean",
+      "minLength": 1,
+      "title": "Name",
+      "description": "Active state of the dynamic rule"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "title": "Name",
+      "description": "Target entity to block"
+    },
     "include": {
       "type": "array",
       "title": "Included tags",
@@ -46,10 +63,12 @@
   },
   "additionalProperties": true,
   "required": [
+    "id",
     "name",
-    "description",
     "threshold",
     "timeframe",
-    "ttl"
+    "ttl",
+    "active",
+    "target"
   ]
 }

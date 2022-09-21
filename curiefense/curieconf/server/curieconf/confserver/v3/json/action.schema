@@ -64,7 +64,6 @@
     "id",
     "name",
     "tags",
-    "description",
     "type"
   ]
 }

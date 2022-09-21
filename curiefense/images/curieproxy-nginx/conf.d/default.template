@@ -11,6 +11,7 @@ upstream backend_b {
 }
 
 server {
+    resolver local=on;
     set $request_map '{}';
     access_log /dev/stdout curiefenselog;
     error_log  logs/error.log  debug;
@@ -35,6 +36,7 @@ server {
 }
 
 server {
+    resolver local=on;
     set $request_map '{}';
     access_log logs/access.log curiefenselog;
     access_log syslog:server=unix:/dev/log curiefenselog;
