@@ -9,8 +9,6 @@
     "active": true,
     "target": "ip",
     "include":["rl-ato", "rl-bruterorce"],
-    "exclude": ["geo-country:germany"],
-    "tags": [],
-    "action": "Default"
+    "exclude": ["geo-country:germany"]
   }
 ]

@@ -220,8 +220,6 @@ m_dynamicrule = api.model(
         "target": fields.String(required=True),
         "include": fields.List(fields.String(required=True)),
         "exclude": fields.List(fields.String(required=True)),
-        "tags": fields.List(fields.String(required=True)),
-        "action": fields.Raw(required=True),
     },
 )
 
