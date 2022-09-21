@@ -74,7 +74,7 @@ server {
         }
         log_by_lua_block {
             local session = require "lua.session_nginx"
-            session.log(ngx)
+            session.log(ngx, {["test"]="value"})
         }
         proxy_pass http://backend_b;
     }

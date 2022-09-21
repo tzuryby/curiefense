@@ -213,10 +213,10 @@ function session_rust_nginx.inspect(handle)
 end
 
 -- log block stage processing
-function session_rust_nginx.log(handle)
+function session_rust_nginx.log(handle, extra)
     local res = handle.ctx.res
     handle.ctx.res = nil
-    handle.var.request_map = res:request_map({["test"]="value"})
+    handle.var.request_map = res:request_map(extra)
 end
 
 return session_rust_nginx
