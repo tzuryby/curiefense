@@ -267,6 +267,7 @@ m_document_mask = api.model(
         "deny": fields.List(fields.String()),
         "force_deny": fields.List(fields.String()),
         "match": fields.String(),
+        "type": fields.String(),
         "*": fields.Wildcard(fields.Raw()),
     },
 )
