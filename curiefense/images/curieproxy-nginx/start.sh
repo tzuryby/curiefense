@@ -1,6 +1,6 @@
 #!/bin/bash
 FILEBEAT="${FILEBEAT:-yes}"
-AGGREGATED_LOG_FILE="${AGGREGATED_LOG_FILE:-/dev/stdout}"
+AGGREGATED_STATS_LOG_FILE="${AGGREGATED_LOG_FILE:-/dev/stdout}"
 ACCESS_LOG="${ACCESS_LOG:-/dev/stdout}"
 ERROR_LOG="${ERROR_LOG:-/logs/error.log}"
 # shellcheck disable=SC2016

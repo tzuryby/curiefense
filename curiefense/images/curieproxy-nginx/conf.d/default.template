@@ -12,9 +12,9 @@ upstream backend_b {
 }
 
 server {
-    # todo: change to something on disk
+    resolver local=on;
     access_log ${AGGREGATED_STATS_LOGFILE} aggregationlog;
-    error_log  /logs/error.log  debug;
+    error_log  ${ERROR_LOG}  debug;
 
     listen 127.0.0.1:8999;
 
