@@ -290,6 +290,8 @@ struct AggregatedCounters {
 
 impl AggregatedCounters {
     fn increment(&mut self, dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, tags: &Tags) {
+        self.hits += 1;
+
         let mut blocked = false;
         let mut skipped = false;
         for r in &dec.reasons {
@@ -397,7 +399,6 @@ impl AggregatedCounters {
 
         if let Some(code) = rcode {
             self.status.inc(code);
-            self.hits += 1;
         }
 
         self.methods.inc(rinfo.rinfo.meta.method.clone());
