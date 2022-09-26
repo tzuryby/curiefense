@@ -3,11 +3,10 @@ use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
-use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
-use serde::ser::SerializeSeq;
-use serde::{ser::SerializeMap, Deserialize, Serialize, Serializer};
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
 
 pub use self::block_reasons::*;
@@ -201,7 +200,6 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("rate_limit_triggers", get_trigger(&InitiatorKind::RateLimit))?;
     map_ser.serialize_entry("global_filter_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
     map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
-    map_ser.serialize_entry("proxy", &NameValue::new(&proxy))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
 
     // it's too bad one can't directly write the recursive structures from just the serializer object
@@ -220,8 +218,12 @@ pub fn jsonlog_rinfo(
                 sq.serialize_element(&crate::utils::json::BigTableKV { name, value })?;
             }
             sq.serialize_element(&crate::utils::json::BigTableKV {
-                name: "location",
-                value: self.l,
+                name: "geo_long",
+                value: self.l.as_ref().map(|x| x.0),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_lat",
+                value: self.l.as_ref().map(|x| x.1),
             })?;
             sq.end()
         }
