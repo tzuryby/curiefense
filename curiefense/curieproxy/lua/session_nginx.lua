@@ -71,7 +71,7 @@ local function redis_connect(handle)
     return red
 end
 
-function session_rust_nginx.inspect(handle)
+function session_rust_nginx.inspect(handle, loglevel)
     local ip_str = handle.var.remote_addr
 
     local rheaders, err = handle.req.get_headers()
@@ -95,7 +95,7 @@ function session_rust_nginx.inspect(handle)
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
 
     local res = curiefense.inspect_request_init_hops(
-        meta, headers, body_content, ip_str, HOPS
+        loglevel, meta, headers, body_content, ip_str, HOPS
     )
 
     if res.error then

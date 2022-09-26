@@ -113,9 +113,9 @@ local function run_inspect_request_gen(raw_request_map, mode)
       res = curiefense.test_inspect_request(meta, headers, raw_request_map.body, ip, human)
     else
       if mode ~= "lua_async" then
-        res = curiefense.inspect_request(meta, headers, raw_request_map.body, ip)
+        res = curiefense.inspect_request("debug", meta, headers, raw_request_map.body, ip)
       else
-        local r1 = curiefense.inspect_request_init(meta, headers, raw_request_map.body, ip)
+        local r1 = curiefense.inspect_request_init("debug", meta, headers, raw_request_map.body, ip)
         if r1.error then
           error(r1.error)
         end

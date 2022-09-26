@@ -44,7 +44,7 @@ server {
     location / {
         access_by_lua_block {
             local session = require "lua.session_nginx"
-            session.inspect(ngx)
+            session.inspect(ngx, "${CF_LOG_LEVEL}")
         }
         log_by_lua_block {
             local session = require "lua.session_nginx"
@@ -58,7 +58,6 @@ server {
     resolver local=on;
     set $request_map '{}';
     access_log ${ACCESS_LOG} curiefenselog;
-    access_log syslog:server=unix:/dev/log curiefenselog;
     error_log  ${ERROR_LOG}  debug;
 
     listen 31082 default_server;
@@ -70,7 +69,7 @@ server {
     location / {
         access_by_lua_block {
             local session = require "lua.session_nginx"
-            session.inspect(ngx)
+            session.inspect(ngx, "${CF_LOG_LEVEL}")
         }
         log_by_lua_block {
             local session = require "lua.session_nginx"

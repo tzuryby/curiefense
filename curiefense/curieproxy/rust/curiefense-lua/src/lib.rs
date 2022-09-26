@@ -10,6 +10,7 @@ use curiefense::grasshopper::Grasshopper;
 use curiefense::inspect_generic_request_map;
 use curiefense::inspect_generic_request_map_init;
 use curiefense::interface::aggregator::aggregated_values_block;
+use curiefense::logs::LogLevel;
 use curiefense::logs::Logs;
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
@@ -31,18 +32,30 @@ struct LuaArgs<'l> {
     headers: HashMap<String, String>,
     lua_body: Option<LuaString<'l>>,
     str_ip: String,
+    loglevel: LogLevel,
 }
 
 fn lua_convert_args<'l>(
     lua: &'l Lua,
     args: (
+        LuaValue,     // loglevel
         LuaValue,     // meta
         LuaValue,     // headers
         LuaValue<'l>, // optional body
         LuaValue,     // ip
     ),
 ) -> Result<LuaArgs<'l>, String> {
-    let (vmeta, vheaders, vlua_body, vstr_ip) = args;
+    let (vloglevel, vmeta, vheaders, vlua_body, vstr_ip) = args;
+    let loglevel = match String::from_lua(vloglevel, lua) {
+        Err(rr) => return Err(format!("Could not convert the loglevel argument: {}", rr)),
+        Ok(m) => match m.as_str() {
+            "debug" => LogLevel::Debug,
+            "info" => LogLevel::Info,
+            "warn" | "warning" => LogLevel::Warning,
+            "err" | "error" => LogLevel::Error,
+            _ => return Err(format!("Invalid log level {}", m)),
+        },
+    };
     let meta = match FromLua::from_lua(vmeta, lua) {
         Err(rr) => return Err(format!("Could not convert the meta argument: {}", rr)),
         Ok(m) => m,
@@ -64,6 +77,7 @@ fn lua_convert_args<'l>(
         headers,
         lua_body,
         str_ip,
+        loglevel,
     })
 }
 
@@ -77,6 +91,7 @@ fn lua_convert_args<'l>(
 fn lua_inspect_request(
     lua: &Lua,
     args: (
+        LuaValue, // log level
         LuaValue, // meta
         LuaValue, // headers
         LuaValue, // optional body
@@ -108,6 +123,7 @@ fn lua_inspect_request(
 fn lua_inspect_init_hops(
     lua: &Lua,
     args: (
+        LuaValue, // log level
         LuaValue, // meta
         LuaValue, // headers
         LuaValue, // optional body
@@ -115,13 +131,14 @@ fn lua_inspect_init_hops(
         LuaValue, // hops
     ),
 ) -> LuaResult<LInitResult> {
-    let (meta, headers, body, ip, lhops) = args;
+    let (loglevel, meta, headers, body, ip, lhops) = args;
     let hops = FromLua::from_lua(lhops, lua)?;
-    match lua_convert_args(lua, (meta, headers, body, ip)) {
+    match lua_convert_args(lua, (loglevel, meta, headers, body, ip)) {
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
             let ip = curiefense::incremental::extract_ip(hops, &lua_args.headers).unwrap_or(lua_args.str_ip);
             let res = inspect_init(
+                lua_args.loglevel,
                 "/cf-config/current/config",
                 lua_args.meta,
                 lua_args.headers,
@@ -144,6 +161,7 @@ fn lua_inspect_init_hops(
 fn lua_inspect_init(
     lua: &Lua,
     args: (
+        LuaValue, // log level
         LuaValue, // meta
         LuaValue, // headers
         LuaValue, // optional body
@@ -154,6 +172,7 @@ fn lua_inspect_init(
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
             let res = inspect_init(
+                lua_args.loglevel,
                 "/cf-config/current/config",
                 lua_args.meta,
                 lua_args.headers,
@@ -292,6 +311,7 @@ fn inspect_request<GH: Grasshopper>(
 }
 /// Rust-native functions for the dialog system
 fn inspect_init<GH: Grasshopper>(
+    loglevel: LogLevel,
     configpath: &str,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
@@ -299,7 +319,7 @@ fn inspect_init<GH: Grasshopper>(
     ip: String,
     grasshopper: Option<&GH>,
 ) -> Result<(InitResult, Logs), String> {
-    let mut logs = Logs::default();
+    let mut logs = Logs::new(loglevel);
     logs.debug("Inspection init");
     let rmeta: RequestMeta = RequestMeta::from_map(meta)?;
 
