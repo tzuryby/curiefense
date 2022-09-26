@@ -466,27 +466,27 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     content.insert("challenge".into(), Value::Number(serde_json::Number::from(e.challenge)));
 
     content.insert(
-        "cf-section-active".into(),
+        "cf_section_active".into(),
         serde_json::to_value(&e.location_active).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf-section-report".into(),
+        "cf_section_report".into(),
         serde_json::to_value(&e.location_report).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf-top-ruleid-active".into(),
+        "cf_top_ruleid_active".into(),
         serde_json::to_value(&e.ruleid_active).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf-top-ruleid-report".into(),
+        "cf_top_ruleid_report".into(),
         serde_json::to_value(&e.ruleid_report).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf-top-risk-level-active".into(),
+        "cf_top_risk_level_active".into(),
         serde_json::to_value(&e.risk_level_active).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf-top-risk-level-report".into(),
+        "cf_top_risk_level_report".into(),
         serde_json::to_value(&e.risk_level_report).unwrap_or(Value::Null),
     );
     content.insert(
@@ -530,30 +530,30 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     e.asn.serialize_map("asn", &mut content);
 
     content.insert(
-        "top-tags".into(),
+        "top_tags".into(),
         serde_json::to_value(&e.top_tags).unwrap_or(Value::Null),
     );
-    content.insert("top-request-per-cookies".into(), e.headers_amount.serialize_top());
-    content.insert("top-request-per-args".into(), e.args_amount.serialize_top());
-    content.insert("top-request-per-headers".into(), e.headers_amount.serialize_top());
-    content.insert("top-max-cookies-per-request".into(), e.headers_amount.serialize_max());
-    content.insert("top-max-args-per-request".into(), e.args_amount.serialize_max());
-    content.insert("top-max-headers-per-request".into(), e.headers_amount.serialize_max());
+    content.insert("top_request_per_cookies".into(), e.headers_amount.serialize_top());
+    content.insert("top_request_per_args".into(), e.args_amount.serialize_top());
+    content.insert("top_request_per_headers".into(), e.headers_amount.serialize_top());
+    content.insert("top_max_cookies_per_request".into(), e.headers_amount.serialize_max());
+    content.insert("top_max_args_per_request".into(), e.args_amount.serialize_max());
+    content.insert("top_max_headers_per_request".into(), e.headers_amount.serialize_max());
 
     content.insert(
-        "top-ip-per-unique-uri".into(),
+        "top_ip_per_unique_uri".into(),
         serde_json::to_value(&e.ip_per_uri).unwrap_or(Value::Null),
     );
     content.insert(
-        "top-uri-per-unique-ip".into(),
+        "top_uri_per_unique_ip".into(),
         serde_json::to_value(&e.uri_per_ip).unwrap_or(Value::Null),
     );
     content.insert(
-        "top-session-per-unique-uri".into(),
+        "top_session_per_unique_uri".into(),
         serde_json::to_value(&e.session_per_uri).unwrap_or(Value::Null),
     );
     content.insert(
-        "top-uri-per-unique-session".into(),
+        "top_uri_per_unique_session".into(),
         serde_json::to_value(&e.uri_per_session).unwrap_or(Value::Null),
     );
 
