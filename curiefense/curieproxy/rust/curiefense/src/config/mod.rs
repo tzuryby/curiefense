@@ -304,6 +304,8 @@ impl Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
+        logs.debug(|| format!("Loading configuration from {}", basepath));
+
         let mmanifest: Result<RawManifest, String> = PathBuf::from(basepath)
             .parent()
             .ok_or_else(|| "could not get parent directory?".to_string())
