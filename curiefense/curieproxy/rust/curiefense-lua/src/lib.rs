@@ -371,14 +371,14 @@ mod tests {
         let cfg = with_config("../../cf-config", &mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                4 => {
+                5 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[1].message.to_string().contains("manifest.json"));
-                    assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
-                    assert!(logs.logs[3].message.to_string().contains("CFGLOAD logs end"));
+                    assert!(logs.logs[2].message.to_string().contains("manifest.json"));
+                    assert!(logs.logs[3].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[4].message.to_string().contains("CFGLOAD logs end"));
                 }
-                12 => {
-                    assert!(logs.logs[1]
+                13 => {
+                    assert!(logs.logs[2]
                         .message
                         .to_string()
                         .contains("../../cf-config: No such file or directory"))
