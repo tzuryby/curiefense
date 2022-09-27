@@ -5,6 +5,8 @@ local sfmt = string.format
 local redis = require "resty.redis"
 
 local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 1
+local redishost = os.getenv("REDIS_HOST") or "redis"
+local redisport = os.getenv("REDIS_PORT") or 6379
 
 local function custom_response(handle, action_params)
     if not action_params then action_params = {} end
@@ -60,13 +62,10 @@ local function make_safe_headers(rheaders)
 end
 
 local function redis_connect(handle)
-    local redishost = os.getenv("REDIS_HOST") or "redis"
-    local redisport = os.getenv("REDIS_PORT") or 6379
     local red = redis:new()
-    red:set_timeout(100) -- 100ms
-    local _, err = red:connect(redishost, redisport)
-    if err then
-        handle.log(handle.ERR, err)
+    local ok, err = red:connect(redishost, redisport)
+    if not ok then
+        handle.log(handle.ERR, "connect error: " .. err)
     end
     return red
 end
@@ -115,7 +114,6 @@ function session_rust_nginx.inspect(handle, loglevel)
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
             local red = redis_connect(handle)
             red:init_pipeline()
-
             for _, flow in pairs(flows) do
                 red:llen(flow.key)
             end
@@ -134,8 +132,10 @@ function session_rust_nginx.inspect(handle, loglevel)
                 end
             end
             local results, redis_err = red:commit_pipeline()
-            if not results then
-                handle.log(handle.ERR, "failed to run redis calls " .. redis_err)
+            if redis_err or not results then
+                handle.log(handle.ERR, "failed to run redis calls: " .. redis_err)
+                flows = {}
+                limits = {}
             end
 
             local result_idx = 1
@@ -164,6 +164,7 @@ function session_rust_nginx.inspect(handle, loglevel)
                 table.insert(rflows, flow:result(flowtype))
             end
 
+            red:init_pipeline()
             for _, limit in pairs(limits) do
                 local key = limit.key
                 local curcount = 1
@@ -184,6 +185,12 @@ function session_rust_nginx.inspect(handle, loglevel)
                     end
                 end
                 table.insert(rlimits, limit:result(curcount))
+            end
+            red:commit_pipeline()
+
+            local ok, err = red:set_keepalive(300000, 360)
+            if not ok then
+                handle.log(handle.ERR, "set_keepalive error: " .. err)
             end
         end
 
