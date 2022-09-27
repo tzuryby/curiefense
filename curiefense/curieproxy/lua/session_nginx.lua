@@ -188,10 +188,7 @@ function session_rust_nginx.inspect(handle, loglevel)
             end
             red:commit_pipeline()
 
-            local ok, err = red:set_keepalive(300000, 360)
-            if not ok then
-                handle.log(handle.ERR, "set_keepalive error: " .. err)
-            end
+            red:set_keepalive(300000, 360)
         end
 
         res = curiefense.inspect_request_process(res, rflows, rlimits)

@@ -364,7 +364,7 @@ local function test_masking(request_path)
         if p ~= nil then
           error("Could find secret in " .. section .. "/" .. value["name"])
         end
-        local p = string.find(value["value"], secret)
+        p = string.find(value["value"], secret)
         if p ~= nil then
           error("Could find secret in " .. section .. "/" .. value["name"])
         end
