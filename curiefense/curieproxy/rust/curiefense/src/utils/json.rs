@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::Serialize;
+use std::collections::HashMap;
 
 /// newtype for the BT format
 pub struct NameValue<'t, K: Eq + std::hash::Hash, V> {
