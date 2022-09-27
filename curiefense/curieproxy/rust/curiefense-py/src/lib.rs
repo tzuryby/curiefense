@@ -4,20 +4,28 @@ use std::collections::HashMap;
 
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::inspect_generic_request_map;
-use curiefense::logs::Logs;
+use curiefense::logs::{LogLevel, Logs};
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
 
 #[pyfunction]
 #[pyo3(name = "inspect_request")]
 fn py_inspect_request(
-    configpath: &str,
+    loglevel: String,
+    configpath: String,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
-) -> PyResult<(String, String)> {
-    let mut logs = Logs::default();
+) -> PyResult<(String, Vec<u8>)> {
+    let real_loglevel = match loglevel.as_str() {
+        "debug" => LogLevel::Debug,
+        "info" => LogLevel::Info,
+        "warn" | "warning" => LogLevel::Warning,
+        "err" | "error" => LogLevel::Error,
+        _ => return Err(PyTypeError::new_err(format!("Can't recognize log level: {}", loglevel))),
+    };
+    let mut logs = Logs::new(real_loglevel);
     logs.debug("Inspection init");
     let rmeta: RequestMeta = RequestMeta::from_map(meta).map_err(PyTypeError::new_err)?;
 
@@ -29,7 +37,7 @@ fn py_inspect_request(
     };
 
     let grasshopper = DynGrasshopper {};
-    let dec = inspect_generic_request_map(configpath, Some(&grasshopper), raw, &mut logs);
+    let dec = inspect_generic_request_map(&configpath, Some(&grasshopper), raw, &mut logs);
     let res = InspectionResult {
         decision: dec.decision,
         tags: Some(dec.tags),
@@ -39,7 +47,7 @@ fn py_inspect_request(
         stats: dec.stats,
     };
     let response = res.decision.response_json();
-    let request_map = res.log_json();
+    let request_map = res.log_json_block(HashMap::new());
     let merr = res.err;
     match merr {
         Some(rr) => Err(PyTypeError::new_err(rr)),
@@ -57,8 +65,8 @@ struct MatchResult {
 }
 
 #[pyfunction]
-fn rust_match(pattern: &str, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
-    let re = regex::Regex::new(pattern).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
+fn rust_match(pattern: String, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
+    let re = regex::Regex::new(&pattern).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
     if let Some(to_match) = mmatch {
         Ok(re
             .find_iter(to_match)
@@ -73,11 +81,11 @@ fn rust_match(pattern: &str, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>>
 }
 
 #[pyfunction]
-fn hyperscan_match(pattern: &str, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
+fn hyperscan_match(pattern: String, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
     use hyperscan::prelude::*;
     use hyperscan::BlockMode;
     let db: Database<BlockMode> =
-        Database::compile(pattern, CompileFlags::empty(), None).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
+        Database::compile(&pattern, CompileFlags::empty(), None).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
     let scratch = db.alloc_scratch().map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
 
     if let Some(to_match) = mmatch {
@@ -96,10 +104,16 @@ fn hyperscan_match(pattern: &str, mmatch: Option<&str>) -> PyResult<Vec<MatchRes
     }
 }
 
+#[pyfunction]
+fn aggregated_data() -> PyResult<String> {
+    Ok(curiefense::interface::aggregator::aggregated_values_block())
+}
+
 #[pymodule]
 fn curiefense(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_inspect_request, m)?)?;
     m.add_function(wrap_pyfunction!(rust_match, m)?)?;
     m.add_function(wrap_pyfunction!(hyperscan_match, m)?)?;
+    m.add_function(wrap_pyfunction!(aggregated_data, m)?)?;
     Ok(())
 }
