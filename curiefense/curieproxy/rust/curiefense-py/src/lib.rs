@@ -4,20 +4,28 @@ use std::collections::HashMap;
 
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::inspect_generic_request_map;
-use curiefense::logs::Logs;
+use curiefense::logs::{LogLevel, Logs};
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
 
 #[pyfunction]
 #[pyo3(name = "inspect_request")]
 fn py_inspect_request(
+    loglevel: String,
     configpath: String,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
 ) -> PyResult<(String, Vec<u8>)> {
-    let mut logs = Logs::default();
+    let real_loglevel = match loglevel.as_str() {
+        "debug" => LogLevel::Debug,
+        "info" => LogLevel::Info,
+        "warn" | "warning" => LogLevel::Warning,
+        "err" | "error" => LogLevel::Error,
+        _ => return Err(PyTypeError::new_err(format!("Can't recognize log level: {}", loglevel))),
+    };
+    let mut logs = Logs::new(real_loglevel);
     logs.debug("Inspection init");
     let rmeta: RequestMeta = RequestMeta::from_map(meta).map_err(PyTypeError::new_err)?;
 
