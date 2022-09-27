@@ -160,19 +160,6 @@ pub fn jsonlog_rinfo(
     proxy: HashMap<String, String>,
     now: &chrono::DateTime<chrono::Utc>,
 ) -> serde_json::Result<Vec<u8>> {
-    let mut tgs = tags.clone();
-    if let Some(action) = &dec.maction {
-        if let Some(extra) = &action.extra_tags {
-            for t in extra {
-                tgs.insert(t, Location::Request);
-            }
-        }
-    }
-    if let Some(cde) = rcode {
-        tgs.insert_qualified("status", &format!("{}", cde), Location::Request);
-        tgs.insert_qualified("status-class", &format!("{}xx", cde / 100), Location::Request);
-    }
-
     let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
@@ -189,7 +176,6 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("authority", &rinfo.rinfo.meta.authority)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
-    map_ser.serialize_entry("tags", &tgs)?;
     map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
@@ -204,6 +190,38 @@ pub fn jsonlog_rinfo(
 
     // it's too bad one can't directly write the recursive structures from just the serializer object
     // that's why there are several one shot structures for nested data:
+    struct LogTags<'t> {
+        tags: &'t Tags,
+        extra: Option<&'t HashSet<String>>,
+        rcode: Option<u32>,
+    }
+    impl<'t> Serialize for LogTags<'t> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut code_vec: Vec<(&str, String)> = Vec::new();
+            if let Some(code) = self.rcode {
+                code_vec.push(("status", format!("{}", code)));
+                code_vec.push(("status-class", format!("{}xx", code / 100)));
+            }
+
+            self.tags.serialize_with_extra(
+                serializer,
+                self.extra.iter().flat_map(|i| i.iter().map(|s| s.as_str())),
+                code_vec.into_iter(),
+            )
+        }
+    }
+    map_ser.serialize_entry(
+        "tags",
+        &LogTags {
+            tags,
+            extra: dec.maction.as_ref().and_then(|a| a.extra_tags.as_ref()),
+            rcode,
+        },
+    )?;
+
     struct LogProxy<'t> {
         p: &'t HashMap<String, String>,
         l: &'t Option<(f64, f64)>,

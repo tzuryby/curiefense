@@ -1,5 +1,5 @@
 use crate::config::contentfilter::SectionIdx;
-use serde::ser::SerializeMap;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -291,11 +291,15 @@ impl Tags {
         self.insert_qualified_locs(id, value, locs);
     }
 
-    pub fn insert_qualified_locs(&mut self, id: &str, value: &str, locs: HashSet<Location>) {
+    fn qualified(id: &str, value: &str) -> String {
         let mut to_insert = id.to_string();
         to_insert.push(':');
         to_insert += &tagify(value);
-        self.0.insert(to_insert, locs);
+        to_insert
+    }
+
+    pub fn insert_qualified_locs(&mut self, id: &str, value: &str, locs: HashSet<Location>) {
+        self.0.insert(Self::qualified(id, value), locs);
     }
 
     pub fn extend(&mut self, other: Self) {
@@ -353,6 +357,34 @@ impl Tags {
             let e = self.0.entry(k).or_default();
             (*e).extend(v);
         }
+    }
+
+    pub fn inner(&self) -> &HashMap<String, HashSet<Location>> {
+        &self.0
+    }
+
+    pub fn serialize_with_extra<'t, S, I, Q>(
+        &self,
+        serializer: S,
+        extra: I,
+        extra_qualified: Q,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        I: Iterator<Item = &'t str>,
+        Q: Iterator<Item = (&'t str, String)>,
+    {
+        let mut sq = serializer.serialize_seq(None)?;
+        for t in self.0.keys() {
+            sq.serialize_element(t)?;
+        }
+        for t in extra {
+            sq.serialize_element(&tagify(t))?;
+        }
+        for (k, v) in extra_qualified {
+            sq.serialize_element(&Self::qualified(k, &v))?;
+        }
+        sq.end()
     }
 }
 
