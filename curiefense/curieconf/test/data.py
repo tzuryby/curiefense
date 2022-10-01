@@ -4,10 +4,7 @@ from curieconf.utils import DOCUMENTS_PATH, BLOBS_PATH, BLOBS_BOOTSTRAP
 
 bootstrap_config_json = json.load(open("config.batch.json"))
 
-vec_action = {
-        "id": "default",
-        "type": "custom"
-}
+vec_action = {"id": "default", "type": "custom"}
 
 vec_limit = {
     "id": "f971e92459e2",
