@@ -1,6 +1,7 @@
 [
   {
     "description": "3 requests in 3s",
+    "global": false,
     "exclude": [],
     "id": "limitcountry",
     "include": [],
@@ -23,6 +24,7 @@
   },
   {
     "description": "3 requests in 3s",
+    "global": false,
     "exclude": [],
     "id": "limitsimple",
     "include": [],
@@ -45,6 +47,7 @@
   },
   {
     "description": "3 requests in 3s",
+    "global": false,
     "exclude": [],
     "id": "limitinclude",
     "include": [
@@ -71,7 +74,8 @@
     "description": "3 requests in 3s",
     "exclude": [
       "hdrfoobar"
-    ],
+    "global": false,
+  ],
     "id": "limitexclude",
     "include": [],
     "key": [
@@ -93,6 +97,7 @@
   },
   {
     "description": "3 requests in 3s",
+    "global": false,
     "exclude": [],
     "id": "includecompany",
     "include": [
@@ -118,6 +123,7 @@
   },
   {
     "description": "3 requests in 3s",
+    "global": false,
     "exclude": [],
     "id": "redirector",
     "include": [],
@@ -140,6 +146,7 @@
   },
   {
     "description": "3 requests per 10 seconds",
+    "global": false,
     "exclude": [],
     "id": "e2e1000000007",
     "include": [
@@ -164,6 +171,7 @@
   },
   {
     "description": "3 requests per 2 seconds",
+    "global": false,
     "exclude": [],
     "id": "f971e92459e2",
     "include": [],
@@ -186,6 +194,7 @@
   },
   {
     "description": ":)",
+    "global": false,
     "exclude": [],
     "id": "mlimitA",
     "include": [],
@@ -208,6 +217,7 @@
   },
   {
     "description": ":)",
+    "global": false,
     "exclude": [],
     "id": "mlimitB",
     "include": [],
@@ -230,6 +240,7 @@
   },
   {
     "description": ":)",
+    "global": false,
     "exclude": [],
     "id": "4d1d9d405fc9",
     "include": [],
@@ -252,6 +263,7 @@
   },
   {
     "description": ":)",
+    "global": false,
     "exclude": [],
     "id": "4d1d9d405hdr",
     "include": [],
@@ -274,6 +286,7 @@
   },
   {
     "description": "Multiple thresholds. The last threshold to check that ban works even if it doesn't have the highest limit.",
+    "global": false,
     "exclude": [],
     "id": "limitmultithreshold",
     "include": [],
@@ -304,6 +317,7 @@
   },
   {
     "description": "Test identical limits attached to the same location",
+    "global": false,
     "exclude": [],
     "id": "samelocationA",
     "include": [],
@@ -326,6 +340,7 @@
   },
   {
     "description": "Test identical limits attached to the same location",
+    "global": false,
     "exclude": [],
     "id": "samelocationB",
     "include": [],
@@ -348,6 +363,7 @@
   },
   {
     "description": "Limit per hostname",
+    "global": false,
     "exclude": [],
     "id": "limithostname",
     "include": [],
@@ -370,6 +386,7 @@
   },
   {
     "description": "Limit per url",
+    "global": false,
     "exclude": [],
     "id": "limiturl",
     "include": [],
