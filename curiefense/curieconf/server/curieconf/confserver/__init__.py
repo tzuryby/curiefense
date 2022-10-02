@@ -6,6 +6,7 @@ from flask import Flask, current_app
 from .backend import Backends
 
 from flask_cors import CORS
+from prometheus_flask_exporter import PrometheusMetrics
 
 
 ## Import all versions
@@ -61,6 +62,8 @@ def main(args=None):
 
     if options.pdb:
         flask.got_request_exception.connect(drop_into_pdb)
+
+    metrics = PrometheusMetrics(app)
 
     try:
         with app.app_context():
