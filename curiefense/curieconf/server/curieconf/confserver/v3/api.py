@@ -231,7 +231,7 @@ m_custom = api.model(
         "id": fields.String(required=True),
         "name": fields.String(required=True),
         "*": fields.Wildcard(fields.Raw()),
-    }
+    },
 )
 
 ### mapping from doc name to model
