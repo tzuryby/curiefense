@@ -21,11 +21,11 @@
                 "arguments": { "type": "string" },
                 "attrs": {
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicyid", "securitypolicyentryid", "region", "subregion"]
                  },
                 "attributes":{
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicyid", "securitypolicyentryid", "region", "subregion"]
                  }
             }
         }
