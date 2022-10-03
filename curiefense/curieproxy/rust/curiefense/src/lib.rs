@@ -106,7 +106,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let (securitypolicy, (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
+    let ((ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs);
             match mmapinfo {
@@ -130,8 +130,10 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         None
                     };
 
+                    let stats = StatsCollect::new(cfg.revision.clone())
+                        .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
                     // if the max depth is equal to 0, the body will not be parsed
-                    let reqinfo = map_request(slogs, secpolicy.clone(), &raw, Some(start));
+                    let reqinfo = map_request(slogs, secpolicy, &raw, Some(start));
 
                     if let Some(action) = body_too_large {
                         return RequestMappingResult::BodyTooLarge(action, reqinfo);
@@ -146,11 +148,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         false
                     };
 
-                    let stats = StatsCollect::new(cfg.revision.clone())
-                        .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
-
                     let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
-                    RequestMappingResult::Res((secpolicy, ntags, nflows, reqinfo, is_human))
+                    RequestMappingResult::Res((ntags, nflows, reqinfo, is_human))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
             }
@@ -194,7 +193,6 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     Ok(APhase0 {
         stats,
         itags: tags,
-        securitypolicy,
         reqinfo,
         is_human,
         globalfilter_dec,
