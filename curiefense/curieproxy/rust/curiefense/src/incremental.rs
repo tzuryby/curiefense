@@ -110,21 +110,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(
-        &mut logs,
-        "unk",
-        "unk",
-        &secpolicy.session,
-        &secpolicy.session_ids,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        0,
-        secpolicy.content_filter_profile.ignore_body,
-        &rawrequest,
-        Some(idata.start),
-    );
+    let reqinfo = map_request(&mut logs, &secpolicy, &rawrequest, Some(idata.start));
     (
         logs,
         AnalyzeResult {
@@ -226,21 +212,7 @@ pub async fn finalize<GH: Grasshopper>(
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(
-        &mut logs,
-        &secpolicy.policy.id,
-        &secpolicy.entry.id,
-        &secpolicy.session,
-        &secpolicy.session_ids,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        secpolicy.content_filter_profile.max_body_depth,
-        secpolicy.content_filter_profile.ignore_body,
-        &rawrequest,
-        Some(idata.start),
-    );
+    let reqinfo = map_request(&mut logs, &secpolicy, &rawrequest, Some(idata.start));
 
     // without grasshopper, default to being human
     let is_human = if let Some(gh) = mgh {

@@ -29,6 +29,8 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::config::hostmap::SecurityPolicy;
+
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
         if let Some(ua) = reqinfo.headers.get("user-agent") {
@@ -108,44 +110,26 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
-                    let pmax_depth = secpolicy.content_filter_profile.max_body_depth;
 
                     // check if the body is too large
                     // if the body is too large, we store the "too large" action for later use, and set the max depth to 0
-                    let (body_too_large, max_depth) = if let Some(body) = raw.mbody {
+                    let body_too_large = if let Some(body) = raw.mbody {
                         if body.len() > secpolicy.content_filter_profile.max_body_size
                             && !secpolicy.content_filter_profile.ignore_body
                         {
-                            (
                                 Some(body_too_large(
                                     secpolicy.content_filter_profile.max_body_size,
                                     body.len(),
-                                )),
-                                0,
-                            )
+                                ))
                         } else {
-                            (None, pmax_depth)
+                            None
                         }
                     } else {
-                        (None, pmax_depth)
+                        None
                     };
 
                     // if the max depth is equal to 0, the body will not be parsed
-                    let reqinfo = map_request(
-                        slogs,
-                        &secpolicy.policy.id,
-                        &secpolicy.entry.id,
-                        &secpolicy.session,
-                        &secpolicy.session_ids,
-                        &secpolicy.content_filter_profile.masking_seed,
-                        &secpolicy.content_filter_profile.decoding,
-                        &secpolicy.content_filter_profile.content_type,
-                        secpolicy.content_filter_profile.referer_as_uri,
-                        max_depth,
-                        secpolicy.content_filter_profile.ignore_body,
-                        &raw,
-                        Some(start),
-                    );
+                    let reqinfo = map_request(slogs, secpolicy.as_ref(), &raw, Some(start));
 
                     if let Some(action) = body_too_large {
                         return RequestMappingResult::BodyTooLarge(action, reqinfo);
@@ -180,21 +164,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
-                let rinfo = map_request(
-                    logs,
-                    "unk",
-                    "unk",
-                    &[],
-                    &[],
-                    b"CHANGEME",
-                    &[],
-                    &[],
-                    false,
-                    0,
-                    true,
-                    &raw,
-                    Some(start),
-                );
+                let mut secpol = SecurityPolicy::default();
+                secpol.content_filter_profile.ignore_body = true;
+                let rinfo = map_request(logs, &secpol, &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -204,21 +176,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
-                let rinfo = map_request(
-                    logs,
-                    "unk",
-                    "unk",
-                    &[],
-                    &[],
-                    b"CHANGEME",
-                    &[],
-                    &[],
-                    false,
-                    0,
-                    true,
-                    &raw,
-                    Some(start),
-                );
+                let mut secpol = SecurityPolicy::default();
+                secpol.content_filter_profile.ignore_body = true;
+                let rinfo = map_request(logs, &secpol, &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,

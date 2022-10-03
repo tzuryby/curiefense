@@ -465,6 +465,7 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::hostmap::SecurityPolicy;
     use crate::interface::stats::Stats;
     use crate::interface::{jsonlog, Decision};
     use crate::utils::{map_request, RequestMeta};
@@ -489,21 +490,8 @@ mod test {
             headers,
             meta,
         };
-        map_request(
-            &mut logs,
-            "a",
-            "b",
-            &[],
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            false,
-            500,
-            false,
-            &raw_request,
-            None,
-        )
+        let mut secpol = SecurityPolicy::empty();
+        map_request(&mut logs, &secpol, &raw_request, None)
     }
 
     #[test]
@@ -694,21 +682,11 @@ mod test {
             headers,
             meta,
         };
-        let rinfo = map_request(
-            &mut logs,
-            "a",
-            "b",
-            &[],
-            &[],
-            b"CHANGEME",
-            &[crate::config::contentfilter::Transformation::Base64Decode],
-            &[crate::config::raw::ContentType::Json],
-            true,
-            50,
-            false,
-            &raw_request,
-            None,
-        );
+        let mut secpol = SecurityPolicy::default();
+        secpol.content_filter_profile.decoding = vec![crate::config::contentfilter::Transformation::Base64Decode];
+        secpol.content_filter_profile.content_type = vec![crate::config::raw::ContentType::Json];
+        secpol.content_filter_profile.referer_as_uri = true;
+        let rinfo = map_request(&mut logs, &secpol, &raw_request, None);
 
         let mut profile = ContentFilterProfile::default_from_seed("test");
         let asection = profile.sections.at(SectionIdx::Args);

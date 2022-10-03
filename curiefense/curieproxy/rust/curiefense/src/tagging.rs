@@ -259,6 +259,7 @@ mod tests {
     use super::*;
     use crate::config::globalfilter::optimize_ipranges;
     use crate::config::globalfilter::GlobalFilterRelation;
+    use crate::config::hostmap::SecurityPolicy;
     use crate::logs::Logs;
     use crate::utils::map_request;
     use crate::utils::RawRequest;
@@ -294,18 +295,10 @@ mod tests {
         }
         let meta = RequestMeta::from_map(attrs).unwrap();
         let mut logs = Logs::default();
+        let secpol = SecurityPolicy::default();
         map_request(
             &mut logs,
-            "a",
-            "b",
-            &[],
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            false,
-            500,
-            false,
+            &secpol,
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),
                 headers,
