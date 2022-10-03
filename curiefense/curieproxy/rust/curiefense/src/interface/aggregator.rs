@@ -257,6 +257,15 @@ struct AggregatedCounters {
     requests_triggered_ratelimit_active: usize,
     requests_triggered_ratelimit_report: usize,
 
+    aclid_active: TopN<String>,
+    aclid_report: TopN<String>,
+    secpolid_active: TopN<String>,
+    secpolid_report: TopN<String>,
+    secpolentryid_active: TopN<String>,
+    secpolentryid_report: TopN<String>,
+    cfid_active: TopN<String>,
+    cfid_report: TopN<String>,
+
     location_active: AggSection,
     location_report: AggSection,
     ruleid_active: TopN<String>,
@@ -294,6 +303,10 @@ impl AggregatedCounters {
 
         let mut blocked = false;
         let mut skipped = false;
+        let mut acl_blocked = false;
+        let mut acl_report = false;
+        let mut cf_blocked = false;
+        let mut cf_report = false;
         for r in &dec.reasons {
             use super::Initiator::*;
             let this_blocked = match r.decision {
@@ -319,8 +332,10 @@ impl AggregatedCounters {
                 }
                 Acl { tags: _, stage: _ } => {
                     if this_blocked {
+                        acl_blocked = true;
                         self.requests_triggered_acl_active += 1;
                     } else {
+                        acl_report = true;
                         self.requests_triggered_acl_report += 1;
                     }
                 }
@@ -347,10 +362,12 @@ impl AggregatedCounters {
 
                 ContentFilter { ruleid, risk_level } => {
                     if this_blocked {
+                        cf_blocked = true;
                         self.requests_triggered_cf_active += 1;
                         self.ruleid_active.inc(ruleid.clone());
                         self.risk_level_active.inc(*risk_level);
                     } else {
+                        cf_report = true;
                         self.requests_triggered_cf_report += 1;
                         self.ruleid_report.inc(ruleid.clone());
                         self.risk_level_report.inc(*risk_level);
@@ -390,10 +407,34 @@ impl AggregatedCounters {
             }
         }
         blocked &= !skipped;
+        acl_report |= acl_blocked & !skipped;
+        acl_blocked &= !skipped;
+        cf_report |= cf_blocked & !skipped;
+        cf_blocked &= !skipped;
 
+        if acl_blocked {
+            self.aclid_active.inc(rinfo.rinfo.secpolicy.acl_profile.id.to_string());
+        }
+        if acl_report {
+            self.aclid_report.inc(rinfo.rinfo.secpolicy.acl_profile.id.to_string());
+        }
+        if cf_blocked {
+            self.cfid_active
+                .inc(rinfo.rinfo.secpolicy.content_filter_profile.id.to_string());
+        }
+        if cf_report {
+            self.cfid_report
+                .inc(rinfo.rinfo.secpolicy.content_filter_profile.id.to_string());
+        }
         if blocked {
+            self.secpolid_active.inc(rinfo.rinfo.secpolicy.policy.id.to_string());
+            self.secpolentryid_active
+                .inc(rinfo.rinfo.secpolicy.entry.id.to_string());
             self.blocks += 1;
         } else {
+            self.secpolid_report.inc(rinfo.rinfo.secpolicy.policy.id.to_string());
+            self.secpolentryid_report
+                .inc(rinfo.rinfo.secpolicy.entry.id.to_string());
             self.report += 1;
         }
 
@@ -422,7 +463,7 @@ impl AggregatedCounters {
                 "bot" => self.bot += 1,
                 "human" => self.human += 1,
                 tg => {
-                    if !tg.starts_with("securitypolicy") && !tg.starts_with("ip:") {
+                    if !tg.contains(':') {
                         self.top_tags.inc(tg.to_string())
                     }
                 }
@@ -444,8 +485,8 @@ impl AggregatedCounters {
 
 /* missing:
 
-  * d-bytes
-  * u-bytes
+  * d_bytes
+  * u_bytes
   * processing time
   *
 */
@@ -480,6 +521,30 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     content.insert(
         "cf_top_ruleid_report".into(),
         serde_json::to_value(&e.ruleid_report).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_aclid_active".into(),
+        serde_json::to_value(&e.aclid_active).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_aclid_report".into(),
+        serde_json::to_value(&e.aclid_report).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_secpolid_active".into(),
+        serde_json::to_value(&e.secpolid_active).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_secpolid_report".into(),
+        serde_json::to_value(&e.secpolid_report).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_secpolentryid_active".into(),
+        serde_json::to_value(&e.secpolentryid_active).unwrap_or(Value::Null),
+    );
+    content.insert(
+        "cf_top_secpolentryid_report".into(),
+        serde_json::to_value(&e.secpolentryid_report).unwrap_or(Value::Null),
     );
     content.insert(
         "cf_top_risk_level_active".into(),
