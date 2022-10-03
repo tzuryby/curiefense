@@ -32,4 +32,5 @@ pub struct SecurityPolicy {
     pub content_filter_profile: ContentFilterProfile,
     pub limits: Vec<Limit>,
     pub session: Vec<RequestSelector>,
+    pub session_ids: Vec<RequestSelector>,
 }

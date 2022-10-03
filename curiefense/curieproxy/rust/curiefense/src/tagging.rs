@@ -299,6 +299,7 @@ mod tests {
             "a",
             "b",
             &[],
+            &[],
             b"CHANGEME",
             &[],
             &[],

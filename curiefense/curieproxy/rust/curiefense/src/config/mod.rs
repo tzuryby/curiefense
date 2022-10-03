@@ -110,10 +110,11 @@ impl Config {
         global_limits: &[Limit],
         acls: &HashMap<String, AclProfile>,
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
+        session: Vec<RequestSelector>,
+        session_ids: Vec<RequestSelector>,
     ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
         let mut default: Option<Arc<SecurityPolicy>> = None;
         let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
-
         for rawmap in rawmaps {
             let mapname = rawmap.name.clone();
             let acl_profile: AclProfile = match acls.get(&rawmap.acl_profile) {
@@ -143,19 +144,6 @@ impl Config {
                     Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
                 }
             }
-            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
-                Ok(Vec::new())
-            } else {
-                rawmap
-                    .session
-                    .into_iter()
-                    .map(RequestSelector::resolve_selector_map)
-                    .collect()
-            };
-            let session = msession.unwrap_or_else(|rr| {
-                logs.error(|| format!("error when decoding session in {}, {}", mapname, rr));
-                Vec::new()
-            });
             let securitypolicy = SecurityPolicy {
                 policy: PolicyId {
                     id: policyid.to_string(),
@@ -165,7 +153,8 @@ impl Config {
                     id: rawmap.id.unwrap_or_else(|| mapname.clone()),
                     name: rawmap.name,
                 },
-                session,
+                session: session.clone(),
+                session_ids: session_ids.clone(),
                 acl_active: rawmap.acl_active,
                 acl_profile,
                 content_filter_active: rawmap.content_filter_active,
@@ -218,6 +207,30 @@ impl Config {
 
         // build the entries while looking for the default entry
         for rawmap in rawmaps {
+            let mapname = rawmap.name.clone();
+            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
+                Ok(Vec::new())
+            } else {
+                rawmap
+                    .session
+                    .into_iter()
+                    .map(RequestSelector::resolve_selector_map)
+                    .collect()
+            };
+            let msession_ids: anyhow::Result<Vec<RequestSelector>> = rawmap
+                .session_ids
+                .into_iter()
+                .map(RequestSelector::resolve_selector_map)
+                .collect();
+            let session = msession.unwrap_or_else(|rr| {
+                logs.error(|| format!("error when decoding session in {}, {}", &mapname, rr));
+                Vec::new()
+            });
+
+            let session_ids = msession_ids.unwrap_or_else(|rr| {
+                logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
+                Vec::new()
+            });
             let (entries, default_entry) = Config::resolve_security_policies(
                 &mut logs,
                 &rawmap.id,
@@ -227,11 +240,12 @@ impl Config {
                 &global_limits,
                 &acls,
                 &content_filter_profiles,
+                session,
+                session_ids,
             );
             if default_entry.is_none() {
                 logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
             }
-            let mapname = rawmap.name.clone();
             let hostmap = HostMap {
                 name: rawmap.name,
                 entries,
