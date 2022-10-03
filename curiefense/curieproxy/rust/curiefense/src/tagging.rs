@@ -143,14 +143,14 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
         GlobalFilterEntryE::SecurityPolicyId(id) => {
-            if &rinfo.rinfo.policyid == id {
+            if &rinfo.rinfo.secpolicy.policy.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
         GlobalFilterEntryE::SecurityPolicyEntryId(id) => {
-            if &rinfo.rinfo.entryid == id {
+            if &rinfo.rinfo.secpolicy.entry.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
@@ -259,12 +259,14 @@ mod tests {
     use super::*;
     use crate::config::globalfilter::optimize_ipranges;
     use crate::config::globalfilter::GlobalFilterRelation;
+    use crate::config::hostmap::SecurityPolicy;
     use crate::logs::Logs;
     use crate::utils::map_request;
     use crate::utils::RawRequest;
     use crate::utils::RequestMeta;
     use regex::Regex;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn mk_rinfo() -> RequestInfo {
         let raw_headers = [
@@ -294,18 +296,10 @@ mod tests {
         }
         let meta = RequestMeta::from_map(attrs).unwrap();
         let mut logs = Logs::default();
+        let secpol = SecurityPolicy::default();
         map_request(
             &mut logs,
-            "a",
-            "b",
-            &[],
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            false,
-            500,
-            false,
+            Arc::new(secpol),
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),
                 headers,

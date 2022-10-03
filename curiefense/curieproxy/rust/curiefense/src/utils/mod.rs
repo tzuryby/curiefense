@@ -5,6 +5,7 @@ use serde_json::json;
 use sha2::{Digest, Sha224};
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::Arc;
 
 pub mod decoders;
 pub mod json;
@@ -13,6 +14,7 @@ pub mod url;
 
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
+use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::interface::stats::Stats;
@@ -294,8 +296,7 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
-    pub policyid: String,
-    pub entryid: String,
+    pub secpolicy: Arc<SecurityPolicy>,
 }
 
 #[derive(Debug, Clone)]
@@ -488,39 +489,33 @@ impl<'a> RawRequest<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn map_request(
     logs: &mut Logs,
-    policyid: &str,
-    entryid: &str,
-    session_sel: &[RequestSelector],
-    session_ids: &[RequestSelector],
-    seed: &[u8],
-    dec: &[Transformation],
-    accepted_types: &[ContentType],
-    referer_as_uri: bool,
-    max_depth: usize, // if set to 0, the body will not be parsed
-    ignore_body: bool,
+    secpolicy: Arc<SecurityPolicy>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
     logs.debug("map_request starts");
-    let (headers, cookies) = map_headers(dec, &raw.headers);
+    let (headers, cookies) = map_headers(&secpolicy.content_filter_profile.decoding, &raw.headers);
     logs.debug("headers mapped");
     let geoip = find_geoip(logs, raw.ipstr.clone());
     logs.debug("geoip computed");
     let mut qinfo = map_args(
         logs,
-        dec,
+        &secpolicy.content_filter_profile.decoding,
         &raw.meta.path,
         headers.get_str("content-type"),
-        accepted_types,
-        if ignore_body { None } else { raw.mbody },
-        max_depth,
+        &secpolicy.content_filter_profile.content_type,
+        if secpolicy.content_filter_profile.ignore_body {
+            None
+        } else {
+            raw.mbody
+        },
+        secpolicy.content_filter_profile.max_body_depth,
     );
-    if referer_as_uri {
+    if secpolicy.content_filter_profile.referer_as_uri {
         if let Some(rf) = headers.get("referer") {
             parse_uri(
                 &mut qinfo.args,
@@ -537,8 +532,7 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
-        policyid: policyid.to_string(),
-        entryid: entryid.to_string(),
+        secpolicy: secpolicy.clone(),
     };
 
     let dummy_reqinfo = RequestInfo {
@@ -550,10 +544,10 @@ pub fn map_request(
         session_ids: HashMap::new(),
     };
 
-    let raw_session = (if session_sel.is_empty() {
+    let raw_session = (if secpolicy.session.is_empty() {
         &[RequestSelector::Ip]
     } else {
-        session_sel
+        secpolicy.session.as_slice()
     })
     .iter()
     .filter_map(|s| select_string(&dummy_reqinfo, s, None))
@@ -562,14 +556,15 @@ pub fn map_request(
 
     let session_string = |s: &str| {
         let mut hasher = Sha224::new();
-        hasher.update(seed);
+        hasher.update(&secpolicy.content_filter_profile.masking_seed);
         hasher.update(s.as_bytes());
         let bytes = hasher.finalize();
         format!("{:x}", bytes)
     };
 
     let session = session_string(&raw_session);
-    let session_ids = session_ids
+    let session_ids = secpolicy
+        .session_ids
         .iter()
         .filter_map(|s| select_string(&dummy_reqinfo, s, None).map(|str| (s.to_string(), session_string(&str))))
         .collect();
@@ -617,8 +612,8 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
         RequestSelector::Tags => tags.map(|tags| Selected::OStr(tags.selector())),
-        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.policyid)),
-        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.entryid)),
+        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.policy.id)),
+        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.entry.id)),
     }
 }
 
@@ -749,21 +744,9 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(
-            &mut logs,
-            "a",
-            "b",
-            &[],
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            true,
-            100,
-            false,
-            &raw,
-            None,
-        );
+        let mut secpol = SecurityPolicy::empty();
+        secpol.content_filter_profile.referer_as_uri = true;
+        let ri = map_request(&mut logs, Arc::new(secpol), &raw, None);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

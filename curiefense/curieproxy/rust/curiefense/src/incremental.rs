@@ -84,17 +84,20 @@ pub fn inspect_init(
     );
     match mr {
         None => Err("could not find a matching security policy".to_string()),
-        Some(secpol) => Ok(IData {
-            start: start.unwrap_or_else(Utc::now),
-            logs,
-            meta,
-            headers: HashMap::new(),
-            secpol: secpol.clone(),
-            body: None,
-            ipinfo,
-            stats: StatsCollect::new(config.revision.clone())
-                .secpol(SecpolStats::build(&secpol, config.globalfilters.len())),
-        }),
+        Some(secpol) => {
+            let stats = StatsCollect::new(config.revision.clone())
+                .secpol(SecpolStats::build(&secpol, config.globalfilters.len()));
+            Ok(IData {
+                start: start.unwrap_or_else(Utc::now),
+                logs,
+                meta,
+                headers: HashMap::new(),
+                secpol,
+                body: None,
+                ipinfo,
+                stats,
+            })
+        }
     }
 }
 
@@ -110,21 +113,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(
-        &mut logs,
-        "unk",
-        "unk",
-        &secpolicy.session,
-        &secpolicy.session_ids,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        0,
-        secpolicy.content_filter_profile.ignore_body,
-        &rawrequest,
-        Some(idata.start),
-    );
+    let reqinfo = map_request(&mut logs, secpolicy, &rawrequest, Some(idata.start));
     (
         logs,
         AnalyzeResult {
@@ -226,21 +215,10 @@ pub async fn finalize<GH: Grasshopper>(
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(
-        &mut logs,
-        &secpolicy.policy.id,
-        &secpolicy.entry.id,
-        &secpolicy.session,
-        &secpolicy.session_ids,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        secpolicy.content_filter_profile.max_body_depth,
-        secpolicy.content_filter_profile.ignore_body,
-        &rawrequest,
-        Some(idata.start),
-    );
+    let cfrules = mcfrules
+        .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
+        .unwrap_or(CfRulesArg::Global);
+    let reqinfo = map_request(&mut logs, secpolicy, &rawrequest, Some(idata.start));
 
     // without grasshopper, default to being human
     let is_human = if let Some(gh) = mgh {
@@ -252,16 +230,12 @@ pub async fn finalize<GH: Grasshopper>(
     let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo);
     tags.insert("all", Location::Request);
 
-    let cfrules = mcfrules
-        .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
-        .unwrap_or(CfRulesArg::Global);
     let dec = analyze(
         &mut logs,
         mgh,
         APhase0 {
             stats,
             itags: tags,
-            securitypolicy: secpolicy,
             reqinfo,
             is_human,
             globalfilter_dec,
