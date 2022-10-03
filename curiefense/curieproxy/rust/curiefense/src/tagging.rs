@@ -143,14 +143,14 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
         GlobalFilterEntryE::SecurityPolicyId(id) => {
-            if &rinfo.rinfo.policyid == id {
+            if &rinfo.rinfo.secpolicy.policy.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
         GlobalFilterEntryE::SecurityPolicyEntryId(id) => {
-            if &rinfo.rinfo.entryid == id {
+            if &rinfo.rinfo.secpolicy.entry.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
@@ -266,6 +266,7 @@ mod tests {
     use crate::utils::RequestMeta;
     use regex::Regex;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn mk_rinfo() -> RequestInfo {
         let raw_headers = [
@@ -298,7 +299,7 @@ mod tests {
         let secpol = SecurityPolicy::default();
         map_request(
             &mut logs,
-            &secpol,
+            Arc::new(secpol),
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),
                 headers,

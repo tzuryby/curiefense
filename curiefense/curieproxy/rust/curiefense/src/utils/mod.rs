@@ -5,6 +5,7 @@ use serde_json::json;
 use sha2::{Digest, Sha224};
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::Arc;
 
 pub mod decoders;
 pub mod json;
@@ -295,10 +296,7 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
-    pub policyid: String,
-    pub entryid: String,
-    pub aclid: String,
-    pub cfid: String,
+    pub secpolicy: Arc<SecurityPolicy>,
 }
 
 #[derive(Debug, Clone)]
@@ -493,7 +491,7 @@ impl<'a> RawRequest<'a> {
 
 pub fn map_request(
     logs: &mut Logs,
-    secpolicy: &SecurityPolicy,
+    secpolicy: Arc<SecurityPolicy>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
 ) -> RequestInfo {
@@ -534,10 +532,7 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
-        policyid: secpolicy.policy.id.to_string(),
-        entryid: secpolicy.entry.id.to_string(),
-        aclid: secpolicy.acl_profile.id.to_string(),
-        cfid: secpolicy.content_filter_profile.id.to_string(),
+        secpolicy: secpolicy.clone(),
     };
 
     let dummy_reqinfo = RequestInfo {
@@ -617,8 +612,8 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
         RequestSelector::Tags => tags.map(|tags| Selected::OStr(tags.selector())),
-        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.policyid)),
-        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.entryid)),
+        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.policy.id)),
+        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.entry.id)),
     }
 }
 
@@ -751,7 +746,7 @@ mod tests {
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
         let mut secpol = SecurityPolicy::empty();
         secpol.content_filter_profile.referer_as_uri = true;
-        let ri = map_request(&mut logs, &secpol,  &raw, None);
+        let ri = map_request(&mut logs, Arc::new(secpol), &raw, None);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

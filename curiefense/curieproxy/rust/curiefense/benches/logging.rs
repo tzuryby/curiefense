@@ -44,7 +44,7 @@ fn logging_empty(c: &mut Criterion) {
         session_ids: Vec::new(),
     });
     let mut logs = Logs::new(LogLevel::Debug);
-    let reqinfo = map_request(&mut logs, &secpolicy, &raw, None);
+    let reqinfo = map_request(&mut logs, secpolicy.clone(), &raw, None);
 
     let stats = StatsCollect::new("QSDQSDQSD".into()).secpol(SecpolStats::build(&secpolicy, 0));
     let (itags, _, stats) = tag_request(stats, false, &[], &reqinfo);

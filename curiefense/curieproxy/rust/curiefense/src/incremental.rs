@@ -110,7 +110,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(&mut logs, &secpolicy, &rawrequest, Some(idata.start));
+    let reqinfo = map_request(&mut logs, secpolicy, &rawrequest, Some(idata.start));
     (
         logs,
         AnalyzeResult {
@@ -212,7 +212,7 @@ pub async fn finalize<GH: Grasshopper>(
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
-    let reqinfo = map_request(&mut logs, &secpolicy, &rawrequest, Some(idata.start));
+    let reqinfo = map_request(&mut logs, secpolicy.clone(), &rawrequest, Some(idata.start));
 
     // without grasshopper, default to being human
     let is_human = if let Some(gh) = mgh {

@@ -17,6 +17,8 @@ pub mod simple_executor;
 pub mod tagging;
 pub mod utils;
 
+use std::sync::Arc;
+
 use analyze::{APhase0, CfRulesArg};
 use body::body_too_large;
 use config::with_config;
@@ -117,10 +119,10 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         if body.len() > secpolicy.content_filter_profile.max_body_size
                             && !secpolicy.content_filter_profile.ignore_body
                         {
-                                Some(body_too_large(
-                                    secpolicy.content_filter_profile.max_body_size,
-                                    body.len(),
-                                ))
+                            Some(body_too_large(
+                                secpolicy.content_filter_profile.max_body_size,
+                                body.len(),
+                            ))
                         } else {
                             None
                         }
@@ -129,7 +131,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     };
 
                     // if the max depth is equal to 0, the body will not be parsed
-                    let reqinfo = map_request(slogs, secpolicy.as_ref(), &raw, Some(start));
+                    let reqinfo = map_request(slogs, secpolicy.clone(), &raw, Some(start));
 
                     if let Some(action) = body_too_large {
                         return RequestMappingResult::BodyTooLarge(action, reqinfo);
@@ -166,7 +168,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 logs.debug("No security policy found");
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
-                let rinfo = map_request(logs, &secpol, &raw, Some(start));
+                let rinfo = map_request(logs, Arc::new(secpol), &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -178,7 +180,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 logs.debug("Something went wrong during security policy searching");
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
-                let rinfo = map_request(logs, &secpol, &raw, Some(start));
+                let rinfo = map_request(logs, Arc::new(secpol), &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,

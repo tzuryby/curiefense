@@ -614,8 +614,8 @@ pub async fn aggregate(dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, 
     let seconds = rinfo.timestamp.timestamp();
     let key = AggregationKey {
         proxy: None,
-        secpolid: rinfo.rinfo.policyid.to_string(),
-        secpolentryid: rinfo.rinfo.entryid.to_string(),
+        secpolid: rinfo.rinfo.secpolicy.policy.id.to_string(),
+        secpolentryid: rinfo.rinfo.secpolicy.entry.id.to_string(),
     };
     let mut guard = AGGREGATED.lock().await;
     prune_old_values(&mut guard);

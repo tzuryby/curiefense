@@ -464,6 +464,8 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use super::*;
     use crate::config::hostmap::SecurityPolicy;
     use crate::interface::stats::Stats;
@@ -490,8 +492,8 @@ mod test {
             headers,
             meta,
         };
-        let mut secpol = SecurityPolicy::empty();
-        map_request(&mut logs, &secpol, &raw_request, None)
+        let secpol = SecurityPolicy::empty();
+        map_request(&mut logs, Arc::new(secpol), &raw_request, None)
     }
 
     #[test]
@@ -686,7 +688,7 @@ mod test {
         secpol.content_filter_profile.decoding = vec![crate::config::contentfilter::Transformation::Base64Decode];
         secpol.content_filter_profile.content_type = vec![crate::config::raw::ContentType::Json];
         secpol.content_filter_profile.referer_as_uri = true;
-        let rinfo = map_request(&mut logs, &secpol, &raw_request, None);
+        let rinfo = map_request(&mut logs, Arc::new(secpol), &raw_request, None);
 
         let mut profile = ContentFilterProfile::default_from_seed("test");
         let asection = profile.sections.at(SectionIdx::Args);
