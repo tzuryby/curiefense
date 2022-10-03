@@ -305,6 +305,7 @@ pub struct RequestInfo {
     pub headers: RequestField,
     pub rinfo: RInfo,
     pub session: String,
+    pub session_ids: HashMap<String, String>,
 }
 
 impl RequestInfo {
@@ -493,6 +494,7 @@ pub fn map_request(
     policyid: &str,
     entryid: &str,
     session_sel: &[RequestSelector],
+    session_ids: &[RequestSelector],
     seed: &[u8],
     dec: &[Transformation],
     accepted_types: &[ContentType],
@@ -545,6 +547,7 @@ pub fn map_request(
         headers,
         rinfo,
         session: String::new(),
+        session_ids: HashMap::new(),
     };
 
     let raw_session = (if session_sel.is_empty() {
@@ -557,11 +560,19 @@ pub fn map_request(
     .next()
     .unwrap_or_else(|| "???".to_string());
 
-    let mut hasher = Sha224::new();
-    hasher.update(seed);
-    hasher.update(raw_session.as_bytes());
-    let bytes = hasher.finalize();
-    let session = format!("{:x}", bytes);
+    let session_string = |s: &str| {
+        let mut hasher = Sha224::new();
+        hasher.update(seed);
+        hasher.update(s.as_bytes());
+        let bytes = hasher.finalize();
+        format!("{:x}", bytes)
+    };
+
+    let session = session_string(&raw_session);
+    let session_ids = session_ids
+        .iter()
+        .filter_map(|s| select_string(&dummy_reqinfo, s, None).map(|str| (s.to_string(), session_string(&str))))
+        .collect();
 
     RequestInfo {
         timestamp: dummy_reqinfo.timestamp,
@@ -569,6 +580,7 @@ pub fn map_request(
         headers: dummy_reqinfo.headers,
         rinfo: dummy_reqinfo.rinfo,
         session,
+        session_ids,
     }
 }
 
@@ -741,6 +753,7 @@ mod tests {
             &mut logs,
             "a",
             "b",
+            &[],
             &[],
             b"CHANGEME",
             &[],

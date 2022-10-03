@@ -89,6 +89,28 @@ impl RequestSelector {
     }
 }
 
+impl std::fmt::Display for RequestSelector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RequestSelector::Ip => write!(f, "ip"),
+            RequestSelector::Path => write!(f, "path"),
+            RequestSelector::Query => write!(f, "query"),
+            RequestSelector::Uri => write!(f, "uri"),
+            RequestSelector::Country => write!(f, "country"),
+            RequestSelector::Method => write!(f, "method"),
+            RequestSelector::Asn => write!(f, "asn"),
+            RequestSelector::Args(a) => write!(f, "argument_{}", a),
+            RequestSelector::Cookie(c) => write!(f, "cookie_{}", c),
+            RequestSelector::Header(h) => write!(f, "header_{}", h),
+            RequestSelector::Company => write!(f, "company"),
+            RequestSelector::Authority => write!(f, "authority"),
+            RequestSelector::Tags => write!(f, "tags"),
+            RequestSelector::SecpolId => write!(f, "security_policy_id"),
+            RequestSelector::SecpolEntryId => write!(f, "security_policy_entry_id"),
+        }
+    }
+}
+
 pub fn decode_request_selector_condition(
     tp: SelectorType,
     v: &str,

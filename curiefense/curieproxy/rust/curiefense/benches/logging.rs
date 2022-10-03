@@ -41,6 +41,7 @@ fn logging_empty(c: &mut Criterion) {
         content_filter_profile: ContentFilterProfile::default_from_seed("seedqszqsdqsdd"),
         limits: Vec::new(),
         session: Vec::new(),
+        session_ids: Vec::new(),
     });
     let mut logs = Logs::new(LogLevel::Debug);
     let reqinfo = map_request(
@@ -48,6 +49,7 @@ fn logging_empty(c: &mut Criterion) {
         &secpolicy.policy.id,
         &secpolicy.entry.id,
         &secpolicy.session,
+        &secpolicy.session_ids,
         &secpolicy.content_filter_profile.masking_seed,
         &secpolicy.content_filter_profile.decoding,
         &secpolicy.content_filter_profile.content_type,

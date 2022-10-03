@@ -66,6 +66,10 @@ pub struct RawHostMap {
     pub id: String,
     pub name: String,
     pub map: Vec<RawSecurityPolicy>,
+    #[serde(default)]
+    pub session: Vec<HashMap<String, String>>,
+    #[serde(default)]
+    pub session_ids: Vec<HashMap<String, String>>,
 }
 
 /// a mapping of the configuration file for security policies
@@ -74,8 +78,6 @@ pub struct RawHostMap {
 pub struct RawSecurityPolicy {
     #[serde(rename = "match")]
     pub match_: String,
-    #[serde(default)]
-    pub session: Vec<HashMap<String, String>>,
     pub id: Option<String>, // set to name if absent
     pub name: String,
     pub acl_profile: String,

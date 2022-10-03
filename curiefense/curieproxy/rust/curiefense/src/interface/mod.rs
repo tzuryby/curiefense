@@ -3,6 +3,7 @@ use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
 use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
+use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, RequestInfo, Selected};
 use serde::ser::{SerializeMap, SerializeSeq};
@@ -169,6 +170,7 @@ pub fn jsonlog_rinfo(
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
+    map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     map_ser.serialize_entry("request_id", &rinfo.rinfo.meta.requestid)?;
     map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
     map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
