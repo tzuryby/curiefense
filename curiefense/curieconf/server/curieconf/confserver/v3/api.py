@@ -378,8 +378,8 @@ def validateJson(json_data, schema_type):
         validate(instance=json_data, schema=schema_type_map[schema_type])
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
-        return False
-    return True
+        return False, str(err)
+    return True, ""
 
 
 ### DB Schema validation
@@ -634,9 +634,9 @@ class DocumentResource(Resource):
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
         for entry in request.json:
-            isValid = validateJson(entry, document)
+            isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched")
+                abort(500, "schema mismatched: \n" + err)
         res = current_app.backend.documents_create(
             config, document, data, get_gitactor()
         )
@@ -649,9 +649,9 @@ class DocumentResource(Resource):
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
         for entry in request.json:
-            isValid = validateJson(entry, document)
+            isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched " + str(entry))
+                abort(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
         res = current_app.backend.documents_update(
             config, document, data, get_gitactor()
         )
@@ -713,7 +713,7 @@ class EntriesResource(Resource):
         "Create an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        isValid = validateJson(request.json, document)
+        isValid, err = validateJson(request.json, document)
         if isValid:
             data = marshal(request.json, models[document], skip_none=True)
             res = current_app.backend.entries_create(
@@ -721,7 +721,7 @@ class EntriesResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched")
+            abort(500, "schema mismatched: \n" + err)
 
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
@@ -738,7 +738,7 @@ class EntryResource(Resource):
         "Update an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        isValid = validateJson(request.json, document)
+        isValid, err = validateJson(request.json, document)
         if isValid:
             data = marshal(request.json, models[document], skip_none=True)
             res = current_app.backend.entries_update(
@@ -746,7 +746,7 @@ class EntryResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched")
+            abort(500, "schema mismatched: \n" + err)
 
     def delete(self, config, document, entry):
         "Delete an entry from a document"
