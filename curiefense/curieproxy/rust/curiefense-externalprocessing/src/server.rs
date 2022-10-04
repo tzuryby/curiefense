@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use curiefense::{
-    config::{flow::FlowMap, globalfilter::GlobalFilterSection, with_config},
+    config::{flow::FlowMap, globalfilter::GlobalFilterSection, virtualtags::VirtualTags, with_config},
     grasshopper::DynGrasshopper,
     incremental::{add_body, add_headers, finalize, inspect_init, IData, IPInfo},
     interface::{jsonlog, AnalyzeResult},
@@ -41,7 +41,7 @@ pub struct MyEP {
 
 type CfgRequest = (
     RequestMeta,
-    Sender<Option<Result<(IData, Vec<GlobalFilterSection>, FlowMap), String>>>,
+    Sender<Option<Result<(IData, Vec<GlobalFilterSection>, FlowMap, VirtualTags), String>>>,
 );
 
 /// this function loops and waits for configuration queries
@@ -66,7 +66,8 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
                 // that would not be necessary if we could avoid the autoreloading feature, but had a system for reloading the server when the configuration changes
                 let gf = cfg.globalfilters.clone();
                 let fl = cfg.flows.clone();
-                (o, gf, fl)
+                let vtags = cfg.virtual_tags.clone();
+                (o, gf, fl, vtags)
             })
         });
         show_logs(logs);
@@ -182,7 +183,7 @@ impl MyEP {
         self.reqchannel.send((meta, rtx)).await.unwrap();
         let midata = rrx.recv().await;
 
-        let (idata, globalfilters, flows) = midata.unwrap().unwrap().unwrap();
+        let (idata, globalfilters, flows, vtags) = midata.unwrap().unwrap().unwrap();
 
         let mut idata = match add_headers(idata, mheaders) {
             Ok(i) => i,
@@ -213,7 +214,7 @@ impl MyEP {
             }
         }
 
-        let (dec, logs) = finalize(idata, Some(&DynGrasshopper {}), &globalfilters, &flows, None).await;
+        let (dec, logs) = finalize(idata, Some(&DynGrasshopper {}), &globalfilters, &flows, None, vtags).await;
 
         let stage = if headers_only {
             ProcessingStage::Headers

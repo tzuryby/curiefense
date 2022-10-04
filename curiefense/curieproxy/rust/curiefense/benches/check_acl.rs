@@ -1,4 +1,5 @@
 use criterion::*;
+use curiefense::config::virtualtags::VirtualTags;
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashSet;
 
@@ -22,7 +23,7 @@ fn tags_vec(sz: usize) -> Vec<(String, Location)> {
 }
 
 fn gen_tags(sz: usize) -> Tags {
-    Tags::from_slice(&tags_vec(sz))
+    Tags::from_slice(&tags_vec(sz), VirtualTags::default())
 }
 
 fn gen_profile(sz: usize) -> AclProfile {

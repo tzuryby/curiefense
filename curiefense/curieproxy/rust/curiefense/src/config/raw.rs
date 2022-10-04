@@ -474,6 +474,21 @@ pub struct RawFlowStep {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawVirtualTag {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "match")]
+    pub match_: Vec<RawVirtualTagMatch>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawVirtualTagMatch {
+    pub vtag: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RawManifest {
     pub meta: RawMetaManifest,
 }

@@ -589,6 +589,7 @@ pub async fn stream_wrapper<GH: Grasshopper>(
                 &config.config.globalfilters,
                 &config.config.flows,
                 Some(&config.content_filter_rules),
+                config.config.virtual_tags.clone(),
             )
             .await
         }

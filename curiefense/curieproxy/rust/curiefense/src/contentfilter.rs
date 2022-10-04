@@ -131,7 +131,7 @@ pub fn content_filter_check(
         );
     }
 
-    let mut specific_tags = Tags::default();
+    let mut specific_tags = tags.new_with_vtags();
 
     // finally, hyperscan check
     match mhsdb {
@@ -359,8 +359,8 @@ fn hyperscan(
                     {
                         matches += 1;
                         let location = Location::from_value(sid, &name, &k);
-                        tags.merge(new_tags.with_loc(&location));
-                        specific_tags.merge(new_specific_tags.with_loc(&location));
+                        tags.merge(tags.new_with_vtags().with_raw_tags(new_tags, &location));
+                        specific_tags.merge(tags.new_with_vtags().with_raw_tags(new_specific_tags, &location));
                         let decision = if specific_tags.has_intersection(active) {
                             nactive += 1;
                             BDecision::Blocking
@@ -470,6 +470,7 @@ mod test {
 
     use super::*;
     use crate::config::hostmap::SecurityPolicy;
+    use crate::config::virtualtags::VirtualTags;
     use crate::interface::stats::Stats;
     use crate::interface::{jsonlog, Decision};
     use crate::utils::{map_request, RequestMeta};
@@ -564,7 +565,7 @@ mod test {
             &Decision::pass(Vec::new()),
             Some(&masked),
             None,
-            &Tags::default(),
+            &Tags::new(&VirtualTags::default()),
             &Stats::default(),
             &Logs::default(),
             HashMap::new(),
@@ -709,7 +710,7 @@ mod test {
             &Decision::pass(Vec::new()),
             Some(&masked),
             None,
-            &Tags::default(),
+            &Tags::new(&VirtualTags::default()),
             &Stats::default(),
             &Logs::default(),
             HashMap::new(),

@@ -16,7 +16,7 @@ use crate::{
     challenge_verified,
     config::{
         contentfilter::ContentFilterRules, contentfilter::SectionIdx, flow::FlowMap, globalfilter::GlobalFilterSection,
-        hostmap::SecurityPolicy, Config,
+        hostmap::SecurityPolicy, virtualtags::VirtualTags, Config,
     },
     grasshopper::Grasshopper,
     interface::{
@@ -118,7 +118,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
         logs,
         AnalyzeResult {
             decision: Decision::action(action, vec![br]),
-            tags: Tags::default(),
+            tags: Tags::new(&VirtualTags::default()),
             rinfo: reqinfo,
             stats: Stats::default(),
         },
@@ -205,6 +205,7 @@ pub async fn finalize<GH: Grasshopper>(
     globalfilters: &[GlobalFilterSection],
     flows: &FlowMap,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
+    vtags: VirtualTags,
 ) -> (AnalyzeResult, Logs) {
     let ipstr = idata.ip();
     let mut logs = idata.logs;
@@ -227,7 +228,7 @@ pub async fn finalize<GH: Grasshopper>(
         false
     };
 
-    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo);
+    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo, &vtags);
     tags.insert("all", Location::Request);
 
     let dec = analyze(
@@ -289,6 +290,7 @@ mod test {
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
+            virtual_tags: Arc::new(HashMap::new()),
         }
     }
 
