@@ -68,6 +68,8 @@ services:
     restart: always
     volumes:
       - curieproxy_config:/cf-config
+      - ./filebeat/ilm.json:/usr/share/filebeat/ilm.json
+      - ./filebeat/template.json:/usr/share/filebeat/template.json
     environment:
       - ENVOY_UID
       - XFF_TRUSTED_HOPS
@@ -81,6 +83,9 @@ services:
       - NGINX_ACCESS_LOG
       - NGINX_ERROR_LOG
       - CF_LOG_LEVEL
+      - NGINX_LOG_LEVEL
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - KIBANA_URL=http://kibana:5601
     networks:
       curiemesh:
         aliases:

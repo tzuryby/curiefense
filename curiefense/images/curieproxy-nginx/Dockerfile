@@ -18,7 +18,7 @@ RUN mkfifo /nginx-accesslogs
 COPY start.sh /usr/bin/
 
 RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.13.3-amd64.deb && dpkg -i filebeat-7.13.3-amd64.deb && rm filebeat-7.13.3-amd64.deb
-COPY filebeat/filebeat-stdin.yml /etc/filebeat.yml
+COPY filebeat/filebeat-nginx.yml /etc/filebeat.yml
 RUN chmod go-w /etc/filebeat.yml
 
 CMD /bin/bash /usr/bin/start.sh
