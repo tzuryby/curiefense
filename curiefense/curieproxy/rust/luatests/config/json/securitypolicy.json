@@ -1,5 +1,22 @@
 [
     {
+        "match": "www.collision.com",
+        "id": "flowcollisiontests",
+        "name": "flow control collision tests",
+        "map": [
+            {
+                "match": "/",
+                "name": "default",
+                "id": "default",
+                "acl_profile": "flowcontrol",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": []
+            }
+        ]
+    },
+    {
         "match": "limitt1.com",
         "id": "limitt1",
         "name": "limit test1",
@@ -174,6 +191,16 @@
         "id": "__default__",
         "name": "default entry",
         "map": [
+            {
+                "match": "/flow-test",
+                "name": "flowtest",
+                "id": "flowtest",
+                "acl_profile": "flowcontrol",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": []
+            },
             {
                 "match": "^/content-filter/rl45report3",
                 "name": "rl45report3",
