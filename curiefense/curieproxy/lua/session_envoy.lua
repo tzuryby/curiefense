@@ -74,6 +74,7 @@ local function custom_response(handle, action_params)
 end
 
 function session_rust_envoy.on_response(handle)
+    handle:logDebug("todo, capture return code")
 end
 
 function session_rust_envoy.inspect(handle)

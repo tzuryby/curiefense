@@ -12,16 +12,14 @@
 # To run this with docker-compose:
 # pytest --base-protected-url http://localhost:30081/ --base-conf-url http://localhost:30000/api/v3/ --base-ui-url http://localhost:30080 --elasticsearch-url http://localhost:9200 .      # pylint: disable=line-too-long
 
-from typing import Any, Dict, Iterator
-import argparse
+from typing import Any, Dict, List, Tuple
 import json
 import logging
 import os
-import re
+import pytest
+import requests
 import subprocess
 import time
-import requests
-import sys
 
 # --- Helpers ---
 TEST_CONFIG_NAME = "master"
@@ -89,7 +87,6 @@ class CliHelper:
         time.sleep(20)
 
     def set_configuration(self, luatests_path: str):
-        # acl-profiles.json  actions.json  contentfilter-profiles.json  contentfilter-rules.json  flow-control.json  globalfilter-lists.json  limits.json  securitypolicy.json
         for (cmdname, path) in [
             ("actions", "actions.json"),
             ("aclprofiles", "acl-profiles.json"),
@@ -108,167 +105,101 @@ class CliHelper:
         self.publish_and_apply()
 
 
-parser = argparse.ArgumentParser(description="Curiefense E2E tests")
-parser.add_argument("--base-protected-url", nargs="+", required=True)
-parser.add_argument("--base-conf-url", required=True)
-parser.add_argument("--base-ui-url", required=True)
-parser.add_argument("--elasticsearch-url", required=True)
-parser.add_argument("--luatests-path", required=True)
-parser.add_argument("--log-level", required=False)
-parser.add_argument(
-    "--ignore-config",
-    action="store_true",
-    help="Ignore configuration phase, run the tests on the current configuration",
-)
-parser.add_argument("match", help="regex for filtering the test name", nargs="*")
-args = parser.parse_args()
-
-logging.basicConfig(level=logging.INFO)
-if args.log_level == "DEBUG":
-    logging.basicConfig(level=logging.DEBUG)
-if args.log_level == "WARN":
-    logging.basicConfig(level=logging.WARN)
-if args.log_level == "ERROR":
-    logging.basicConfig(level=logging.ERROR)
-
-if not args.ignore_config:
-    cli = CliHelper(args.base_conf_url)
-    cli.set_configuration(args.luatests_path)
+@pytest.fixture(scope="session")
+def luatests_path(request: pytest.FixtureRequest) -> str:
+    path = request.config.getoption("--luatests-path")
+    assert isinstance(path, str), "bad lua test"
+    return path
 
 
-def testcase_load(path: str) -> Iterator[Any]:
-    for file in os.listdir(os.path.join(args.luatests_path, path)):
-        if not file.endswith(".json"):
-            continue
-        with open(os.path.join(args.luatests_path, path, file)) as f:
-            yield (file, json.load(f))
+@pytest.fixture(scope="session")
+def curieconfig(request: pytest.FixtureRequest, luatests_path: str):
+    if not request.config.getoption("--ignore-config"):
+        conf_url = request.config.getoption("--base-conf-url")
+        assert isinstance(conf_url, str), "--base-conf-url unset"
+        cli = CliHelper(conf_url)
+        cli.set_configuration(luatests_path)
 
 
-def run_request(base_url: str, req: Any) -> requests.Response:
-    method: str = "GET"
-    path: str = "/"
-    headers: Dict[str, str] = {}
+class RequestHelper:
+    def __init__(self, base_url: str, hops: int):
+        self.base_url = base_url
+        self.hops = hops
 
-    for (k, v) in req["headers"].items():
-        if k.startswith(":"):
-            if k == ":method":
-                method = v
-            elif k == ":authority":
-                headers["Host"] = v
-            elif k == ":path":
-                path = v
-        else:
-            headers[k] = v
-    return requests.request(
-        method=method,
-        headers=headers,
-        data=req["body"] if "body" in req else None,
-        url=base_url + path,
-    )
+    def run(self, req: Any) -> requests.Response:
+        method: str = "GET"
+        path: str = "/"
+        headers: Dict[str, str] = {}
+
+        k: str
+        v: str
+        for (k, v) in req["headers"].items():
+            if k.startswith(":"):
+                if k == ":method":
+                    method = v
+                elif k == ":authority":
+                    headers["Host"] = v
+                elif k == ":path":
+                    path = v
+            else:
+                headers[k.lower()] = v
+        if "ip" in req:
+            ip_lst = [req["ip"]] + ["10.0.0.%d" % step for step in range(self.hops - 1)]
+            headers["x-forwarded-for"] = ",".join(ip_lst)
+
+        return requests.request(
+            method=method,
+            headers=headers,
+            data=req["body"] if "body" in req else None,
+            url=self.base_url + path,
+        )
 
 
-def skipped(identifier: str) -> bool:
-    if args.match:
-        return not any([re.search(mtch, identifier) for mtch in args.match])
+@pytest.fixture(scope="session")
+def requester(curieconfig: None, request: pytest.FixtureRequest):
+    target_url = request.config.getoption("--base-protected-url")
+    assert isinstance(target_url, str)
+    hops = request.config.getoption("--xff-hops")
+    assert isinstance(hops, int)
+    return RequestHelper(target_url, hops)
+
+
+def test_raw_request(raw_request: Any, requester: RequestHelper):
+    req = raw_request
+    if "human" in req and req["human"]:
+        pytest.skip("Ignoring because of humanity test")
+    res = requester.run(req)
+    response = req["response"]
+    if "block_mode" in response and response["block_mode"]:
+        expected = (
+            response["real_status"] if "real_status" in response else response["status"]
+        )
     else:
-        return False
+        expected = 200
+    assert expected == res.status_code
 
 
-max_time_limit = 0
-with open(
-    os.path.join(args.luatests_path, "config", "json", "limits.json"), "r"
-) as lfile:
-    for limit in json.load(lfile):
-        for t in limit["thresholds"]:
-            max_time_limit = max(max_time_limit, t["limit"])
-with open(
-    os.path.join(args.luatests_path, "config", "json", "flow-control.json"), "r"
-) as lfile:
-    for flow in json.load(lfile):
-        max_time_limit = max(max_time_limit, flow["timeframe"])
-logging.debug("Maximum time limit: %d", max_time_limit)
+def test_rate_limit(
+    limit_request: List[Any], requester: RequestHelper, max_time_limit: int
+):
+    time.sleep(max_time_limit)
+    for (step, req) in enumerate(limit_request):
+        res = requester.run(req)
+        if req["pass"]:
+            assert res.status_code == 200, "at step %d" % step
+        else:
+            assert res.status_code != 200, "at step %d" % step
+        time.sleep(req["delay"])
 
-good = True
-for base_url in args.base_protected_url:
-    logging.info("URL: %s", base_url)
-    for (fname, elements) in testcase_load("raw_requests"):
-        logging.info("%s ->", fname)
-        for req in elements:
-            if skipped(req["name"]):
-                continue
-            logging.info("  %s", req["name"])
-            if "human" in req and req["human"]:
-                logging.debug(
-                    "Ignoring test raw_requests/%s/%s because of humanity test"
-                    % (fname, req["name"])
-                )
-            res = run_request(base_url, req)
-            response = req["response"]
-            if "block_mode" in response and response["block_mode"]:
-                expected = (
-                    response["real_status"]
-                    if "real_status" in response
-                    else response["status"]
-                )
-            else:
-                expected = 200
-            if expected != res.status_code:
-                logging.error(
-                    "raw_requests/%s/%s failed %d != %d",
-                    fname,
-                    req["name"],
-                    expected,
-                    res.status_code,
-                )
-                good = False
 
-    for (fname, elements) in testcase_load("ratelimit"):
-        if skipped(fname):
-            continue
-        logging.info("%s ->", fname)
-        for (step, req) in enumerate(elements):
-            logging.info("  step %d", step)
-            res = run_request(base_url, req)
-            if req["pass"]:
-                if res.status_code != 200:
-                    logging.error(
-                        "limits/%s/%d failed, did not pass, status=%d",
-                        fname,
-                        step,
-                        res.status_code,
-                    )
-                    good = False
-            else:
-                if res.status_code == 200:
-                    logging.error("limits/%s/%d failed, did pass, got 200", fname, step)
-                    good = False
-            if "delay" in req:
-                time.sleep(req["delay"])
-        time.sleep(max_time_limit)
-
-    for (fname, elements) in testcase_load("flows"):
-        if skipped(fname):
-            continue
-        logging.info("%s ->", fname)
-        for (step, req) in enumerate(elements):
-            logging.info("  step %d", step)
-            res = run_request(base_url, req)
-            if req["pass"]:
-                if res.status_code != 200:
-                    logging.error(
-                        "limits/%s/%d failed, did not pass, status=%d",
-                        fname,
-                        step,
-                        res.status_code,
-                    )
-                    good = False
-            else:
-                if res.status_code == 200:
-                    logging.error("limits/%s/%d failed, did pass, got 200", fname, step)
-                    good = False
-            if "delay" in req:
-                time.sleep(req["delay"])
-        time.sleep(max_time_limit)
-
-if not good:
-    sys.exit(1)
+def test_flow_control(
+    flow_request: List[Any], requester: RequestHelper, max_time_limit: int
+):
+    time.sleep(max_time_limit)
+    for (step, req) in enumerate(flow_request):
+        res = requester.run(req)
+        if req["pass"]:
+            assert res.status_code == 200, "at step %d" % step
+        else:
+            assert res.status_code != 200, "at step %d" % step
+        time.sleep(req["delay"])

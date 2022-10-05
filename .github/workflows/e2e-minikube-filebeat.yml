@@ -59,7 +59,7 @@ jobs:
             export IP=$(minikube ip)
             export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
             export IPPORT=$IP:$INGRESS_PORT
-            python3 test_e2e.py --log-level INFO --base-protected-url http://$IP:30081 --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:9200/ --luatests-path ../curiefense/curieproxy/rust/luatests
+            pytest --log-level INFO --base-protected-url http://$IPPORT --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:30200/ --junit-xml pytest.xml --luatests-path ../curiefense/curieproxy/rust/luatests
 
       - name: Dump logs
         if: ${{ failure() }}
@@ -78,3 +78,28 @@ jobs:
             kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=kibana
             echo "--- Logs for elasticsearch ---"
             kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=elasticsearch
+
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@ea8720de4a2e723f8204d44fc0178744cf401c1a
+        with:
+          files: e2e/pytest.xml
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          check_name: E2E Test Results on docker-compose
+          comment_title: E2E Test Statistics
+          hide_comments: all but latest
+          comment_on_pr: true
+          report_individual_runs: true
+          deduplicate_classes_by_file_name: false
+        if: >
+          always() &&
+          github.event.sender.login != 'dependabot[bot]' &&
+          ( github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository )
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Unit Test Results
+          path: |
+            e2e/pytest.xml
