@@ -1,4 +1,5 @@
 use crate::config::contentfilter::SectionIdx;
+use crate::config::virtualtags::VirtualTags;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -249,10 +250,13 @@ pub fn all_parents(locs: HashSet<Location>) -> HashSet<Location> {
 }
 
 /// a newtype representing tags, to make sure they are tagified when inserted
-#[derive(Debug, Clone, Default)]
-pub struct Tags(pub HashMap<String, HashSet<Location>>);
+#[derive(Debug, Clone)]
+pub struct Tags {
+    pub tags: HashMap<String, HashSet<Location>>,
+    vtags: VirtualTags,
+}
 
-fn tagify(tag: &str) -> String {
+pub fn tagify(tag: &str) -> String {
     fn filter_char(c: char) -> char {
         if c.is_ascii_alphanumeric() || c == ':' {
             c
@@ -268,22 +272,59 @@ impl Serialize for Tags {
     where
         S: serde::Serializer,
     {
-        serializer.collect_seq(self.0.keys())
+        serializer.collect_seq(self.tags.keys())
     }
 }
 
 impl Tags {
+    pub fn new(vtags: &VirtualTags) -> Self {
+        Tags {
+            tags: HashMap::new(),
+            vtags: vtags.clone(),
+        }
+    }
+
+    /// Create a new Tags with vtags from existing tag
+    pub fn new_with_vtags(&self) -> Self {
+        Tags {
+            tags: HashMap::new(),
+            vtags: self.vtags.clone(),
+        }
+    }
+
+    pub fn with_raw_tags(mut self, rawtags: RawTags, loc: &Location) -> Self {
+        for tag in rawtags.0.into_iter() {
+            self.insert(tag.as_str(), loc.clone());
+        }
+
+        self
+    }
+
+    pub fn with_raw_tags_locs(mut self, rawtags: RawTags, loc: &HashSet<Location>) -> Self {
+        for tag in rawtags.0.into_iter() {
+            self.insert_locs(tag.as_str(), loc.clone());
+        }
+
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.tags.is_empty()
     }
 
     pub fn insert(&mut self, value: &str, loc: Location) {
         let locs = std::iter::once(loc).collect();
-        self.0.insert(tagify(value), locs);
+        self.insert_locs(value, locs);
     }
 
     pub fn insert_locs(&mut self, value: &str, locs: HashSet<Location>) {
-        self.0.insert(tagify(value), locs);
+        let tag = tagify(value);
+        if let Some(vtags) = self.vtags.get(&tag) {
+            for vtag in vtags.into_iter() {
+                self.tags.insert(vtag.clone(), locs.clone());
+            }
+        }
+        self.tags.insert(tagify(value.clone()), locs.clone());
     }
 
     pub fn insert_qualified(&mut self, id: &str, value: &str, loc: Location) {
@@ -299,43 +340,49 @@ impl Tags {
     }
 
     pub fn insert_qualified_locs(&mut self, id: &str, value: &str, locs: HashSet<Location>) {
-        self.0.insert(Self::qualified(id, value), locs);
+        self.insert_locs(&Self::qualified(id, value), locs);
     }
 
+    /// **Warning**: Does not keep vtags of other
     pub fn extend(&mut self, other: Self) {
-        self.0.extend(other.0)
+        self.tags.extend(other.tags)
     }
 
-    pub fn from_slice(slice: &[(String, Location)]) -> Self {
-        Tags(
-            slice
-                .iter()
-                .map(|(s, l)| (tagify(s), std::iter::once(l.clone()).collect()))
-                .collect(),
-        )
+    pub fn from_slice(slice: &[(String, Location)], vtags: VirtualTags) -> Self {
+        let mut out = Tags {
+            tags: HashMap::new(),
+            vtags,
+        };
+
+        for (value, loc) in slice.iter() {
+            out.insert(value, loc.clone())
+        }
+
+        out
     }
 
     pub fn contains(&self, s: &str) -> bool {
-        self.0.contains_key(s)
+        self.tags.contains_key(s)
     }
 
     pub fn get(&self, s: &str) -> Option<&HashSet<Location>> {
-        self.0.get(s)
+        self.tags.get(s)
     }
 
     pub fn as_hash_ref(&self) -> &HashMap<String, HashSet<Location>> {
-        &self.0
+        &self.tags
     }
 
     pub fn selector(&self) -> String {
-        let mut tvec: Vec<&str> = self.0.keys().map(|s| s.as_ref()).collect();
+        let mut tvec: Vec<&str> = self.tags.keys().map(|s| s.as_ref()).collect();
         tvec.sort_unstable();
         tvec.join("*")
     }
 
+    /// **Warning**: tags implied by vtags are not kept if not present in `other`
     pub fn intersect(&self, other: &HashSet<String>) -> HashMap<String, HashSet<Location>> {
         let mut out = HashMap::new();
-        for (k, v) in &self.0 {
+        for (k, v) in &self.tags {
             if other.contains(k) {
                 out.insert(k.clone(), v.clone());
             }
@@ -344,23 +391,28 @@ impl Tags {
         out
     }
 
+    /// **Warning**: tags implied by vtags are not kept if not present in `other`
     pub fn intersect_tags(&self, other: &HashSet<String>) -> Self {
-        Tags(self.intersect(other))
+        let tags = self.intersect(other);
+        Tags {
+            tags,
+            vtags: self.vtags.clone(),
+        }
     }
 
     pub fn has_intersection(&self, other: &HashSet<String>) -> bool {
-        other.iter().any(|t| self.0.contains_key(t))
+        other.iter().any(|t| self.tags.contains_key(t))
     }
 
     pub fn merge(&mut self, other: Self) {
-        for (k, v) in other.0.into_iter() {
-            let e = self.0.entry(k).or_default();
+        for (k, v) in other.tags.into_iter() {
+            let e = self.tags.entry(k).or_default();
             (*e).extend(v);
         }
     }
 
     pub fn inner(&self) -> &HashMap<String, HashSet<Location>> {
-        &self.0
+        &self.tags
     }
 
     pub fn serialize_with_extra<'t, S, I, Q>(
@@ -375,7 +427,7 @@ impl Tags {
         Q: Iterator<Item = (&'t str, String)>,
     {
         let mut sq = serializer.serialize_seq(None)?;
-        for t in self.0.keys() {
+        for t in self.tags.keys() {
             sq.serialize_element(t)?;
         }
         for t in extra {
@@ -418,18 +470,6 @@ impl RawTags {
     pub fn has_intersection(&self, other: &HashSet<String>) -> bool {
         self.intersect(other).next().is_some()
     }
-
-    pub fn with_loc(self, locations: &Location) -> Tags {
-        Tags(
-            self.0
-                .into_iter()
-                .map(|k| (k, std::iter::once(locations.clone()).collect()))
-                .collect(),
-        )
-    }
-    pub fn with_locs(self, locations: &HashSet<Location>) -> Tags {
-        Tags(self.0.into_iter().map(|k| (k, locations.clone())).collect())
-    }
 }
 
 impl std::iter::FromIterator<String> for RawTags {
@@ -448,21 +488,42 @@ mod test {
 
     #[test]
     fn tag_selector() {
-        let tags = Tags::from_slice(&[
-            ("ccc".to_string(), Location::Request),
-            ("bbb".to_string(), Location::Request),
-            ("aaa".to_string(), Location::Request),
-        ]);
+        let tags = Tags::from_slice(
+            &[
+                ("ccc".to_string(), Location::Request),
+                ("bbb".to_string(), Location::Request),
+                ("aaa".to_string(), Location::Request),
+            ],
+            VirtualTags::default(),
+        );
         assert_eq!(tags.selector(), "aaa*bbb*ccc");
     }
 
     #[test]
     fn tag_selector_r() {
-        let tags = Tags::from_slice(&[
-            ("aaa".to_string(), Location::Request),
-            ("ccc".to_string(), Location::Request),
-            ("bbb".to_string(), Location::Request),
-        ]);
+        let tags = Tags::from_slice(
+            &[
+                ("aaa".to_string(), Location::Request),
+                ("ccc".to_string(), Location::Request),
+                ("bbb".to_string(), Location::Request),
+            ],
+            VirtualTags::default(),
+        );
         assert_eq!(tags.selector(), "aaa*bbb*ccc");
+    }
+
+    #[test]
+    fn insert_vtag() {
+        let vtags = VirtualTags::new(HashMap::from([("tag1".to_string(), Vec::from(["vtag1".to_string()]))]));
+
+        let tags = Tags::from_slice(
+            &[
+                ("tag1".to_string(), Location::Request),
+                ("tag2".to_string(), Location::Request),
+            ],
+            vtags,
+        );
+
+        assert_eq!(tags.selector(), "tag1*tag2*vtag1");
     }
 }

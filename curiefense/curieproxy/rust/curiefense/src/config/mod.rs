@@ -5,6 +5,7 @@ pub mod hostmap;
 pub mod limit;
 pub mod matchers;
 pub mod raw;
+pub mod virtualtags;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -22,7 +23,8 @@ use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, PolicyId, SecurityPolicy};
 use matchers::Matching;
-use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
+use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawVirtualTag};
+use virtualtags::{vtags_resolve, VirtualTags};
 
 use self::flow::FlowMap;
 use self::matchers::RequestSelector;
@@ -89,6 +91,7 @@ pub struct Config {
     pub container_name: Option<String>,
     pub flows: FlowMap,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
+    pub virtual_tags: VirtualTags,
     pub logs: Logs,
 }
 
@@ -194,6 +197,7 @@ impl Config {
         content_filter_profiles: HashMap<String, ContentFilterProfile>,
         container_name: Option<String>,
         rawflows: Vec<RawFlowEntry>,
+        rawvirtualtags: Vec<RawVirtualTag>,
     ) -> Config {
         let mut default: Option<HostMap> = None;
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
@@ -273,6 +277,8 @@ impl Config {
 
         let flows = flow_resolve(&mut logs, rawflows);
 
+        let virtual_tags = vtags_resolve(&mut logs, rawvirtualtags);
+
         Config {
             revision,
             securitypolicies,
@@ -283,6 +289,7 @@ impl Config {
             flows,
             content_filter_profiles,
             logs,
+            virtual_tags,
         }
     }
 
@@ -349,6 +356,7 @@ impl Config {
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
+        let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
 
         let container_name = std::fs::read_to_string("/etc/hostname")
             .ok()
@@ -371,6 +379,7 @@ impl Config {
             content_filter_profiles,
             container_name,
             flows,
+            virtualtags,
         );
 
         (config, hsdb)
@@ -402,6 +411,7 @@ impl Config {
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
+            virtual_tags: Arc::new(HashMap::new()),
         }
     }
 }

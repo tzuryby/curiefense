@@ -17,6 +17,7 @@ use crate::config::contentfilter::Transformation;
 use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
+use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
@@ -358,7 +359,7 @@ pub struct InspectionResult {
 
 impl InspectionResult {
     pub async fn log_json(&self, proxy: HashMap<String, String>) -> Vec<u8> {
-        let dtags = Tags::default();
+        let dtags = Tags::new(&VirtualTags::default());
         let tags: &Tags = match &self.tags {
             Some(t) => t,
             None => &dtags,

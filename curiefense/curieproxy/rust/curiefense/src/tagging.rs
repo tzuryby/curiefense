@@ -2,6 +2,7 @@ use crate::config::globalfilter::{
     GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterRule, GlobalFilterSection, PairEntry, SingleEntry,
 };
 use crate::config::raw::Relation;
+use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
@@ -174,8 +175,9 @@ pub fn tag_request(
     is_human: bool,
     globalfilters: &[GlobalFilterSection],
     rinfo: &RequestInfo,
+    vtags: &VirtualTags,
 ) -> (Tags, SimpleDecision, StatsCollect<BStageMapped>) {
-    let mut tags = Tags::default();
+    let mut tags = Tags::new(vtags);
     if is_human {
         tags.insert("human", Location::Request);
     } else {
@@ -236,7 +238,9 @@ pub fn tag_request(
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
             matched += 1;
-            let rtags = psection.tags.clone().with_locs(&mtch.matched);
+            let rtags = tags
+                .new_with_vtags()
+                .with_raw_tags_locs(psection.tags.clone(), &mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
                 let curdec = SimpleDecision::Action(
@@ -311,7 +315,11 @@ mod tests {
     }
 
     fn t_check_entry(negated: bool, entry: GlobalFilterEntryE) -> MatchResult {
-        check_entry(&mk_rinfo(), &Tags::default(), &GlobalFilterEntry { negated, entry })
+        check_entry(
+            &mk_rinfo(),
+            &Tags::new(&VirtualTags::default()),
+            &GlobalFilterEntry { negated, entry },
+        )
     }
 
     fn single_re(input: &str) -> SingleEntry {
@@ -423,7 +431,7 @@ mod tests {
         let entries = mk_globalfilterentries(input);
         let ssection = GlobalFilterRule::Rel(GlobalFilterRelation { entries, relation: rel });
         let optimized = optimize(&ssection);
-        let tags = Tags::default();
+        let tags = Tags::new(&VirtualTags::default());
 
         let mut ri = mk_rinfo();
         for (ip, expected) in samples {

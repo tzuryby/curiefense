@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use analyze::{APhase0, CfRulesArg};
 use body::body_too_large;
+use config::virtualtags::VirtualTags;
 use config::with_config;
 use grasshopper::Grasshopper;
 use interface::stats::{SecpolStats, Stats, StatsCollect};
@@ -88,10 +89,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     logs: &mut Logs,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
-    let mut tags = Tags::default();
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
-    tags.insert("all", Location::Request);
+    let tags = Tags::from_slice(&[(String::from("all"), Location::Request)], VirtualTags::default());
 
     logs.debug(|| format!("Inspection starts (grasshopper active: {})", mgh.is_some()));
 
@@ -106,7 +106,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let ((ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
+    let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs);
             match mmapinfo {
@@ -148,7 +148,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         false
                     };
 
-                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
+                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo, &cfg.virtual_tags);
                     RequestMappingResult::Res((ntags, nflows, reqinfo, is_human))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
@@ -188,11 +188,11 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 });
             }
         };
-    tags.extend(ntags);
+    ntags.extend(tags);
 
     Ok(APhase0 {
         stats,
-        itags: tags,
+        itags: ntags,
         reqinfo,
         is_human,
         globalfilter_dec,

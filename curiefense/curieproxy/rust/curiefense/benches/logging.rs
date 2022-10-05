@@ -3,6 +3,7 @@ use curiefense::analyze::{analyze, APhase0, CfRulesArg};
 use curiefense::config::contentfilter::{ContentFilterProfile, ContentFilterRules};
 use curiefense::config::hostmap::{PolicyId, SecurityPolicy};
 use curiefense::config::raw::AclProfile;
+use curiefense::config::virtualtags::VirtualTags;
 use curiefense::grasshopper::DummyGrasshopper;
 use curiefense::interface::{SecpolStats, SimpleDecision, StatsCollect};
 use curiefense::logs::{LogLevel, Logs};
@@ -46,8 +47,7 @@ fn logging_empty(c: &mut Criterion) {
     let mut logs = Logs::new(LogLevel::Debug);
     let stats = StatsCollect::new("QSDQSDQSD".into()).secpol(SecpolStats::build(&secpolicy, 0));
     let reqinfo = map_request(&mut logs, secpolicy, &raw, None);
-
-    let (itags, _, stats) = tag_request(stats, false, &[], &reqinfo);
+    let (itags, _, stats) = tag_request(stats, false, &[], &reqinfo, &VirtualTags::default());
     let p0 = APhase0 {
         flows: HashMap::new(),
         globalfilter_dec: SimpleDecision::Pass,

@@ -339,7 +339,7 @@ impl BlockReason {
     pub fn acl(tags: Tags, stage: AclStage) -> Self {
         let mut tagv = Vec::new();
         let mut location = HashSet::new();
-        for (k, v) in tags.0.into_iter() {
+        for (k, v) in tags.tags.into_iter() {
             tagv.push(k);
             location.extend(v);
         }

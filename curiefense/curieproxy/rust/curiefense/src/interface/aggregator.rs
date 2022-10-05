@@ -457,7 +457,7 @@ impl AggregatedCounters {
             self.asn.inc(asn, blocked);
         }
 
-        for tag in tags.0.keys() {
+        for tag in tags.tags.keys() {
             match tag.as_str() {
                 "all" => (),
                 "bot" => self.bot += 1,
