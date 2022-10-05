@@ -190,6 +190,7 @@ logging.debug("Maximum time limit: %d", max_time_limit)
 
 good = True
 for base_url in args.base_protected_url:
+    logging.info("URL: %s", base_url)
     for (fname, elements) in testcase_load("raw_requests"):
         logging.info("%s ->", fname)
         for req in elements:
@@ -245,6 +246,29 @@ for base_url in args.base_protected_url:
                 time.sleep(req["delay"])
         time.sleep(max_time_limit)
 
+    for (fname, elements) in testcase_load("flows"):
+        if skipped(fname):
+            continue
+        logging.info("%s ->", fname)
+        for (step, req) in enumerate(elements):
+            logging.info("  step %d", step)
+            res = run_request(base_url, req)
+            if req["pass"]:
+                if res.status_code != 200:
+                    logging.error(
+                        "limits/%s/%d failed, did not pass, status=%d",
+                        fname,
+                        step,
+                        res.status_code,
+                    )
+                    good = False
+            else:
+                if res.status_code == 200:
+                    logging.error("limits/%s/%d failed, did pass, got 200", fname, step)
+                    good = False
+            if "delay" in req:
+                time.sleep(req["delay"])
+        time.sleep(max_time_limit)
 
 if not good:
     sys.exit(1)
