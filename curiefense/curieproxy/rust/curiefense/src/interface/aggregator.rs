@@ -176,23 +176,23 @@ impl<T: Ord + std::hash::Hash + Clone> Metric<T> {
 impl<T: Eq + Clone + std::hash::Hash + std::fmt::Display> Metric<T> {
     fn serialize_map(&self, tp: &str, mp: &mut serde_json::Map<String, Value>) {
         mp.insert(
-            format!("unique-{}", tp),
+            format!("unique_{}", tp),
             Value::Number(serde_json::Number::from(self.unique.count())),
         );
         mp.insert(
-            format!("unique-blocked-{}", tp),
+            format!("unique_blocked_{}", tp),
             Value::Number(serde_json::Number::from(self.unique_blocked.count())),
         );
         mp.insert(
-            format!("unique-passed-{}", tp),
+            format!("unique_passed_{}", tp),
             Value::Number(serde_json::Number::from(self.unique_passed.count())),
         );
         mp.insert(
-            format!("top-blocked-{}", tp),
+            format!("top_blocked_{}", tp),
             serde_json::to_value(&self.top_blocked).unwrap_or(Value::Null),
         );
         mp.insert(
-            format!("top-passed-{}", tp),
+            format!("top_passed_{}", tp),
             serde_json::to_value(&self.top_passed).unwrap_or(Value::Null),
         );
     }
