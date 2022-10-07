@@ -10,8 +10,8 @@ use crate::utils::RequestInfo;
 use super::{BDecision, Decision, Location, Tags};
 
 lazy_static! {
-    static ref AGGREGATED: Mutex<BTreeMap<i64, HashMap<AggregationKey, AggregatedCounters>>> =
-        Mutex::new(BTreeMap::new());
+    static ref AGGREGATED: Mutex<HashMap<AggregationKey, BTreeMap<i64, AggregatedCounters>>> =
+        Mutex::new(HashMap::new());
     static ref SECONDS_KEPT: i64 = std::env::var("AGGREGATED_SECONDS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -24,6 +24,7 @@ lazy_static! {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(8);
+    static ref EMPTY_AGGREGATED_DATA: AggregatedCounters = AggregatedCounters::default();
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -641,11 +642,11 @@ fn serialize_entry(secs: i64, hdr: &AggregationKey, counters: &AggregatedCounter
     Value::Object(content)
 }
 
-fn prune_old_values<A>(mp: &mut BTreeMap<i64, A>) {
-    let keys: Vec<i64> = mp.keys().copied().collect();
-    if let Some(last_entry) = keys.last() {
+fn prune_old_values<A>(amp: &mut HashMap<AggregationKey, BTreeMap<i64, A>>, curtime: i64) {
+    for (_, mp) in amp.iter_mut() {
+        let keys: Vec<i64> = mp.keys().copied().collect();
         for k in keys.iter() {
-            if *k < *last_entry - *SECONDS_KEPT {
+            if *k <= curtime - *SECONDS_KEPT {
                 mp.remove(k);
             }
         }
@@ -655,16 +656,29 @@ fn prune_old_values<A>(mp: &mut BTreeMap<i64, A>) {
 /// displays the Nth last seconds of aggregated data
 pub async fn aggregated_values() -> String {
     let mut guard = AGGREGATED.lock().await;
+    let timestamp = chrono::Utc::now().timestamp();
     // first, prune excess data
-    prune_old_values(&mut guard);
+    prune_old_values(&mut guard, timestamp);
 
-    let entries: Vec<Value> = guard
-        .iter()
-        .flat_map(|(secs, v)| {
-            v.iter()
-                .map(move |(hdr, counters)| serialize_entry(*secs, hdr, counters))
-        })
-        .collect();
+    let entries: Vec<Value> = if guard.is_empty() {
+        vec![serialize_entry(
+            timestamp,
+            &AggregationKey {
+                proxy: None,
+                secpolid: "__default__".to_string(),
+                secpolentryid: "__default__".to_string(),
+            },
+            &AggregatedCounters::default(),
+        )]
+    } else {
+        guard
+            .iter()
+            .flat_map(|(hdr, v)| {
+                (1 + timestamp - *SECONDS_KEPT..=timestamp)
+                    .map(move |secs| serialize_entry(secs, hdr, v.get(&secs).unwrap_or(&EMPTY_AGGREGATED_DATA)))
+            })
+            .collect()
+    };
 
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into())
 }
@@ -683,8 +697,8 @@ pub async fn aggregate(dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, 
         secpolentryid: rinfo.rinfo.secpolicy.entry.id.to_string(),
     };
     let mut guard = AGGREGATED.lock().await;
-    prune_old_values(&mut guard);
-    let entry_secs = guard.entry(seconds).or_default();
-    let entry = entry_secs.entry(key).or_default();
+    prune_old_values(&mut guard, seconds);
+    let entry_hdrs = guard.entry(key).or_default();
+    let entry = entry_hdrs.entry(seconds).or_default();
     entry.increment(dec, rcode, rinfo, tags);
 }
