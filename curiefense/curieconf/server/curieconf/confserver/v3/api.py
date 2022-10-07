@@ -89,6 +89,8 @@ m_securitypolicy = api.model(
         "name": fields.String(required=True),
         "description": fields.String(),
         "match": fields.String(required=True),
+        "curiesession": AnyType(),
+        "curiesession_ids": AnyType(),
         "map": fields.List(fields.Nested(m_secprofilemap)),
     },
 )
@@ -125,6 +127,7 @@ m_contentfilterprofile = api.model(
         "headers": fields.Raw(required=True),
         "cookies": fields.Raw(required=True),
         "path": fields.Raw(required=True),
+        "allsections": fields.Raw(),
         "decoding": fields.Raw(required=True),
         "masking_seed": fields.String(required=True),
         "content_type": fields.List(fields.String()),
@@ -223,6 +226,18 @@ m_dynamicrule = api.model(
     },
 )
 
+# Virtual Tag
+
+m_virtualtag = api.model(
+    "Virtual Tag",
+    {
+        "id": fields.String(required=True),
+        "name": fields.String(required=True),
+        "description": fields.String(),
+        "match": fields.List(fields.Raw(required=True)),
+    },
+)
+
 # custom
 
 m_custom = api.model(
@@ -246,6 +261,7 @@ models = {
     "flowcontrol": m_flowcontrol,
     "actions": m_action,
     "dynamicrules": m_dynamicrule,
+    "virtualtags": m_virtualtag,
     "custom": m_custom,
 }
 
@@ -453,6 +469,9 @@ with open(action_file_path) as json_file:
 dynamicrule_file_path = (base_path / "./json/dynamic-rule.schema").resolve()
 with open(dynamicrule_file_path) as json_file:
     dynamic_rule_schema = json.load(json_file)
+virtualtag_file_path = (base_path / "./json/virtual-tags.schema").resolve()
+with open(virtualtag_file_path) as json_file:
+    virtual_tags_schema = json.load(json_file)
 custom_file_path = (base_path / "./json/custom.schema").resolve()
 with open(custom_file_path) as json_file:
     custom_schema = json.load(json_file)
@@ -468,6 +487,7 @@ schema_type_map = {
     "contentfilterrules": content_filter_rule_schema,
     "actions": action_schema,
     "dynamicrules": dynamic_rule_schema,
+    "virtualtags": virtual_tags_schema,
     "custom": custom_schema,
 }
 
