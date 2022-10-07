@@ -666,7 +666,20 @@ pub async fn aggregated_values() -> String {
     // first, prune excess data
     prune_old_values(&mut guard, timestamp);
 
-    let entries: Vec<Value> = if guard.is_empty() {
+    let entries: Vec<Value> = guard
+        .iter()
+        .flat_map(|(hdr, v)| {
+            let range = if !v.is_empty() {
+                (1 + timestamp - *SECONDS_KEPT..=timestamp).collect()
+            } else {
+                Vec::new()
+            };
+            range
+                .into_iter()
+                .map(move |secs| serialize_entry(secs, hdr, v.get(&secs).unwrap_or(&EMPTY_AGGREGATED_DATA)))
+        })
+        .collect();
+    let entries = if entries.is_empty() {
         vec![serialize_entry(
             timestamp,
             &AggregationKey {
@@ -677,13 +690,7 @@ pub async fn aggregated_values() -> String {
             &AggregatedCounters::default(),
         )]
     } else {
-        guard
-            .iter()
-            .flat_map(|(hdr, v)| {
-                (1 + timestamp - *SECONDS_KEPT..=timestamp)
-                    .map(move |secs| serialize_entry(secs, hdr, v.get(&secs).unwrap_or(&EMPTY_AGGREGATED_DATA)))
-            })
-            .collect()
+        entries
     };
 
     serde_json::to_string(&entries).unwrap_or_else(|_| "[]".into())
