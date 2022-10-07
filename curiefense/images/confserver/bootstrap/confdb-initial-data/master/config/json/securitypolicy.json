@@ -10,7 +10,7 @@
         ],
         "curiesession_ids": [
             {
-                "attrs": "ip"
+                "cookies": "SESSIONID"
             }
         ],
         "map": [
