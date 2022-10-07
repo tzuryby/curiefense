@@ -635,7 +635,13 @@ fn serialize_entry(secs: i64, hdr: &AggregationKey, counters: &AggregatedCounter
         "timestamp".into(),
         serde_json::to_value(&timestamp).unwrap_or_else(|_| Value::String("??".into())),
     );
-    content.insert("proxy".into(), Value::Null);
+    content.insert(
+        "proxy".into(),
+        hdr.proxy
+            .as_ref()
+            .map(|s| Value::String(s.clone()))
+            .unwrap_or(Value::Null),
+    );
     content.insert("secpolid".into(), Value::String(hdr.secpolid.clone()));
     content.insert("secpolentryid".into(), Value::String(hdr.secpolentryid.clone()));
     content.insert("counters".into(), serialize_counters(counters));
@@ -692,7 +698,7 @@ pub fn aggregated_values_block() -> String {
 pub async fn aggregate(dec: &Decision, rcode: Option<u32>, rinfo: &RequestInfo, tags: &Tags) {
     let seconds = rinfo.timestamp.timestamp();
     let key = AggregationKey {
-        proxy: None,
+        proxy: rinfo.rinfo.container_name.clone(),
         secpolid: rinfo.rinfo.secpolicy.policy.id.to_string(),
         secpolentryid: rinfo.rinfo.secpolicy.entry.id.to_string(),
     };
