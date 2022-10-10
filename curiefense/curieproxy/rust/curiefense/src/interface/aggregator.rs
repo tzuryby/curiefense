@@ -599,10 +599,10 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
         "top_tags".into(),
         serde_json::to_value(&e.top_tags).unwrap_or(Value::Null),
     );
-    content.insert("top_request_per_cookies".into(), e.headers_amount.serialize_top());
+    content.insert("top_request_per_cookies".into(), e.cookies_amount.serialize_top());
     content.insert("top_request_per_args".into(), e.args_amount.serialize_top());
     content.insert("top_request_per_headers".into(), e.headers_amount.serialize_top());
-    content.insert("top_max_cookies_per_request".into(), e.headers_amount.serialize_max());
+    content.insert("top_max_cookies_per_request".into(), e.cookies_amount.serialize_max());
     content.insert("top_max_args_per_request".into(), e.args_amount.serialize_max());
     content.insert("top_max_headers_per_request".into(), e.headers_amount.serialize_max());
 
