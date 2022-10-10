@@ -12,7 +12,8 @@
 # To run this with docker-compose:
 # pytest --base-protected-url http://localhost:30081/ --base-conf-url http://localhost:30000/api/v3/ --base-ui-url http://localhost:30080 --elasticsearch-url http://localhost:9200 .      # pylint: disable=line-too-long
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
+import reqflip
 import json
 import logging
 import os
@@ -122,9 +123,10 @@ def curieconfig(request: pytest.FixtureRequest, luatests_path: str):
 
 
 class RequestHelper:
-    def __init__(self, base_url: str, hops: int):
-        self.base_url = base_url
-        self.hops = hops
+    def __init__(self, base_url: str, hops: int, flip_requests: bool):
+        self._base_url = base_url
+        self._hops = hops
+        self._flip = flip_requests
 
     def run(self, req: Any) -> requests.Response:
         method: str = "GET"
@@ -144,24 +146,36 @@ class RequestHelper:
             else:
                 headers[k.lower()] = v
         if "ip" in req:
-            ip_lst = [req["ip"]] + ["10.0.0.%d" % step for step in range(self.hops - 1)]
+            ip_lst = [req["ip"]] + [
+                "10.0.0.%d" % step for step in range(self._hops - 1)
+            ]
             headers["x-forwarded-for"] = ",".join(ip_lst)
 
-        return requests.request(
+        res = requests.request(
             method=method,
             headers=headers,
             data=req["body"] if "body" in req else None,
-            url=self.base_url + path,
+            url=self._base_url + path,
         )
+        if self._flip:
+            # Also send copies of the request, flipping bits one by one
+            # This is a "light fuzzing" approach
+            reqflip.bitflip_send(res)
+        return res
 
 
 @pytest.fixture(scope="session")
-def requester(curieconfig: None, request: pytest.FixtureRequest):
+def requester(curieconfig: None, request: pytest.FixtureRequest, flip_requests: bool):
     target_url = request.config.getoption("--base-protected-url")
     assert isinstance(target_url, str)
     hops = request.config.getoption("--xff-hops")
     assert isinstance(hops, int)
-    return RequestHelper(target_url, hops)
+    return RequestHelper(target_url, hops, flip_requests)
+
+
+@pytest.fixture(scope="session")
+def flip_requests(request: pytest.FixtureRequest):
+    return request.config.getoption("--flip-requests")
 
 
 def test_raw_request(raw_request: Any, requester: RequestHelper):
@@ -180,8 +194,13 @@ def test_raw_request(raw_request: Any, requester: RequestHelper):
 
 
 def test_rate_limit(
-    limit_request: List[Any], requester: RequestHelper, max_time_limit: int
+    limit_request: List[Any],
+    requester: RequestHelper,
+    max_time_limit: int,
+    flip_requests: bool,
 ):
+    if flip_requests:
+        pytest.skip("only run raw requests for bit flip tests")
     time.sleep(max_time_limit)
     for (step, req) in enumerate(limit_request):
         res = requester.run(req)
@@ -193,8 +212,13 @@ def test_rate_limit(
 
 
 def test_flow_control(
-    flow_request: List[Any], requester: RequestHelper, max_time_limit: int
+    flow_request: List[Any],
+    requester: RequestHelper,
+    max_time_limit: int,
+    flip_requests: bool,
 ):
+    if flip_requests:
+        pytest.skip("only run raw requests for bit flip tests")
     time.sleep(max_time_limit)
     for (step, req) in enumerate(flow_request):
         res = requester.run(req)
