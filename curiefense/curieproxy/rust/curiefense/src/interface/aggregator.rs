@@ -680,10 +680,14 @@ pub async fn aggregated_values() -> String {
         })
         .collect();
     let entries = if entries.is_empty() {
+        let proxy = crate::config::CONFIG
+            .read()
+            .ok()
+            .and_then(|cfg| cfg.container_name.clone());
         vec![serialize_entry(
             timestamp,
             &AggregationKey {
-                proxy: None,
+                proxy,
                 secpolid: "__default__".to_string(),
                 secpolentryid: "__default__".to_string(),
             },
