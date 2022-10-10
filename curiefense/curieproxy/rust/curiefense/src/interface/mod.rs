@@ -169,6 +169,7 @@ pub fn jsonlog_rinfo(
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
+    map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     map_ser.serialize_entry("request_id", &rinfo.rinfo.meta.requestid)?;
