@@ -12,13 +12,15 @@
 # To run this with docker-compose:
 # pytest --base-protected-url http://localhost:30081/ --base-conf-url http://localhost:30000/api/v3/ --base-ui-url http://localhost:30080 --elasticsearch-url http://localhost:9200 .      # pylint: disable=line-too-long
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import reqflip
 import json
 import logging
 import os
 import pytest
+import random
 import requests
+import string
 import subprocess
 import time
 
@@ -128,6 +130,25 @@ class RequestHelper:
         self._hops = hops
         self._flip = flip_requests
 
+    def request(
+        self,
+        method: str,
+        path: str,
+        headers: Dict[str, str],
+        ip: Optional[str],
+        body: Optional[str],
+    ) -> requests.Response:
+        if ip:
+            ip_lst = [ip] + ["10.0.0.%d" % step for step in range(self._hops - 1)]
+            headers["x-forwarded-for"] = ",".join(ip_lst)
+        print(f"{method} {path} {headers} {ip} {body}")
+        return requests.request(
+            method=method,
+            headers=headers,
+            data=body,
+            url=self._base_url + path,
+        )
+
     def run(self, req: Any) -> requests.Response:
         method: str = "GET"
         path: str = "/"
@@ -145,18 +166,8 @@ class RequestHelper:
                     path = v
             else:
                 headers[k.lower()] = v
-        if "ip" in req:
-            ip_lst = [req["ip"]] + [
-                "10.0.0.%d" % step for step in range(self._hops - 1)
-            ]
-            headers["x-forwarded-for"] = ",".join(ip_lst)
 
-        res = requests.request(
-            method=method,
-            headers=headers,
-            data=req["body"] if "body" in req else None,
-            url=self._base_url + path,
-        )
+        res = self.request(method, path, headers, req.get("ip"), req.get("body"))
         if self._flip:
             # Also send copies of the request, flipping bits one by one
             # This is a "light fuzzing" approach
@@ -170,12 +181,35 @@ def requester(curieconfig: None, request: pytest.FixtureRequest, flip_requests: 
     assert isinstance(target_url, str)
     hops = request.config.getoption("--xff-hops")
     assert isinstance(hops, int)
-    return RequestHelper(target_url, hops, flip_requests)
+    return RequestHelper(target_url.rstrip("/"), hops, flip_requests)
 
 
 @pytest.fixture(scope="session")
 def flip_requests(request: pytest.FixtureRequest):
     return request.config.getoption("--flip-requests")
+
+
+def test_logging(request: pytest.FixtureRequest, requester: RequestHelper):
+    es_url = request.config.getoption("--elasticsearch-url")
+    assert isinstance(es_url, str)
+    es_url = es_url.rstrip("/") + "/_search"
+    test_pattern = "/test" + "".join(
+        [random.choice(string.ascii_lowercase) for _ in range(20)]
+    )
+    res = requester.request("GET", test_pattern, {}, None, None)
+    assert res.status_code == 200
+    for _ in range(15):
+        time.sleep(4)
+        mdata = {"query": {"bool": {"must": {"match": {"uri": test_pattern}}}}}
+        res = requests.get(es_url, json=mdata)
+        print(res.json())
+        nbhits = res.json()["hits"]["total"]["value"]
+        if nbhits == 1:
+            return
+        else:
+            print("Pattern %r" % (test_pattern,))
+            print("Request result %r -> %s" % (res, res.text))
+    assert False
 
 
 def test_raw_request(raw_request: Any, requester: RequestHelper):
