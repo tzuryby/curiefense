@@ -208,24 +208,6 @@ m_action = api.model(
     },
 )
 
-# Dynamic Rule
-
-m_dynamicrule = api.model(
-    "Dynamic Rule",
-    {
-        "id": fields.String(required=True),
-        "name": fields.String(required=True),
-        "description": fields.String(),
-        "threshold": fields.Integer(required=True),
-        "timeframe": fields.Integer(required=True),
-        "ttl": fields.Integer(required=True),
-        "active": fields.Boolean(required=True),
-        "target": fields.String(required=True),
-        "include": fields.List(fields.String(required=True)),
-        "exclude": fields.List(fields.String(required=True)),
-    },
-)
-
 # Virtual Tag
 
 m_virtualtag = api.model(
@@ -260,7 +242,6 @@ models = {
     "globalfilters": m_globalfilter,
     "flowcontrol": m_flowcontrol,
     "actions": m_action,
-    "dynamicrules": m_dynamicrule,
     "virtualtags": m_virtualtag,
     "custom": m_custom,
 }
@@ -466,9 +447,6 @@ with open(content_filter_rule_file_path) as json_file:
 action_file_path = (base_path / "./json/action.schema").resolve()
 with open(action_file_path) as json_file:
     action_schema = json.load(json_file)
-dynamicrule_file_path = (base_path / "./json/dynamic-rule.schema").resolve()
-with open(dynamicrule_file_path) as json_file:
-    dynamic_rule_schema = json.load(json_file)
 virtualtag_file_path = (base_path / "./json/virtual-tags.schema").resolve()
 with open(virtualtag_file_path) as json_file:
     virtual_tags_schema = json.load(json_file)
@@ -486,7 +464,6 @@ schema_type_map = {
     "flowcontrol": flowcontrol_schema,
     "contentfilterrules": content_filter_rule_schema,
     "actions": action_schema,
-    "dynamicrules": dynamic_rule_schema,
     "virtualtags": virtual_tags_schema,
     "custom": custom_schema,
 }
