@@ -31,7 +31,7 @@ ns_tools = api.namespace("tools", description="Tools")
 
 
 class AnyType(fields.Raw):
-    __schema_type__ = ["number","string","boolean","object","array", "null"]
+    __schema_type__ = ["number", "string", "boolean", "object", "array", "null"]
 
 
 # limit
