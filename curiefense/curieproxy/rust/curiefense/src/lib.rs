@@ -69,7 +69,7 @@ pub unsafe fn inspect_async_free(ptr: *mut Executor<(Decision, Tags, Logs)>) {
     if ptr.is_null() {
         return;
     }
-    Box::from_raw(ptr);
+    let _x = Box::from_raw(ptr);
 }
 
 pub fn inspect_generic_request_map<GH: Grasshopper>(
