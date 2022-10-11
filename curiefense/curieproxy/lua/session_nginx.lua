@@ -39,7 +39,7 @@ local function custom_response(handle, action_params)
 
     if block_mode then
         if action_params["content"] then handle.say(action_params["content"]) end
-        handle.exit(handle.HTTP_OK)
+        return handle.exit(handle.HTTP_OK)
     end
 
 end
