@@ -163,13 +163,13 @@ impl Location {
                 map.serialize_entry("section", "attributes")?;
             }
             Location::Ip => {
-                map.serialize_entry("section", "ip")?;
+                map.serialize_entry("request_element", "ip")?;
             }
             Location::Uri => {
-                map.serialize_entry("section", "uri")?;
+                map.serialize_entry("request_element", "uri")?;
             }
             Location::RefererPath => {
-                map.serialize_entry("section", "referer path")?;
+                map.serialize_entry("request_element", "referer_path")?;
             }
             Location::RefererPathpart(part) => {
                 map.serialize_entry("part", part)?;
@@ -193,10 +193,10 @@ impl Location {
                 map.serialize_entry("value", value)?;
             }
             Location::RefererArgument(name) => {
-                map.serialize_entry("name", name)?;
+                map.serialize_entry("ref_name", name)?;
             }
             Location::RefererArgumentValue(_, value) => {
-                map.serialize_entry("value", value)?;
+                map.serialize_entry("ref_value", value)?;
             }
             Location::Body => {
                 map.serialize_entry("section", "body")?;
@@ -525,5 +525,48 @@ mod test {
         );
 
         assert_eq!(tags.selector(), "tag1*tag2*vtag1");
+    }
+
+    #[test]
+    fn location_no_overlap() {
+        use Location::*;
+        let locations = &[
+            PathpartValue(5, "foo".to_string()),
+            UriArgumentValue("foo".to_string(), "foo".to_string()),
+            RefererArgumentValue("foo".to_string(), "foo".to_string()),
+            Request,
+            Attributes,
+            Ip,
+            Uri,
+            Path,
+            Pathpart(5),
+            RefererPath,
+            RefererPathpart(5),
+            RefererPathpartValue(5, "foo".to_string()),
+            UriArgument("foo".to_string()),
+            RefererArgument("foo".to_string()),
+            Body,
+            BodyArgument("foo".to_string()),
+            BodyArgumentValue("foo".to_string(), "foo".to_string()),
+            Headers,
+            Header("foo".to_string()),
+            HeaderValue("foo".to_string(), "foo".to_string()),
+            Cookies,
+            Cookie("foo".to_string()),
+            CookieValue("foo".to_string(), "foo".to_string()),
+        ];
+        for location in locations {
+            let res = serde_json::to_string(location).unwrap();
+            let parts = res[1..res.len() - 1].split(',').collect::<Vec<_>>();
+            let mut known = HashSet::new();
+            for part in parts {
+                if let Some((l, _)) = part.split_once(':') {
+                    if known.contains(l) {
+                        panic!("Encoding with repeated keys: {} -> {:?}", res, location);
+                    }
+                    known.insert(l.to_string());
+                }
+            }
+        }
     }
 }
