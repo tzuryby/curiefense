@@ -53,6 +53,11 @@
             "title": "Global Rule",
             "description": "This rate limit is evaluated for every request"
         },
+        "active": {
+            "type": "boolean",
+            "title": "Rule active",
+            "description": "This rule will only take effect when the flag is set to true"
+        },
         "timeframe": {
             "type": "integer",
             "title": "Time To Limit",

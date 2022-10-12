@@ -195,6 +195,8 @@ pub struct RawLimit {
     pub pairwith: HashMap<String, String>,
     #[serde(default)]
     pub global: bool, // global flag, if true this rule applies to all profiles
+    #[serde(default)]
+    pub active: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

@@ -30,7 +30,8 @@
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
                 "limit_ids": [
-                    "limithostname"
+                    "limithostname",
+                    "inactive_limit"
                 ]
             },
             {
@@ -42,7 +43,8 @@
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
                 "limit_ids": [
-                    "limithostname"
+                    "limithostname",
+                    "inactive_limit"
                 ]
             },
             {
@@ -54,7 +56,8 @@
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
                 "limit_ids": [
-                    "limiturl"
+                    "limiturl",
+                    "inactive_limit"
                 ]
             },
             {
@@ -66,7 +69,8 @@
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
                 "limit_ids": [
-                    "limiturl"
+                    "limiturl",
+                    "inactive_limit"
                 ]
             },
             {
@@ -79,7 +83,8 @@
                 "content_filter_active": false,
                 "limit_ids": [
                     "limithostname",
-                    "limiturl"
+                    "limiturl",
+                    "inactive_limit"
                 ]
             }
         ]
@@ -98,7 +103,8 @@
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
                 "limit_ids": [
-                    "limithostname"
+                    "limithostname",
+                    "inactive_limit"
                 ]
             },
             {
