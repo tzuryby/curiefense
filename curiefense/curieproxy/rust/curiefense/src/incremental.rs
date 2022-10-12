@@ -75,6 +75,7 @@ pub fn inspect_init(
     meta: RequestMeta,
     ipinfo: IPInfo,
     start: Option<DateTime<Utc>>,
+    selected_secpol: Option<&str>,
 ) -> Result<IData, String> {
     let mut logs = Logs::new(loglevel);
     let mr = match_securitypolicy(
@@ -82,6 +83,7 @@ pub fn inspect_init(
         &meta.path,
         config,
         &mut logs,
+        selected_secpol,
     );
     match mr {
         None => Err("could not find a matching security policy".to_string()),
@@ -276,6 +278,7 @@ mod test {
     fn empty_config(cf: ContentFilterProfile) -> Config {
         Config {
             revision: "dummy".to_string(),
+            securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             default: Some(HostMap {
@@ -324,6 +327,7 @@ mod test {
                 requestid: None,
             },
             IPInfo::Ip("1.2.3.4".to_string()),
+            None,
             None,
         )
         .unwrap()

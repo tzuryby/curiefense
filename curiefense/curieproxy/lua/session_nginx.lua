@@ -93,8 +93,8 @@ function session_rust_nginx.inspect(handle, loglevel)
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
 
-    local res = curiefense.inspect_request_init_hops(
-        loglevel, meta, headers, body_content, ip_str, HOPS
+    local res = curiefense.inspect_request_init(
+        {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str, hops=HOPS}
     )
 
     if res.error then

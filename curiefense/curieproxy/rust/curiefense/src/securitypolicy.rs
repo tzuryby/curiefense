@@ -15,14 +15,26 @@ pub fn match_securitypolicy<'a>(
     path: &str,
     cfg: &'a Config,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> Option<Arc<SecurityPolicy>> {
     // find the first matching hostmap, or use the default, if it exists
-    let hostmap: &HostMap = cfg
-        .securitypolicies
-        .iter()
-        .find(|e| e.matches(host))
-        .map(|m| &m.inner)
-        .or(cfg.default.as_ref())?;
+    let get_hostmap = || {
+        cfg.securitypolicies
+            .iter()
+            .find(|e| e.matches(host))
+            .map(|m| &m.inner)
+            .or(cfg.default.as_ref())
+    };
+    let hostmap: &HostMap = match selected_secpol {
+        None => get_hostmap()?,
+        Some(secpolid) => match cfg.securitypolicies_map.get(secpolid) {
+            Some(p) => p,
+            None => {
+                logs.error(|| format!("Can't find secpol id {}", secpolid));
+                get_hostmap()?
+            }
+        },
+    };
     logs.debug(|| format!("Selected hostmap {}", hostmap.name));
     // find the first matching securitypolicy, or use the default, if it exists
     let securitypolicy: Arc<SecurityPolicy> = match hostmap

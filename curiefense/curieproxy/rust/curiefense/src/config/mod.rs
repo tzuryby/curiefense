@@ -91,6 +91,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Config {
     pub revision: String,
+    pub securitypolicies_map: HashMap<String, HostMap>, // used when the security policy is set
     pub securitypolicies: Vec<Matching<HostMap>>,
     pub globalfilters: Vec<GlobalFilterSection>,
     pub default: Option<HostMap>,
@@ -213,6 +214,7 @@ impl Config {
     ) -> Config {
         let mut default: Option<HostMap> = None;
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
+        let mut securitypolicies_map = HashMap::new();
         let mut logs = logs;
 
         let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, actions, rawlimits);
@@ -268,6 +270,7 @@ impl Config {
                 entries,
                 default: default_entry,
             };
+            securitypolicies_map.insert(rawmap.id, hostmap.clone());
             if rawmap.match_ == "__default__" {
                 if default.is_some() {
                     logs.error(|| format!("HostMap entry '{}' has several default entries", hostmap.name));
@@ -294,6 +297,7 @@ impl Config {
 
         Config {
             revision,
+            securitypolicies_map,
             securitypolicies,
             globalfilters,
             default,
@@ -414,6 +418,7 @@ impl Config {
     pub fn empty() -> Config {
         Config {
             revision: "dummy".to_string(),
+            securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             last_mod: SystemTime::UNIX_EPOCH,
