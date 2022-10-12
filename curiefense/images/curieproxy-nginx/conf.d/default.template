@@ -22,9 +22,13 @@ server {
 
     server_name _;
     location / {
-        log_by_lua_block {
+        access_by_lua_block {
             local curiefense  = require "curiefense"
-            ngx.var.aggregated = curiefense.aggregated_values()
+            local agg = curiefense.aggregated_values()
+            ngx.var.aggregated = agg
+            ngx.header["content-type"] = "text/json"
+            ngx.say(agg)
+            ngx.exit(200)
         }
     }
 }
