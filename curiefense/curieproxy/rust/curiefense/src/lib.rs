@@ -77,8 +77,15 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> AnalyzeResult {
-    async_std::task::block_on(inspect_generic_request_map_async(configpath, mgh, raw, logs))
+    async_std::task::block_on(inspect_generic_request_map_async(
+        configpath,
+        mgh,
+        raw,
+        logs,
+        selected_secpol,
+    ))
 }
 
 // generic entry point when the request map has already been parsed
@@ -87,6 +94,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
 
@@ -108,7 +116,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
 
     let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
-            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs);
+            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
@@ -206,8 +214,9 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest<'_>,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> AnalyzeResult {
-    match inspect_generic_request_map_init(configpath, mgh, raw, logs) {
+    match inspect_generic_request_map_init(configpath, mgh, raw, logs, selected_secpol) {
         Err(res) => res,
         Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
     }

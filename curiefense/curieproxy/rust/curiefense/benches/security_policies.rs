@@ -98,8 +98,8 @@ fn forms_string_map(c: &mut Criterion) {
             let cfg = gen_bogus_config(size);
             b.iter(|| {
                 let mut logs = Logs::default();
-                let umap =
-                    match_securitypolicy("my.host.name", "/non/matching/path", black_box(&cfg), &mut logs).unwrap();
+                let umap = match_securitypolicy("my.host.name", "/non/matching/path", black_box(&cfg), &mut logs, None)
+                    .unwrap();
                 assert_eq!(umap.entry.name, "selected");
             })
         });

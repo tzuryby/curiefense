@@ -105,7 +105,7 @@ function session_rust_envoy.inspect(handle)
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
     local res = curiefense.inspect_request(
-        "info", meta, headers, body_content, ip_str
+        {loglevel="info", meta=meta, headers=headers, body=body_content, ip=ip_str}
     )
 
     log_request(handle, res)
