@@ -70,7 +70,7 @@ local function redis_connect(handle)
     return red
 end
 
-function session_rust_nginx.inspect(handle, loglevel)
+function session_rust_nginx.inspect(handle, loglevel, secpolid)
     local ip_str = handle.var.remote_addr
 
     local rheaders, err = handle.req.get_headers()
@@ -92,10 +92,13 @@ function session_rust_nginx.inspect(handle, loglevel)
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
+    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str, hops=HOPS}
 
-    local res = curiefense.inspect_request_init(
-        {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str, hops=HOPS}
-    )
+    if secpolid then
+        params['secpolid'] = secpolid
+    end
+
+    local res = curiefense.inspect_request_init(params)
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_init error %s", res.error))
