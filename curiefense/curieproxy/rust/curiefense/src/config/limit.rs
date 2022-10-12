@@ -41,11 +41,12 @@ pub fn resolve_selectors(rawsel: RawLimitSelector) -> anyhow::Result<Vec<Request
 }
 
 impl Limit {
+    /// returns the resolved limit, and whether it's active or not
     fn convert(
         logs: &mut Logs,
         actions: &HashMap<String, SimpleAction>,
         rawlimit: RawLimit,
-    ) -> anyhow::Result<(String, Limit)> {
+    ) -> anyhow::Result<(Limit, bool)> {
         let mkey: anyhow::Result<Vec<RequestSelector>> = rawlimit
             .key
             .into_iter()
@@ -68,7 +69,6 @@ impl Limit {
         }
         thresholds.sort_unstable_by(limit_order);
         Ok((
-            id.clone(),
             Limit {
                 id,
                 name: rawlimit.name,
@@ -79,30 +79,37 @@ impl Limit {
                 pairwith,
                 key,
             },
+            rawlimit.active,
         ))
     }
 
+    /// returns the limit table, list of global limits, set of inactive limits
     pub fn resolve(
         logs: &mut Logs,
         actions: &HashMap<String, SimpleAction>,
         rawlimits: Vec<RawLimit>,
-    ) -> (HashMap<String, Limit>, Vec<Limit>) {
+    ) -> (HashMap<String, Limit>, Vec<Limit>, HashSet<String>) {
         let mut out = HashMap::new();
         let mut globals = Vec::new();
+        let mut inactives = HashSet::new();
         for rl in rawlimits {
             let curid = rl.id.clone();
             let global = rl.global;
             match Limit::convert(logs, actions, rl) {
-                Ok((nm, lm)) => {
-                    if global {
-                        globals.push(lm.clone())
+                Ok((lm, is_active)) => {
+                    if is_active {
+                        if global {
+                            globals.push(lm.clone())
+                        }
+                        out.insert(lm.id.clone(), lm);
+                    } else {
+                        inactives.insert(lm.id);
                     }
-                    out.insert(nm, lm);
                 }
                 Err(rr) => logs.error(|| format!("limit id {}: {:?}", curid, rr)),
             }
         }
-        (out, globals)
+        (out, globals, inactives)
     }
 }
 

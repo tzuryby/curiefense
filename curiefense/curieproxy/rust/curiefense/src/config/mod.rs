@@ -9,6 +9,7 @@ pub mod virtualtags;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -117,6 +118,7 @@ impl Config {
         rawmaps: Vec<RawSecurityPolicy>,
         limits: &HashMap<String, Limit>,
         global_limits: &[Limit],
+        inactive_limits: &HashSet<String>,
         acls: &HashMap<String, AclProfile>,
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
         session: Vec<RequestSelector>,
@@ -148,9 +150,13 @@ impl Config {
                 }
             }
             for lid in rawmap.limit_ids {
-                match from_map(limits, &lid) {
-                    Ok(lm) => olimits.push(lm),
-                    Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
+                if !inactive_limits.contains(&lid) {
+                    match from_map(limits, &lid) {
+                        Ok(lm) => olimits.push(lm),
+                        Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
+                    }
+                } else {
+                    logs.debug(|| format!("Trying to add inactive limit {} in map {}", lid, mapname))
                 }
             }
             let securitypolicy = SecurityPolicy {
@@ -209,7 +215,7 @@ impl Config {
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
         let mut logs = logs;
 
-        let (limits, global_limits) = Limit::resolve(&mut logs, actions, rawlimits);
+        let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, actions, rawlimits);
         let acls = rawacls
             .into_iter()
             .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, actions, a)))
@@ -248,6 +254,7 @@ impl Config {
                 rawmap.map,
                 &limits,
                 &global_limits,
+                &inactive_limits,
                 &acls,
                 &content_filter_profiles,
                 session,
