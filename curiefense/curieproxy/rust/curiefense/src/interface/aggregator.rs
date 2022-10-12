@@ -665,12 +665,13 @@ pub async fn aggregated_values() -> String {
     let timestamp = chrono::Utc::now().timestamp();
     // first, prune excess data
     prune_old_values(&mut guard, timestamp);
+    let timerange = || 1 + timestamp - *SECONDS_KEPT..=timestamp;
 
     let entries: Vec<Value> = guard
         .iter()
         .flat_map(|(hdr, v)| {
             let range = if !v.is_empty() {
-                (1 + timestamp - *SECONDS_KEPT..=timestamp).collect()
+                timerange().collect()
             } else {
                 Vec::new()
             };
@@ -684,15 +685,20 @@ pub async fn aggregated_values() -> String {
             .read()
             .ok()
             .and_then(|cfg| cfg.container_name.clone());
-        vec![serialize_entry(
-            timestamp,
-            &AggregationKey {
-                proxy,
-                secpolid: "__default__".to_string(),
-                secpolentryid: "__default__".to_string(),
-            },
-            &AggregatedCounters::default(),
-        )]
+
+        timerange()
+            .map(|ts| {
+                serialize_entry(
+                    ts,
+                    &AggregationKey {
+                        proxy: proxy.clone(),
+                        secpolid: "__default__".to_string(),
+                        secpolentryid: "__default__".to_string(),
+                    },
+                    &AggregatedCounters::default(),
+                )
+            })
+            .collect()
     } else {
         entries
     };
