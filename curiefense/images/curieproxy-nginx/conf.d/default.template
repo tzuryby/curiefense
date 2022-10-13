@@ -1,6 +1,7 @@
 # should be in nginx.conf, but will do for now
 lua_package_path '/lua/?.lua;;';
 log_format curiefenselog escape=none '$request_map';
+log_format aggregationlog escape=none '$aggregated';
 
 upstream backend_a {
     server ${TARGET_ADDRESS_A}:${TARGET_PORT_A};
@@ -12,9 +13,31 @@ upstream backend_b {
 
 server {
     resolver local=on;
+    access_log ${AGGREGATED_STATS_LOG_FILE} aggregationlog;
+    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
+
+    listen 127.0.0.1:8999;
+
+    set $aggregated '{}';
+
+    server_name _;
+    location / {
+        access_by_lua_block {
+            local curiefense  = require "curiefense"
+            local agg = curiefense.aggregated_values()
+            ngx.var.aggregated = agg
+            ngx.header["content-type"] = "text/json"
+            ngx.say(agg)
+            ngx.exit(200)
+        }
+    }
+}
+
+server {
+    resolver local=on;
     set $request_map '{}';
-    access_log /dev/stdout curiefenselog;
-    error_log  logs/error.log  debug;
+    access_log ${ACCESS_LOG} curiefenselog;
+    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
 
     listen 31081 default_server;
     listen 31083 default_server ssl http2;
@@ -25,11 +48,20 @@ server {
     location / {
         access_by_lua_block {
             local session = require "lua.session_nginx"
-            session.inspect(ngx)
+            session.inspect(ngx, "${CF_LOG_LEVEL}")
         }
         log_by_lua_block {
             local session = require "lua.session_nginx"
-            session.log(ngx)
+            session.log(ngx, {
+                [ "bytes_sent" ] = ngx.var.bytes_sent,
+                [ "request_length" ] = ngx.var.request_length,
+                [ "ssl_protocol" ] = ngx.var.ssl_protocol,
+                [ "ssl_cipher" ] = ngx.var.ssl_cipher,
+                [ "request_time" ] = ngx.var.request_time,
+                [ "upstream_status" ] = ngx.var.upstream_status,
+                [ "upstream_response_time" ] = ngx.var.upstream_response_time,
+                [ "upstream_addr" ] = ngx.var.upstream_addr
+            })
         }
         proxy_pass http://backend_a;
     }
@@ -38,9 +70,8 @@ server {
 server {
     resolver local=on;
     set $request_map '{}';
-    access_log logs/access.log curiefenselog;
-    access_log syslog:server=unix:/dev/log curiefenselog;
-    error_log  logs/error.log  debug;
+    access_log ${ACCESS_LOG} curiefenselog;
+    error_log  ${ERROR_LOG}  debug;
 
     listen 31082 default_server;
     listen 31084 default_server ssl http2;
@@ -51,11 +82,20 @@ server {
     location / {
         access_by_lua_block {
             local session = require "lua.session_nginx"
-            session.inspect(ngx)
+            session.inspect(ngx, "${CF_LOG_LEVEL}")
         }
         log_by_lua_block {
             local session = require "lua.session_nginx"
-            session.log(ngx)
+            session.log(ngx, {
+                [ "bytes_sent" ] = ngx.var.bytes_sent,
+                [ "request_length" ] = ngx.var.request_length,
+                [ "ssl_protocol" ] = ngx.var.ssl_protocol,
+                [ "ssl_cipher" ] = ngx.var.ssl_cipher,
+                [ "request_time" ] = ngx.var.request_time,
+                [ "upstream_status" ] = ngx.var.upstream_status,
+                [ "upstream_response_time" ] = ngx.var.upstream_response_time,
+                [ "upstream_addr" ] = ngx.var.upstream_addr
+            })
         }
         proxy_pass http://backend_b;
     }

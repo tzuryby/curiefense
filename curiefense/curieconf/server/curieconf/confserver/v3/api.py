@@ -31,7 +31,7 @@ ns_tools = api.namespace("tools", description="Tools")
 
 
 class AnyType(fields.Raw):
-    __schema_type__ = "any"
+    __schema_type__ = ["number", "string", "boolean", "object", "array", "null"]
 
 
 # limit
@@ -51,6 +51,7 @@ m_limit = api.model(
         "name": fields.String(required=True),
         "description": fields.String(),
         "global": fields.Boolean(required=True),
+        "active": fields.Boolean(required=True),
         "timeframe": fields.Integer(required=True),
         "thresholds": fields.List(fields.Nested(m_threshold)),
         "include": fields.Raw(required=True),
@@ -89,6 +90,8 @@ m_securitypolicy = api.model(
         "name": fields.String(required=True),
         "description": fields.String(),
         "match": fields.String(required=True),
+        "curiesession": AnyType(),
+        "curiesession_ids": AnyType(),
         "map": fields.List(fields.Nested(m_secprofilemap)),
     },
 )
@@ -125,6 +128,7 @@ m_contentfilterprofile = api.model(
         "headers": fields.Raw(required=True),
         "cookies": fields.Raw(required=True),
         "path": fields.Raw(required=True),
+        "allsections": fields.Raw(),
         "decoding": fields.Raw(required=True),
         "masking_seed": fields.String(required=True),
         "content_type": fields.List(fields.String()),
@@ -205,21 +209,26 @@ m_action = api.model(
     },
 )
 
-# Dynamic Rule
+# Virtual Tag
 
-m_dynamicrule = api.model(
-    "Dynamic Rule",
+m_virtualtag = api.model(
+    "Virtual Tag",
     {
         "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
-        "threshold": fields.Integer(required=True),
-        "timeframe": fields.Integer(required=True),
-        "ttl": fields.Integer(required=True),
-        "active": fields.Boolean(required=True),
-        "target": fields.String(required=True),
-        "include": fields.List(fields.String(required=True)),
-        "exclude": fields.List(fields.String(required=True)),
+        "match": fields.List(fields.Raw(required=True)),
+    },
+)
+
+# custom
+
+m_custom = api.model(
+    "Custom",
+    {
+        "id": fields.String(required=True),
+        "name": fields.String(required=True),
+        "*": fields.Wildcard(fields.Raw()),
     },
 )
 
@@ -234,7 +243,8 @@ models = {
     "globalfilters": m_globalfilter,
     "flowcontrol": m_flowcontrol,
     "actions": m_action,
-    "dynamicrules": m_dynamicrule,
+    "virtualtags": m_virtualtag,
+    "custom": m_custom,
 }
 
 ### Other models
@@ -390,8 +400,8 @@ def validateJson(json_data, schema_type):
         validate(instance=json_data, schema=schema_type_map[schema_type])
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
-        return False
-    return True
+        return False, str(err)
+    return True, ""
 
 
 ### DB Schema validation
@@ -450,9 +460,12 @@ with open(content_filter_rule_file_path) as json_file:
 action_file_path = (base_path / "./json/action.schema").resolve()
 with open(action_file_path) as json_file:
     action_schema = json.load(json_file)
-dynamicrule_file_path = (base_path / "./json/dynamic-rule.schema").resolve()
-with open(dynamicrule_file_path) as json_file:
-    dynamic_rule_schema = json.load(json_file)
+virtualtag_file_path = (base_path / "./json/virtual-tags.schema").resolve()
+with open(virtualtag_file_path) as json_file:
+    virtual_tags_schema = json.load(json_file)
+custom_file_path = (base_path / "./json/custom.schema").resolve()
+with open(custom_file_path) as json_file:
+    custom_schema = json.load(json_file)
 
 
 schema_type_map = {
@@ -464,7 +477,8 @@ schema_type_map = {
     "flowcontrol": flowcontrol_schema,
     "contentfilterrules": content_filter_rule_schema,
     "actions": action_schema,
-    "dynamicrules": dynamic_rule_schema,
+    "virtualtags": virtual_tags_schema,
+    "custom": custom_schema,
 }
 
 
@@ -646,9 +660,9 @@ class DocumentResource(Resource):
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
         for entry in request.json:
-            isValid = validateJson(entry, document)
+            isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched")
+                abort(500, "schema mismatched: \n" + err)
         res = current_app.backend.documents_create(
             config, document, data, get_gitactor()
         )
@@ -661,9 +675,9 @@ class DocumentResource(Resource):
             abort(404, "document does not exist")
         data = marshal(request.json, models[document], skip_none=True)
         for entry in request.json:
-            isValid = validateJson(entry, document)
+            isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched " + str(entry))
+                abort(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
         res = current_app.backend.documents_update(
             config, document, data, get_gitactor()
         )
@@ -725,7 +739,7 @@ class EntriesResource(Resource):
         "Create an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        isValid = validateJson(request.json, document)
+        isValid, err = validateJson(request.json, document)
         if isValid:
             data = marshal(request.json, models[document], skip_none=True)
             res = current_app.backend.entries_create(
@@ -733,7 +747,7 @@ class EntriesResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched")
+            abort(500, "schema mismatched: \n" + err)
 
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
@@ -750,7 +764,7 @@ class EntryResource(Resource):
         "Update an entry in a document"
         if document not in models:
             abort(404, "document does not exist")
-        isValid = validateJson(request.json, document)
+        isValid, err = validateJson(request.json, document)
         if isValid:
             data = marshal(request.json, models[document], skip_none=True)
             res = current_app.backend.entries_update(
@@ -758,7 +772,7 @@ class EntryResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched")
+            abort(500, "schema mismatched: \n" + err)
 
     def delete(self, config, document, entry):
         "Delete an entry from a document"

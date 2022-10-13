@@ -5,9 +5,11 @@ pub mod hostmap;
 pub mod limit;
 pub mod matchers;
 pub mod raw;
+pub mod virtualtags;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,7 +24,8 @@ use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, PolicyId, SecurityPolicy};
 use matchers::Matching;
-use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy};
+use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawVirtualTag};
+use virtualtags::{vtags_resolve, VirtualTags};
 
 use self::flow::FlowMap;
 use self::matchers::RequestSelector;
@@ -38,6 +41,12 @@ fn config_logs(cur: &mut Logs, cfg: &Config) {
     cur.debug("CFGLOAD logs start");
     cur.extend(cfg.logs.clone());
     cur.debug("CFGLOAD logs end");
+}
+
+fn container_name() -> Option<String> {
+    std::fs::read_to_string("/etc/hostname")
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 pub fn with_config<R, F>(basepath: &str, logs: &mut Logs, f: F) -> Option<R>
@@ -82,6 +91,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Config {
     pub revision: String,
+    pub securitypolicies_map: HashMap<String, HostMap>, // used when the security policy is set
     pub securitypolicies: Vec<Matching<HostMap>>,
     pub globalfilters: Vec<GlobalFilterSection>,
     pub default: Option<HostMap>,
@@ -89,6 +99,7 @@ pub struct Config {
     pub container_name: Option<String>,
     pub flows: FlowMap,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
+    pub virtual_tags: VirtualTags,
     pub logs: Logs,
 }
 
@@ -108,12 +119,14 @@ impl Config {
         rawmaps: Vec<RawSecurityPolicy>,
         limits: &HashMap<String, Limit>,
         global_limits: &[Limit],
+        inactive_limits: &HashSet<String>,
         acls: &HashMap<String, AclProfile>,
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
+        session: Vec<RequestSelector>,
+        session_ids: Vec<RequestSelector>,
     ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
         let mut default: Option<Arc<SecurityPolicy>> = None;
         let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
-
         for rawmap in rawmaps {
             let mapname = rawmap.name.clone();
             let acl_profile: AclProfile = match acls.get(&rawmap.acl_profile) {
@@ -138,24 +151,15 @@ impl Config {
                 }
             }
             for lid in rawmap.limit_ids {
-                match from_map(limits, &lid) {
-                    Ok(lm) => olimits.push(lm),
-                    Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
+                if !inactive_limits.contains(&lid) {
+                    match from_map(limits, &lid) {
+                        Ok(lm) => olimits.push(lm),
+                        Err(rr) => logs.error(|| format!("When resolving limits in rawmap {}, {}", mapname, rr)),
+                    }
+                } else {
+                    logs.debug(|| format!("Trying to add inactive limit {} in map {}", lid, mapname))
                 }
             }
-            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
-                Ok(Vec::new())
-            } else {
-                rawmap
-                    .session
-                    .into_iter()
-                    .map(RequestSelector::resolve_selector_map)
-                    .collect()
-            };
-            let session = msession.unwrap_or_else(|rr| {
-                logs.error(|| format!("error when decoding session in {}, {}", mapname, rr));
-                Vec::new()
-            });
             let securitypolicy = SecurityPolicy {
                 policy: PolicyId {
                     id: policyid.to_string(),
@@ -165,14 +169,18 @@ impl Config {
                     id: rawmap.id.unwrap_or_else(|| mapname.clone()),
                     name: rawmap.name,
                 },
-                session,
+                session: session.clone(),
+                session_ids: session_ids.clone(),
                 acl_active: rawmap.acl_active,
                 acl_profile,
                 content_filter_active: rawmap.content_filter_active,
                 content_filter_profile,
                 limits: olimits,
             };
-            if rawmap.match_ == "__default__" || (rawmap.match_ == "/" && securitypolicy.entry.id == "default") {
+            if rawmap.match_ == "__default__"
+                || (rawmap.match_ == "/"
+                    && (securitypolicy.entry.id == "default" || securitypolicy.entry.id == "__default__"))
+            {
                 if default.is_some() {
                     logs.warning("Multiple __default__ maps");
                 }
@@ -202,12 +210,14 @@ impl Config {
         content_filter_profiles: HashMap<String, ContentFilterProfile>,
         container_name: Option<String>,
         rawflows: Vec<RawFlowEntry>,
+        rawvirtualtags: Vec<RawVirtualTag>,
     ) -> Config {
         let mut default: Option<HostMap> = None;
         let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
+        let mut securitypolicies_map = HashMap::new();
         let mut logs = logs;
 
-        let (limits, global_limits) = Limit::resolve(&mut logs, actions, rawlimits);
+        let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, actions, rawlimits);
         let acls = rawacls
             .into_iter()
             .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, actions, a)))
@@ -215,6 +225,30 @@ impl Config {
 
         // build the entries while looking for the default entry
         for rawmap in rawmaps {
+            let mapname = rawmap.name.clone();
+            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
+                Ok(Vec::new())
+            } else {
+                rawmap
+                    .session
+                    .into_iter()
+                    .map(RequestSelector::resolve_selector_map)
+                    .collect()
+            };
+            let msession_ids: anyhow::Result<Vec<RequestSelector>> = rawmap
+                .session_ids
+                .into_iter()
+                .map(RequestSelector::resolve_selector_map)
+                .collect();
+            let session = msession.unwrap_or_else(|rr| {
+                logs.error(|| format!("error when decoding session in {}, {}", &mapname, rr));
+                Vec::new()
+            });
+
+            let session_ids = msession_ids.unwrap_or_else(|rr| {
+                logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
+                Vec::new()
+            });
             let (entries, default_entry) = Config::resolve_security_policies(
                 &mut logs,
                 &rawmap.id,
@@ -222,18 +256,21 @@ impl Config {
                 rawmap.map,
                 &limits,
                 &global_limits,
+                &inactive_limits,
                 &acls,
                 &content_filter_profiles,
+                session,
+                session_ids,
             );
             if default_entry.is_none() {
                 logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
             }
-            let mapname = rawmap.name.clone();
             let hostmap = HostMap {
                 name: rawmap.name,
                 entries,
                 default: default_entry,
             };
+            securitypolicies_map.insert(rawmap.id, hostmap.clone());
             if rawmap.match_ == "__default__" {
                 if default.is_some() {
                     logs.error(|| format!("HostMap entry '{}' has several default entries", hostmap.name));
@@ -256,8 +293,11 @@ impl Config {
 
         let flows = flow_resolve(&mut logs, rawflows);
 
+        let virtual_tags = vtags_resolve(&mut logs, rawvirtualtags);
+
         Config {
             revision,
+            securitypolicies_map,
             securitypolicies,
             globalfilters,
             default,
@@ -266,6 +306,7 @@ impl Config {
             flows,
             content_filter_profiles,
             logs,
+            virtual_tags,
         }
     }
 
@@ -304,6 +345,8 @@ impl Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
+        logs.debug(|| format!("Loading configuration from {}", basepath));
+
         let mmanifest: Result<RawManifest, String> = PathBuf::from(basepath)
             .parent()
             .ok_or_else(|| "could not get parent directory?".to_string())
@@ -330,10 +373,9 @@ impl Config {
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
+        let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
 
-        let container_name = std::fs::read_to_string("/etc/hostname")
-            .ok()
-            .map(|s| s.trim().to_string());
+        let container_name = container_name();
 
         let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
         let content_filter_profiles = ContentFilterProfile::resolve(&mut logs, &actions, rawcontentfilterprofiles);
@@ -352,6 +394,7 @@ impl Config {
             content_filter_profiles,
             container_name,
             flows,
+            virtualtags,
         );
 
         (config, hsdb)
@@ -375,14 +418,16 @@ impl Config {
     pub fn empty() -> Config {
         Config {
             revision: "dummy".to_string(),
+            securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             last_mod: SystemTime::UNIX_EPOCH,
             default: None,
-            container_name: None,
+            container_name: container_name(),
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
+            virtual_tags: Arc::new(HashMap::new()),
         }
     }
 }

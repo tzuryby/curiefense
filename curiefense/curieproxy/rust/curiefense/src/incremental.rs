@@ -8,13 +8,15 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use chrono::{DateTime, Utc};
+
 use crate::{
     analyze::{analyze, APhase0, CfRulesArg},
     body::body_too_large,
     challenge_verified,
     config::{
         contentfilter::ContentFilterRules, contentfilter::SectionIdx, flow::FlowMap, globalfilter::GlobalFilterSection,
-        hostmap::SecurityPolicy, Config,
+        hostmap::SecurityPolicy, virtualtags::VirtualTags, Config,
     },
     grasshopper::Grasshopper,
     interface::{
@@ -33,6 +35,7 @@ pub enum IPInfo {
 }
 
 pub struct IData {
+    start: DateTime<Utc>,
     pub logs: Logs,
     meta: RequestMeta,
     headers: HashMap<String, String>,
@@ -40,6 +43,7 @@ pub struct IData {
     body: Option<Vec<u8>>,
     ipinfo: IPInfo,
     stats: StatsCollect<BStageSecpol>,
+    container_name: Option<String>,
 }
 
 impl IData {
@@ -65,26 +69,39 @@ pub fn extract_ip(trusted_hops: usize, headers: &HashMap<String, String>) -> Opt
     headers.get("x-forwarded-for").map(|s| detect_ip(s.as_str()))
 }
 
-pub fn inspect_init(config: &Config, loglevel: LogLevel, meta: RequestMeta, ipinfo: IPInfo) -> Result<IData, String> {
+pub fn inspect_init(
+    config: &Config,
+    loglevel: LogLevel,
+    meta: RequestMeta,
+    ipinfo: IPInfo,
+    start: Option<DateTime<Utc>>,
+    selected_secpol: Option<&str>,
+) -> Result<IData, String> {
     let mut logs = Logs::new(loglevel);
     let mr = match_securitypolicy(
         meta.authority.as_deref().unwrap_or("localhost"),
         &meta.path,
         config,
         &mut logs,
+        selected_secpol,
     );
     match mr {
         None => Err("could not find a matching security policy".to_string()),
-        Some(secpol) => Ok(IData {
-            logs,
-            meta,
-            headers: HashMap::new(),
-            secpol: secpol.clone(),
-            body: None,
-            ipinfo,
-            stats: StatsCollect::new(config.revision.clone())
-                .secpol(SecpolStats::build(&secpol, config.globalfilters.len())),
-        }),
+        Some(secpol) => {
+            let stats = StatsCollect::new(config.revision.clone())
+                .secpol(SecpolStats::build(&secpol, config.globalfilters.len()));
+            Ok(IData {
+                start: start.unwrap_or_else(Utc::now),
+                logs,
+                meta,
+                headers: HashMap::new(),
+                secpol,
+                body: None,
+                ipinfo,
+                stats,
+                container_name: config.container_name.clone(),
+            })
+        }
     }
 }
 
@@ -102,22 +119,16 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
     };
     let reqinfo = map_request(
         &mut logs,
-        "unk",
-        "unk",
-        &secpolicy.session,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        0,
-        secpolicy.content_filter_profile.ignore_body,
+        secpolicy,
+        idata.container_name,
         &rawrequest,
+        Some(idata.start),
     );
     (
         logs,
         AnalyzeResult {
             decision: Decision::action(action, vec![br]),
-            tags: Tags::default(),
+            tags: Tags::new(&VirtualTags::default()),
             rinfo: reqinfo,
             stats: Stats::default(),
         },
@@ -204,6 +215,7 @@ pub async fn finalize<GH: Grasshopper>(
     globalfilters: &[GlobalFilterSection],
     flows: &FlowMap,
     mcfrules: Option<&HashMap<String, ContentFilterRules>>,
+    vtags: VirtualTags,
 ) -> (AnalyzeResult, Logs) {
     let ipstr = idata.ip();
     let mut logs = idata.logs;
@@ -214,18 +226,15 @@ pub async fn finalize<GH: Grasshopper>(
         meta: idata.meta,
         mbody: idata.body.as_deref(),
     };
+    let cfrules = mcfrules
+        .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
+        .unwrap_or(CfRulesArg::Global);
     let reqinfo = map_request(
         &mut logs,
-        &secpolicy.policy.id,
-        &secpolicy.entry.id,
-        &secpolicy.session,
-        &secpolicy.content_filter_profile.masking_seed,
-        &secpolicy.content_filter_profile.decoding,
-        &secpolicy.content_filter_profile.content_type,
-        secpolicy.content_filter_profile.referer_as_uri,
-        secpolicy.content_filter_profile.max_body_depth,
-        secpolicy.content_filter_profile.ignore_body,
+        secpolicy,
+        idata.container_name,
         &rawrequest,
+        Some(idata.start),
     );
 
     // without grasshopper, default to being human
@@ -235,19 +244,15 @@ pub async fn finalize<GH: Grasshopper>(
         false
     };
 
-    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo);
+    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo, &vtags);
     tags.insert("all", Location::Request);
 
-    let cfrules = mcfrules
-        .map(|cfrules| CfRulesArg::Get(cfrules.get(&secpolicy.content_filter_profile.id)))
-        .unwrap_or(CfRulesArg::Global);
     let dec = analyze(
         &mut logs,
         mgh,
         APhase0 {
             stats,
             itags: tags,
-            securitypolicy: secpolicy,
             reqinfo,
             is_human,
             globalfilter_dec,
@@ -273,6 +278,7 @@ mod test {
     fn empty_config(cf: ContentFilterProfile) -> Config {
         Config {
             revision: "dummy".to_string(),
+            securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
             default: Some(HostMap {
@@ -292,6 +298,7 @@ mod test {
                     content_filter_active: true,
                     content_filter_profile: cf,
                     session: Vec::new(),
+                    session_ids: Vec::new(),
                     limits: Vec::new(),
                 })),
             }),
@@ -300,6 +307,7 @@ mod test {
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
+            virtual_tags: Arc::new(HashMap::new()),
         }
     }
 
@@ -319,6 +327,8 @@ mod test {
                 requestid: None,
             },
             IPInfo::Ip("1.2.3.4".to_string()),
+            None,
+            None,
         )
         .unwrap()
     }

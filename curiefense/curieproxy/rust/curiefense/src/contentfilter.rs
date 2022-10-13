@@ -131,7 +131,7 @@ pub fn content_filter_check(
         );
     }
 
-    let mut specific_tags = Tags::default();
+    let mut specific_tags = tags.new_with_vtags();
 
     // finally, hyperscan check
     match mhsdb {
@@ -359,8 +359,8 @@ fn hyperscan(
                     {
                         matches += 1;
                         let location = Location::from_value(sid, &name, &k);
-                        tags.merge(new_tags.with_loc(&location));
-                        specific_tags.merge(new_specific_tags.with_loc(&location));
+                        tags.merge(tags.new_with_vtags().with_raw_tags(new_tags, &location));
+                        specific_tags.merge(tags.new_with_vtags().with_raw_tags(new_specific_tags, &location));
                         let decision = if specific_tags.has_intersection(active) {
                             nactive += 1;
                             BDecision::Blocking
@@ -413,9 +413,11 @@ fn mask_section(masking_seed: &[u8], sec: &mut RequestField, section: &ContentFi
     to_mask.iter().flat_map(|n| sec.mask(masking_seed, n)).collect()
 }
 
-pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterProfile) -> RequestInfo {
+pub fn masking(req: RequestInfo) -> RequestInfo {
     let mut ri = req;
     let mut to_mask = HashSet::new();
+    let masking_seed = &ri.rinfo.secpolicy.content_filter_profile.masking_seed;
+    let profile = &ri.rinfo.secpolicy.content_filter_profile;
 
     to_mask.extend(mask_section(
         masking_seed,
@@ -464,13 +466,17 @@ pub fn masking(masking_seed: &[u8], req: RequestInfo, profile: &ContentFilterPro
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use super::*;
+    use crate::config::hostmap::SecurityPolicy;
+    use crate::config::virtualtags::VirtualTags;
     use crate::interface::stats::Stats;
     use crate::interface::{jsonlog, Decision};
     use crate::utils::{map_request, RequestMeta};
     use crate::{Logs, RawRequest};
 
-    fn test_request_info() -> RequestInfo {
+    fn test_request_info(profile: ContentFilterProfile) -> RequestInfo {
         let meta = RequestMeta {
             authority: Some("myhost".to_string()),
             method: "GET".to_string(),
@@ -489,26 +495,16 @@ mod test {
             headers,
             meta,
         };
-        map_request(
-            &mut logs,
-            "a",
-            "b",
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            false,
-            500,
-            false,
-            &raw_request,
-        )
+        let mut secpol = SecurityPolicy::empty();
+        secpol.content_filter_profile = profile;
+        map_request(&mut logs, Arc::new(secpol), None, &raw_request, None)
     }
 
     #[test]
     fn no_masking() {
-        let rinfo = test_request_info();
         let profile = ContentFilterProfile::default_from_seed("test");
-        let masked = masking(b"test", rinfo.clone(), &profile);
+        let rinfo = test_request_info(profile);
+        let masked = masking(rinfo.clone());
         assert_eq!(rinfo.headers, masked.headers);
         assert_eq!(rinfo.cookies, masked.cookies);
         assert_eq!(rinfo.rinfo.qinfo.args, masked.rinfo.qinfo.args);
@@ -534,11 +530,12 @@ mod test {
 
     #[test]
     fn masking_all_args_re() {
-        let rinfo = test_request_info();
         let mut profile = ContentFilterProfile::default_from_seed("test");
+        profile.decoding = Vec::new();
         let asection = profile.sections.at(SectionIdx::Args);
         asection.regex = vec![(regex::Regex::new(".").unwrap(), maskentry())];
-        let masked = masking(b"test", rinfo.clone(), &profile);
+        let rinfo = test_request_info(profile);
+        let masked = masking(rinfo.clone());
         assert_eq!(rinfo.headers, masked.headers);
         assert_eq!(rinfo.cookies, masked.cookies);
         assert_eq!(
@@ -564,15 +561,16 @@ mod test {
             masked.rinfo.meta.path
         );
         assert_eq!("arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}", masked.rinfo.qinfo.query);
-        let (logged, _) = jsonlog(
+        let (logged, _) = async_std::task::block_on(jsonlog(
             &Decision::pass(Vec::new()),
             Some(&masked),
             None,
-            &Tags::default(),
+            &Tags::new(&VirtualTags::default()),
             &Stats::default(),
             &Logs::default(),
-        );
-        let log_string = logged.to_string();
+            HashMap::new(),
+        ));
+        let log_string = String::from_utf8(logged).unwrap();
         if log_string.contains("avalue1") || log_string.contains("a value2") || log_string.contains("a%20value2") {
             panic!("log lacks masking: {}", log_string)
         }
@@ -580,11 +578,12 @@ mod test {
 
     #[test]
     fn masking_re_arg1() {
-        let rinfo = test_request_info();
         let mut profile = ContentFilterProfile::default_from_seed("test");
+        profile.decoding = Vec::new();
         let asection = profile.sections.at(SectionIdx::Args);
         asection.regex = vec![(regex::Regex::new("1").unwrap(), maskentry())];
-        let masked = masking(b"test", rinfo.clone(), &profile);
+        let rinfo = test_request_info(profile);
+        let masked = masking(rinfo.clone());
         assert_eq!(rinfo.headers, masked.headers);
         assert_eq!(rinfo.cookies, masked.cookies);
         assert_eq!(
@@ -609,11 +608,12 @@ mod test {
 
     #[test]
     fn masking_named_arg1() {
-        let rinfo = test_request_info();
         let mut profile = ContentFilterProfile::default_from_seed("test");
+        profile.decoding = Vec::new();
         let asection = profile.sections.at(SectionIdx::Args);
         asection.names = ["arg1"].iter().map(|k| (k.to_string(), maskentry())).collect();
-        let masked = masking(b"test", rinfo.clone(), &profile);
+        let rinfo = test_request_info(profile);
+        let masked = masking(rinfo.clone());
         assert_eq!(rinfo.headers, masked.headers);
         assert_eq!(rinfo.cookies, masked.cookies);
         assert_eq!(
@@ -638,11 +638,12 @@ mod test {
 
     #[test]
     fn masking_all_args_names() {
-        let rinfo = test_request_info();
         let mut profile = ContentFilterProfile::default_from_seed("test");
+        profile.decoding = Vec::new();
         let asection = profile.sections.at(SectionIdx::Args);
         asection.names = ["arg1", "arg2"].iter().map(|k| (k.to_string(), maskentry())).collect();
-        let masked = masking(b"test", rinfo.clone(), &profile);
+        let rinfo = test_request_info(profile);
+        let masked = masking(rinfo.clone());
         assert_eq!(rinfo.headers, masked.headers);
         assert_eq!(rinfo.cookies, masked.cookies);
         assert_eq!(
@@ -691,39 +692,30 @@ mod test {
             headers,
             meta,
         };
-        let rinfo = map_request(
-            &mut logs,
-            "a",
-            "b",
-            &[],
-            b"CHANGEME",
-            &[crate::config::contentfilter::Transformation::Base64Decode],
-            &[crate::config::raw::ContentType::Json],
-            true,
-            50,
-            false,
-            &raw_request,
-        );
-
-        let mut profile = ContentFilterProfile::default_from_seed("test");
-        let asection = profile.sections.at(SectionIdx::Args);
+        let mut secpol = SecurityPolicy::default();
+        secpol.content_filter_profile.decoding = vec![crate::config::contentfilter::Transformation::Base64Decode];
+        secpol.content_filter_profile.content_type = vec![crate::config::raw::ContentType::Json];
+        secpol.content_filter_profile.referer_as_uri = true;
+        let asection = secpol.content_filter_profile.sections.at(SectionIdx::Args);
         asection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
-        let hsection = profile.sections.at(SectionIdx::Headers);
+        let hsection = secpol.content_filter_profile.sections.at(SectionIdx::Headers);
         hsection.regex = vec![(regex::Regex::new("^h.*").unwrap(), masksecret())];
-        let csection = profile.sections.at(SectionIdx::Cookies);
+        let csection = secpol.content_filter_profile.sections.at(SectionIdx::Cookies);
         csection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
+        let rinfo = map_request(&mut logs, Arc::new(secpol), None, &raw_request, None);
 
-        let masked = masking(b"test", rinfo, &profile);
+        let masked = masking(rinfo);
 
-        let (logged, _) = jsonlog(
+        let (logged, _) = async_std::task::block_on(jsonlog(
             &Decision::pass(Vec::new()),
             Some(&masked),
             None,
-            &Tags::default(),
+            &Tags::new(&VirtualTags::default()),
             &Stats::default(),
             &Logs::default(),
-        );
-        let log_string = logged.to_string();
+            HashMap::new(),
+        ));
+        let log_string = String::from_utf8(logged).unwrap();
         if log_string.contains("SECRET") {
             panic!("SECRET found in {}", log_string);
         }

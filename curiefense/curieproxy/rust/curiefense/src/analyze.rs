@@ -1,10 +1,8 @@
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use crate::acl::check_acl;
 use crate::config::contentfilter::ContentFilterRules;
 use crate::config::flow::FlowMap;
-use crate::config::hostmap::SecurityPolicy;
 use crate::config::HSDB;
 use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query, FlowCheck, FlowResult};
@@ -29,7 +27,6 @@ pub struct APhase0 {
     pub is_human: bool,
     pub itags: Tags,
     pub reqinfo: RequestInfo,
-    pub securitypolicy: Arc<SecurityPolicy>,
     pub stats: StatsCollect<BStageMapped>,
 }
 
@@ -38,7 +35,6 @@ pub struct AnalysisInfo {
     is_human: bool,
     reasons: Vec<BlockReason>,
     reqinfo: RequestInfo,
-    securitypolicy: Arc<SecurityPolicy>,
     stats: StatsCollect<BStageMapped>,
     tags: Tags,
 }
@@ -74,11 +70,10 @@ pub enum InitResult {
 pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APhase0) -> InitResult {
     let stats = p0.stats;
     let mut tags = p0.itags;
-    let securitypolicy = p0.securitypolicy;
     let reqinfo = p0.reqinfo;
+    let securitypolicy = &reqinfo.rinfo.secpolicy;
     let is_human = p0.is_human;
     let globalfilter_dec = p0.globalfilter_dec;
-    let masking_seed = &securitypolicy.content_filter_profile.masking_seed;
 
     tags.insert_qualified("securitypolicy", &securitypolicy.policy.name, Location::Request);
     tags.insert_qualified("securitypolicy-entry", &securitypolicy.entry.name, Location::Request);
@@ -115,7 +110,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         return InitResult::Res(AnalyzeResult {
             decision: Decision::action(action, vec![reason]),
             tags,
-            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            rinfo: masking(reqinfo),
             stats: stats.mapped_stage_build(),
         });
     }
@@ -124,7 +119,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         return InitResult::Res(AnalyzeResult {
             decision,
             tags,
-            rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+            rinfo: masking(reqinfo),
             stats: stats.mapped_stage_build(),
         });
     }
@@ -140,11 +135,12 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
             return InitResult::Res(AnalyzeResult {
                 decision,
                 tags,
-                rinfo: masking(masking_seed, reqinfo, &securitypolicy.content_filter_profile),
+                rinfo: masking(reqinfo),
                 stats: stats.mapped_stage_build(),
             });
         }
         // if the decision was not adopted, get the reason vector back
+        // (this is because we passed it to action.to_decision)
         brs = decision.reasons;
     }
 
@@ -154,7 +150,6 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         is_human,
         reasons: brs,
         reqinfo,
-        securitypolicy,
         stats,
         tags,
     };
@@ -205,7 +200,8 @@ pub async fn analyze_query<'t>(logs: &mut Logs, p1: APhase1) -> APhase2 {
     let flow_results = eat_errors(logs, flow_resolve_query(&mut redis, &mut lst, p1.flows).await);
     logs.debug("flow checks done");
 
-    let limit_results = eat_errors(logs, limit_resolve_query(&mut redis, &mut lst, p1.limits).await);
+    let limit_results_err = limit_resolve_query(logs, &mut redis, &mut lst, p1.limits).await;
+    let limit_results = eat_errors(logs, limit_results_err);
     logs.debug("limit checks done");
 
     AnalysisPhase {
@@ -227,8 +223,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     let mut brs = info.reasons;
     let is_human = info.is_human;
     let reqinfo = info.reqinfo;
-    let secpol = info.securitypolicy;
-    let masking_seed = &secpol.content_filter_profile.masking_seed;
+    let secpol = &reqinfo.rinfo.secpolicy;
 
     let stats = flow_process(info.stats, 0, &p2.flows, &mut tags);
     let (limit_check, stats) = limit_process(stats, 0, &p2.limits, &mut tags);
@@ -240,11 +235,12 @@ pub fn analyze_finish<GH: Grasshopper>(
             return AnalyzeResult {
                 decision,
                 tags,
-                rinfo: masking(masking_seed, reqinfo, &secpol.content_filter_profile),
+                rinfo: masking(reqinfo),
                 stats: stats.limit_stage_build(),
             };
         }
         // if the decision was not adopted, get the reason vector back
+        // (this is because we passed it to action.to_decision)
         brs = decision.reasons;
     }
     logs.debug("limit checks done");
@@ -267,7 +263,7 @@ pub fn analyze_finish<GH: Grasshopper>(
             return AnalyzeResult {
                 decision: Decision::pass(brs),
                 tags,
-                rinfo: masking(masking_seed, reqinfo, &secpol.content_filter_profile),
+                rinfo: masking(reqinfo),
                 stats: stats.acl_stage_build(),
             };
         }
@@ -307,7 +303,7 @@ pub fn analyze_finish<GH: Grasshopper>(
             return AnalyzeResult {
                 decision,
                 tags,
-                rinfo: masking(masking_seed, reqinfo, &secpol.content_filter_profile),
+                rinfo: masking(reqinfo),
                 stats: stats.acl_stage_build(),
             };
         }
@@ -366,7 +362,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     AnalyzeResult {
         decision,
         tags,
-        rinfo: masking(masking_seed, reqinfo, &secpol.content_filter_profile),
+        rinfo: masking(reqinfo),
         stats: stats.cf_stage_build(),
     }
 }

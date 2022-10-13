@@ -32,4 +32,52 @@ pub struct SecurityPolicy {
     pub content_filter_profile: ContentFilterProfile,
     pub limits: Vec<Limit>,
     pub session: Vec<RequestSelector>,
+    pub session_ids: Vec<RequestSelector>,
+}
+
+impl Default for SecurityPolicy {
+    fn default() -> Self {
+        Self {
+            policy: PolicyId {
+                id: "polid".to_string(),
+                name: "policy name".to_string(),
+            },
+            entry: PolicyId {
+                id: "entryid".to_string(),
+                name: "entry name".to_string(),
+            },
+            acl_active: false,
+            acl_profile: AclProfile::default(),
+            content_filter_active: false,
+            content_filter_profile: ContentFilterProfile::default_from_seed("CHANGEME"),
+            limits: Vec::new(),
+            session: Vec::new(),
+            session_ids: Vec::new(),
+        }
+    }
+}
+
+impl SecurityPolicy {
+    pub fn empty() -> Self {
+        let mut out = Self {
+            policy: PolicyId {
+                id: "polid".to_string(),
+                name: "policy name".to_string(),
+            },
+            entry: PolicyId {
+                id: "entryid".to_string(),
+                name: "entry name".to_string(),
+            },
+            acl_active: false,
+            acl_profile: AclProfile::default(),
+            content_filter_active: false,
+            content_filter_profile: ContentFilterProfile::default_from_seed("CHANGEME"),
+            limits: Vec::new(),
+            session: Vec::new(),
+            session_ids: Vec::new(),
+        };
+        out.content_filter_profile.content_type = Vec::new();
+        out.content_filter_profile.decoding = Vec::new();
+        out
+    }
 }

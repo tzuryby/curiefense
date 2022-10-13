@@ -17,21 +17,22 @@ pub mod simple_executor;
 pub mod tagging;
 pub mod utils;
 
-use analyze::CfRulesArg;
+use std::sync::Arc;
+
+use analyze::{APhase0, CfRulesArg};
 use body::body_too_large;
+use config::virtualtags::VirtualTags;
 use config::with_config;
 use grasshopper::Grasshopper;
-use interface::{Action, ActionType, Decision};
-use interface::{AnalyzeResult, Tags};
+use interface::stats::{SecpolStats, Stats, StatsCollect};
+use interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags};
 use logs::Logs;
 use securitypolicy::match_securitypolicy;
 use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
-use crate::analyze::APhase0;
-use crate::interface::stats::{SecpolStats, Stats, StatsCollect};
-use crate::interface::{BlockReason, Location};
+use crate::config::hostmap::SecurityPolicy;
 
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
@@ -68,7 +69,7 @@ pub unsafe fn inspect_async_free(ptr: *mut Executor<(Decision, Tags, Logs)>) {
     if ptr.is_null() {
         return;
     }
-    Box::from_raw(ptr);
+    let _x = Box::from_raw(ptr);
 }
 
 pub fn inspect_generic_request_map<GH: Grasshopper>(
@@ -76,8 +77,15 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> AnalyzeResult {
-    async_std::task::block_on(inspect_generic_request_map_async(configpath, mgh, raw, logs))
+    async_std::task::block_on(inspect_generic_request_map_async(
+        configpath,
+        mgh,
+        raw,
+        logs,
+        selected_secpol,
+    ))
 }
 
 // generic entry point when the request map has already been parsed
@@ -86,11 +94,12 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> Result<APhase0, AnalyzeResult> {
-    let mut tags = Tags::default();
+    let start = chrono::Utc::now();
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
-    tags.insert("all", Location::Request);
+    let tags = Tags::from_slice(&[(String::from("all"), Location::Request)], VirtualTags::default());
 
     logs.debug(|| format!("Inspection starts (grasshopper active: {})", mgh.is_some()));
 
@@ -105,48 +114,34 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let (securitypolicy, (ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
+    let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
         match with_config(configpath, logs, |slogs, cfg| {
-            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs);
+            let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
-                    let pmax_depth = secpolicy.content_filter_profile.max_body_depth;
 
                     // check if the body is too large
                     // if the body is too large, we store the "too large" action for later use, and set the max depth to 0
-                    let (body_too_large, max_depth) = if let Some(body) = raw.mbody {
+                    let body_too_large = if let Some(body) = raw.mbody {
                         if body.len() > secpolicy.content_filter_profile.max_body_size
                             && !secpolicy.content_filter_profile.ignore_body
                         {
-                            (
-                                Some(body_too_large(
-                                    secpolicy.content_filter_profile.max_body_size,
-                                    body.len(),
-                                )),
-                                0,
-                            )
+                            Some(body_too_large(
+                                secpolicy.content_filter_profile.max_body_size,
+                                body.len(),
+                            ))
                         } else {
-                            (None, pmax_depth)
+                            None
                         }
                     } else {
-                        (None, pmax_depth)
+                        None
                     };
 
+                    let stats = StatsCollect::new(cfg.revision.clone())
+                        .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
                     // if the max depth is equal to 0, the body will not be parsed
-                    let reqinfo = map_request(
-                        slogs,
-                        &secpolicy.policy.id,
-                        &secpolicy.entry.id,
-                        &secpolicy.session,
-                        &secpolicy.content_filter_profile.masking_seed,
-                        &secpolicy.content_filter_profile.decoding,
-                        &secpolicy.content_filter_profile.content_type,
-                        secpolicy.content_filter_profile.referer_as_uri,
-                        max_depth,
-                        secpolicy.content_filter_profile.ignore_body,
-                        &raw,
-                    );
+                    let reqinfo = map_request(slogs, secpolicy, cfg.container_name.clone(), &raw, Some(start));
 
                     if let Some(action) = body_too_large {
                         return RequestMappingResult::BodyTooLarge(action, reqinfo);
@@ -161,11 +156,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         false
                     };
 
-                    let stats = StatsCollect::new(cfg.revision.clone())
-                        .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
-
-                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo);
-                    RequestMappingResult::Res((secpolicy, ntags, nflows, reqinfo, is_human))
+                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo, &cfg.virtual_tags);
+                    RequestMappingResult::Res((ntags, nflows, reqinfo, is_human))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
             }
@@ -181,7 +173,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
                 logs.debug("No security policy found");
-                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
+                let mut secpol = SecurityPolicy::default();
+                secpol.content_filter_profile.ignore_body = true;
+                let rinfo = map_request(logs, Arc::new(secpol), None, &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -191,7 +185,9 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
             }
             None => {
                 logs.debug("Something went wrong during security policy searching");
-                let rinfo = map_request(logs, "unk", "unk", &[], b"CHANGEME", &[], &[], false, 0, true, &raw);
+                let mut secpol = SecurityPolicy::default();
+                secpol.content_filter_profile.ignore_body = true;
+                let rinfo = map_request(logs, Arc::new(secpol), None, &raw, Some(start));
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -200,12 +196,11 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 });
             }
         };
-    tags.extend(ntags);
+    ntags.extend(tags);
 
     Ok(APhase0 {
         stats,
-        itags: tags,
-        securitypolicy,
+        itags: ntags,
         reqinfo,
         is_human,
         globalfilter_dec,
@@ -219,8 +214,9 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     mgh: Option<&GH>,
     raw: RawRequest<'_>,
     logs: &mut Logs,
+    selected_secpol: Option<&str>,
 ) -> AnalyzeResult {
-    match inspect_generic_request_map_init(configpath, mgh, raw, logs) {
+    match inspect_generic_request_map_init(configpath, mgh, raw, logs, selected_secpol) {
         Err(res) => res,
         Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
     }

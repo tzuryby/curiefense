@@ -15,19 +15,22 @@ DOCUMENTS_PATH = {
     "aclprofiles": "config/json/acl-profiles.json",
     "globalfilters": "config/json/globalfilter-lists.json",
     "flowcontrol": "config/json/flow-control.json",
-    "dynamicrules": "config/json/dynamic-rules.json",
+    "virtualtags": "config/json/virtual-tags.json",
+    "custom": "config/json/custom.json",
 }
 
 BLOBS_PATH = {
     "geolite2asn": "config/maxmind/GeoLite2-ASN.mmdb",
     "geolite2country": "config/maxmind/GeoLite2-Country.mmdb",
     "geolite2city": "config/maxmind/GeoLite2-City.mmdb",
+    "customconf": "config/customconf.tar.gz",
 }
 
 BLOBS_BOOTSTRAP = {
     "geolite2asn": b"",
     "geolite2country": b"",
     "geolite2city": b"",
+    "customconf": b"",
 }
 
 

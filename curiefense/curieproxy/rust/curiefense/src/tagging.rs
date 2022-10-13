@@ -2,6 +2,7 @@ use crate::config::globalfilter::{
     GlobalFilterEntry, GlobalFilterEntryE, GlobalFilterRule, GlobalFilterSection, PairEntry, SingleEntry,
 };
 use crate::config::raw::Relation;
+use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
@@ -143,14 +144,14 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Authority(at) => check_single(at, &rinfo.rinfo.host, Location::Request),
         GlobalFilterEntryE::Tag(tg) => tags.get(&tg.exact).cloned(),
         GlobalFilterEntryE::SecurityPolicyId(id) => {
-            if &rinfo.rinfo.policyid == id {
+            if &rinfo.rinfo.secpolicy.policy.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
             }
         }
         GlobalFilterEntryE::SecurityPolicyEntryId(id) => {
-            if &rinfo.rinfo.entryid == id {
+            if &rinfo.rinfo.secpolicy.entry.id == id {
                 Some(std::iter::once(Location::Request).collect())
             } else {
                 None
@@ -174,8 +175,9 @@ pub fn tag_request(
     is_human: bool,
     globalfilters: &[GlobalFilterSection],
     rinfo: &RequestInfo,
+    vtags: &VirtualTags,
 ) -> (Tags, SimpleDecision, StatsCollect<BStageMapped>) {
-    let mut tags = Tags::default();
+    let mut tags = Tags::new(vtags);
     if is_human {
         tags.insert("human", Location::Request);
     } else {
@@ -236,7 +238,9 @@ pub fn tag_request(
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
             matched += 1;
-            let rtags = psection.tags.clone().with_locs(&mtch.matched);
+            let rtags = tags
+                .new_with_vtags()
+                .with_raw_tags_locs(psection.tags.clone(), &mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
                 let curdec = SimpleDecision::Action(
@@ -259,12 +263,14 @@ mod tests {
     use super::*;
     use crate::config::globalfilter::optimize_ipranges;
     use crate::config::globalfilter::GlobalFilterRelation;
+    use crate::config::hostmap::SecurityPolicy;
     use crate::logs::Logs;
     use crate::utils::map_request;
     use crate::utils::RawRequest;
     use crate::utils::RequestMeta;
     use regex::Regex;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn mk_rinfo() -> RequestInfo {
         let raw_headers = [
@@ -294,28 +300,27 @@ mod tests {
         }
         let meta = RequestMeta::from_map(attrs).unwrap();
         let mut logs = Logs::default();
+        let secpol = SecurityPolicy::default();
         map_request(
             &mut logs,
-            "a",
-            "b",
-            &[],
-            b"CHANGEME",
-            &[],
-            &[],
-            false,
-            500,
-            false,
+            Arc::new(secpol),
+            None,
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),
                 headers,
                 meta,
                 mbody: None,
             },
+            None,
         )
     }
 
     fn t_check_entry(negated: bool, entry: GlobalFilterEntryE) -> MatchResult {
-        check_entry(&mk_rinfo(), &Tags::default(), &GlobalFilterEntry { negated, entry })
+        check_entry(
+            &mk_rinfo(),
+            &Tags::new(&VirtualTags::default()),
+            &GlobalFilterEntry { negated, entry },
+        )
     }
 
     fn single_re(input: &str) -> SingleEntry {
@@ -427,7 +432,7 @@ mod tests {
         let entries = mk_globalfilterentries(input);
         let ssection = GlobalFilterRule::Rel(GlobalFilterRelation { entries, relation: rel });
         let optimized = optimize(&ssection);
-        let tags = Tags::default();
+        let tags = Tags::new(&VirtualTags::default());
 
         let mut ri = mk_rinfo();
         for (ip, expected) in samples {

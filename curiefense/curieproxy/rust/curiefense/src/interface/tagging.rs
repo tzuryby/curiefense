@@ -1,5 +1,6 @@
 use crate::config::contentfilter::SectionIdx;
-use serde::ser::SerializeMap;
+use crate::config::virtualtags::VirtualTags;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
@@ -162,13 +163,13 @@ impl Location {
                 map.serialize_entry("section", "attributes")?;
             }
             Location::Ip => {
-                map.serialize_entry("section", "ip")?;
+                map.serialize_entry("request_element", "ip")?;
             }
             Location::Uri => {
-                map.serialize_entry("section", "uri")?;
+                map.serialize_entry("request_element", "uri")?;
             }
             Location::RefererPath => {
-                map.serialize_entry("section", "referer path")?;
+                map.serialize_entry("request_element", "referer_path")?;
             }
             Location::RefererPathpart(part) => {
                 map.serialize_entry("part", part)?;
@@ -192,10 +193,10 @@ impl Location {
                 map.serialize_entry("value", value)?;
             }
             Location::RefererArgument(name) => {
-                map.serialize_entry("name", name)?;
+                map.serialize_entry("ref_name", name)?;
             }
             Location::RefererArgumentValue(_, value) => {
-                map.serialize_entry("value", value)?;
+                map.serialize_entry("ref_value", value)?;
             }
             Location::Body => {
                 map.serialize_entry("section", "body")?;
@@ -249,10 +250,13 @@ pub fn all_parents(locs: HashSet<Location>) -> HashSet<Location> {
 }
 
 /// a newtype representing tags, to make sure they are tagified when inserted
-#[derive(Debug, Clone, Default)]
-pub struct Tags(pub HashMap<String, HashSet<Location>>);
+#[derive(Debug, Clone)]
+pub struct Tags {
+    pub tags: HashMap<String, HashSet<Location>>,
+    vtags: VirtualTags,
+}
 
-fn tagify(tag: &str) -> String {
+pub fn tagify(tag: &str) -> String {
     fn filter_char(c: char) -> char {
         if c.is_ascii_alphanumeric() || c == ':' {
             c
@@ -263,22 +267,64 @@ fn tagify(tag: &str) -> String {
     tag.to_lowercase().chars().map(filter_char).collect()
 }
 
+impl Serialize for Tags {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_seq(self.tags.keys())
+    }
+}
+
 impl Tags {
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+    pub fn new(vtags: &VirtualTags) -> Self {
+        Tags {
+            tags: HashMap::new(),
+            vtags: vtags.clone(),
+        }
     }
 
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!(self.0.keys().collect::<Vec<_>>())
+    /// Create a new Tags with vtags from existing tag
+    pub fn new_with_vtags(&self) -> Self {
+        Tags {
+            tags: HashMap::new(),
+            vtags: self.vtags.clone(),
+        }
+    }
+
+    pub fn with_raw_tags(mut self, rawtags: RawTags, loc: &Location) -> Self {
+        for tag in rawtags.0.into_iter() {
+            self.insert(tag.as_str(), loc.clone());
+        }
+
+        self
+    }
+
+    pub fn with_raw_tags_locs(mut self, rawtags: RawTags, loc: &HashSet<Location>) -> Self {
+        for tag in rawtags.0.into_iter() {
+            self.insert_locs(tag.as_str(), loc.clone());
+        }
+
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tags.is_empty()
     }
 
     pub fn insert(&mut self, value: &str, loc: Location) {
         let locs = std::iter::once(loc).collect();
-        self.0.insert(tagify(value), locs);
+        self.insert_locs(value, locs);
     }
 
     pub fn insert_locs(&mut self, value: &str, locs: HashSet<Location>) {
-        self.0.insert(tagify(value), locs);
+        let tag = tagify(value);
+        if let Some(vtags) = self.vtags.get(&tag) {
+            for vtag in vtags {
+                self.tags.insert(vtag.clone(), locs.clone());
+            }
+        }
+        self.tags.insert(tagify(value), locs);
     }
 
     pub fn insert_qualified(&mut self, id: &str, value: &str, loc: Location) {
@@ -286,47 +332,57 @@ impl Tags {
         self.insert_qualified_locs(id, value, locs);
     }
 
-    pub fn insert_qualified_locs(&mut self, id: &str, value: &str, locs: HashSet<Location>) {
+    fn qualified(id: &str, value: &str) -> String {
         let mut to_insert = id.to_string();
         to_insert.push(':');
         to_insert += &tagify(value);
-        self.0.insert(to_insert, locs);
+        to_insert
     }
 
+    pub fn insert_qualified_locs(&mut self, id: &str, value: &str, locs: HashSet<Location>) {
+        self.insert_locs(&Self::qualified(id, value), locs);
+    }
+
+    /// **Warning**: Does not keep vtags of other
     pub fn extend(&mut self, other: Self) {
-        self.0.extend(other.0)
+        self.tags.extend(other.tags)
     }
 
-    pub fn from_slice(slice: &[(String, Location)]) -> Self {
-        Tags(
-            slice
-                .iter()
-                .map(|(s, l)| (tagify(s), std::iter::once(l.clone()).collect()))
-                .collect(),
-        )
+    pub fn from_slice(slice: &[(String, Location)], vtags: VirtualTags) -> Self {
+        let mut out = Tags {
+            tags: HashMap::new(),
+            vtags,
+        };
+
+        for (value, loc) in slice.iter() {
+            out.insert(value, loc.clone())
+        }
+
+        out
     }
 
     pub fn contains(&self, s: &str) -> bool {
-        self.0.contains_key(s)
+        self.tags.contains_key(s)
     }
 
     pub fn get(&self, s: &str) -> Option<&HashSet<Location>> {
-        self.0.get(s)
+        self.tags.get(s)
     }
 
     pub fn as_hash_ref(&self) -> &HashMap<String, HashSet<Location>> {
-        &self.0
+        &self.tags
     }
 
     pub fn selector(&self) -> String {
-        let mut tvec: Vec<&str> = self.0.keys().map(|s| s.as_ref()).collect();
+        let mut tvec: Vec<&str> = self.tags.keys().map(|s| s.as_ref()).collect();
         tvec.sort_unstable();
         tvec.join("*")
     }
 
+    /// **Warning**: tags implied by vtags are not kept if not present in `other`
     pub fn intersect(&self, other: &HashSet<String>) -> HashMap<String, HashSet<Location>> {
         let mut out = HashMap::new();
-        for (k, v) in &self.0 {
+        for (k, v) in &self.tags {
             if other.contains(k) {
                 out.insert(k.clone(), v.clone());
             }
@@ -335,19 +391,52 @@ impl Tags {
         out
     }
 
+    /// **Warning**: tags implied by vtags are not kept if not present in `other`
     pub fn intersect_tags(&self, other: &HashSet<String>) -> Self {
-        Tags(self.intersect(other))
+        let tags = self.intersect(other);
+        Tags {
+            tags,
+            vtags: self.vtags.clone(),
+        }
     }
 
     pub fn has_intersection(&self, other: &HashSet<String>) -> bool {
-        other.iter().any(|t| self.0.contains_key(t))
+        other.iter().any(|t| self.tags.contains_key(t))
     }
 
     pub fn merge(&mut self, other: Self) {
-        for (k, v) in other.0.into_iter() {
-            let e = self.0.entry(k).or_default();
+        for (k, v) in other.tags.into_iter() {
+            let e = self.tags.entry(k).or_default();
             (*e).extend(v);
         }
+    }
+
+    pub fn inner(&self) -> &HashMap<String, HashSet<Location>> {
+        &self.tags
+    }
+
+    pub fn serialize_with_extra<'t, S, I, Q>(
+        &self,
+        serializer: S,
+        extra: I,
+        extra_qualified: Q,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+        I: Iterator<Item = &'t str>,
+        Q: Iterator<Item = (&'t str, String)>,
+    {
+        let mut sq = serializer.serialize_seq(None)?;
+        for t in self.tags.keys() {
+            sq.serialize_element(t)?;
+        }
+        for t in extra {
+            sq.serialize_element(&tagify(t))?;
+        }
+        for (k, v) in extra_qualified {
+            sq.serialize_element(&Self::qualified(k, &v))?;
+        }
+        sq.end()
     }
 }
 
@@ -381,18 +470,6 @@ impl RawTags {
     pub fn has_intersection(&self, other: &HashSet<String>) -> bool {
         self.intersect(other).next().is_some()
     }
-
-    pub fn with_loc(self, locations: &Location) -> Tags {
-        Tags(
-            self.0
-                .into_iter()
-                .map(|k| (k, std::iter::once(locations.clone()).collect()))
-                .collect(),
-        )
-    }
-    pub fn with_locs(self, locations: &HashSet<Location>) -> Tags {
-        Tags(self.0.into_iter().map(|k| (k, locations.clone())).collect())
-    }
 }
 
 impl std::iter::FromIterator<String> for RawTags {
@@ -411,21 +488,85 @@ mod test {
 
     #[test]
     fn tag_selector() {
-        let tags = Tags::from_slice(&[
-            ("ccc".to_string(), Location::Request),
-            ("bbb".to_string(), Location::Request),
-            ("aaa".to_string(), Location::Request),
-        ]);
+        let tags = Tags::from_slice(
+            &[
+                ("ccc".to_string(), Location::Request),
+                ("bbb".to_string(), Location::Request),
+                ("aaa".to_string(), Location::Request),
+            ],
+            VirtualTags::default(),
+        );
         assert_eq!(tags.selector(), "aaa*bbb*ccc");
     }
 
     #[test]
     fn tag_selector_r() {
-        let tags = Tags::from_slice(&[
-            ("aaa".to_string(), Location::Request),
-            ("ccc".to_string(), Location::Request),
-            ("bbb".to_string(), Location::Request),
-        ]);
+        let tags = Tags::from_slice(
+            &[
+                ("aaa".to_string(), Location::Request),
+                ("ccc".to_string(), Location::Request),
+                ("bbb".to_string(), Location::Request),
+            ],
+            VirtualTags::default(),
+        );
         assert_eq!(tags.selector(), "aaa*bbb*ccc");
+    }
+
+    #[test]
+    fn insert_vtag() {
+        let vtags = VirtualTags::new(HashMap::from([("tag1".to_string(), Vec::from(["vtag1".to_string()]))]));
+
+        let tags = Tags::from_slice(
+            &[
+                ("tag1".to_string(), Location::Request),
+                ("tag2".to_string(), Location::Request),
+            ],
+            vtags,
+        );
+
+        assert_eq!(tags.selector(), "tag1*tag2*vtag1");
+    }
+
+    #[test]
+    fn location_no_overlap() {
+        use Location::*;
+        let locations = &[
+            PathpartValue(5, "foo".to_string()),
+            UriArgumentValue("foo".to_string(), "foo".to_string()),
+            RefererArgumentValue("foo".to_string(), "foo".to_string()),
+            Request,
+            Attributes,
+            Ip,
+            Uri,
+            Path,
+            Pathpart(5),
+            RefererPath,
+            RefererPathpart(5),
+            RefererPathpartValue(5, "foo".to_string()),
+            UriArgument("foo".to_string()),
+            RefererArgument("foo".to_string()),
+            Body,
+            BodyArgument("foo".to_string()),
+            BodyArgumentValue("foo".to_string(), "foo".to_string()),
+            Headers,
+            Header("foo".to_string()),
+            HeaderValue("foo".to_string(), "foo".to_string()),
+            Cookies,
+            Cookie("foo".to_string()),
+            CookieValue("foo".to_string(), "foo".to_string()),
+        ];
+        for location in locations {
+            let res = serde_json::to_string(location).unwrap();
+            let parts = res[1..res.len() - 1].split(',').collect::<Vec<_>>();
+            let mut known = HashSet::new();
+            for part in parts {
+                if let Some((l, _)) = part.split_once(':') {
+                    if known.contains(l) {
+                        panic!("Encoding with repeated keys: {} -> {:?}", res, location);
+                    }
+                    known.insert(l.to_string());
+                }
+            }
+        }
     }
 }

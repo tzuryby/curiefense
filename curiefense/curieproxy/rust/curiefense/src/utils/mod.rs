@@ -1,18 +1,23 @@
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use maxminddb::geoip2::model;
 use serde_json::json;
 use sha2::{Digest, Sha224};
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::Arc;
 
 pub mod decoders;
+pub mod json;
 pub mod templating;
 pub mod url;
 
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
+use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
+use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
@@ -292,23 +297,28 @@ pub struct RInfo {
     pub geoip: GeoIp,
     pub qinfo: QueryInfo,
     pub host: String,
-    pub policyid: String,
-    pub entryid: String,
+    pub secpolicy: Arc<SecurityPolicy>,
+    pub container_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct RequestInfo {
+    pub timestamp: DateTime<Utc>,
     pub cookies: RequestField,
     pub headers: RequestField,
     pub rinfo: RInfo,
     pub session: String,
+    pub session_ids: HashMap<String, String>,
 }
 
 impl RequestInfo {
     pub fn into_json(self, tags: Tags) -> serde_json::Value {
         let mut v = self.into_json_notags();
         if let Some(m) = v.as_object_mut() {
-            m.insert("tags".to_string(), tags.to_json());
+            m.insert(
+                "tags".to_string(),
+                serde_json::to_value(tags).unwrap_or(serde_json::Value::Null),
+            );
         }
         v
     }
@@ -328,10 +338,10 @@ impl RequestInfo {
         .collect();
         attrs.extend(self.rinfo.meta.extra.into_iter().map(|(k, v)| (k, Some(v))));
         serde_json::json!({
-            "headers": self.headers.to_json(),
-            "cookies": self.cookies.to_json(),
-            "args": self.rinfo.qinfo.args.to_json(),
-            "path": self.rinfo.qinfo.path_as_map.to_json(),
+            "headers": self.headers,
+            "cookies": self.cookies,
+            "args": self.rinfo.qinfo.args,
+            "path": self.rinfo.qinfo.path_as_map,
             "attributes": attrs,
             "geo": geo
         })
@@ -349,17 +359,26 @@ pub struct InspectionResult {
 }
 
 impl InspectionResult {
-    pub fn log_json(&self) -> String {
-        let dtags = Tags::default();
+    pub async fn log_json(&self, proxy: HashMap<String, String>) -> Vec<u8> {
+        let dtags = Tags::new(&VirtualTags::default());
         let tags: &Tags = match &self.tags {
             Some(t) => t,
             None => &dtags,
         };
 
         match &self.rinfo {
-            None => "{}".to_string(),
-            Some(rinfo) => self.decision.log_json(rinfo, tags, &self.logs, &self.stats),
+            None => b"{}".to_vec(),
+            Some(rinfo) => {
+                self.decision
+                    .log_json(rinfo, tags, &self.stats, &self.logs, proxy)
+                    .await
+            }
         }
+    }
+
+    // blocking version of log_json
+    pub fn log_json_block(&self, proxy: HashMap<String, String>) -> Vec<u8> {
+        async_std::task::block_on(self.log_json(proxy))
     }
 
     pub fn from_analyze(logs: Logs, dec: AnalyzeResult) -> Self {
@@ -472,37 +491,34 @@ impl<'a> RawRequest<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn map_request(
     logs: &mut Logs,
-    policyid: &str,
-    entryid: &str,
-    session_sel: &[RequestSelector],
-    seed: &[u8],
-    dec: &[Transformation],
-    accepted_types: &[ContentType],
-    referer_as_uri: bool,
-    max_depth: usize, // if set to 0, the body will not be parsed
-    ignore_body: bool,
+    secpolicy: Arc<SecurityPolicy>,
+    container_name: Option<String>,
     raw: &RawRequest,
+    ts: Option<DateTime<Utc>>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
     logs.debug("map_request starts");
-    let (headers, cookies) = map_headers(dec, &raw.headers);
+    let (headers, cookies) = map_headers(&secpolicy.content_filter_profile.decoding, &raw.headers);
     logs.debug("headers mapped");
     let geoip = find_geoip(logs, raw.ipstr.clone());
     logs.debug("geoip computed");
     let mut qinfo = map_args(
         logs,
-        dec,
+        &secpolicy.content_filter_profile.decoding,
         &raw.meta.path,
         headers.get_str("content-type"),
-        accepted_types,
-        if ignore_body { None } else { raw.mbody },
-        max_depth,
+        &secpolicy.content_filter_profile.content_type,
+        if secpolicy.content_filter_profile.ignore_body {
+            None
+        } else {
+            raw.mbody
+        },
+        secpolicy.content_filter_profile.max_body_depth,
     );
-    if referer_as_uri {
+    if secpolicy.content_filter_profile.referer_as_uri {
         if let Some(rf) = headers.get("referer") {
             parse_uri(
                 &mut qinfo.args,
@@ -519,38 +535,51 @@ pub fn map_request(
         geoip,
         qinfo,
         host,
-        policyid: policyid.to_string(),
-        entryid: entryid.to_string(),
+        secpolicy: secpolicy.clone(),
+        container_name,
     };
 
     let dummy_reqinfo = RequestInfo {
+        timestamp: ts.unwrap_or_else(Utc::now),
         cookies,
         headers,
         rinfo,
         session: String::new(),
+        session_ids: HashMap::new(),
     };
 
-    let raw_session = (if session_sel.is_empty() {
+    let raw_session = (if secpolicy.session.is_empty() {
         &[RequestSelector::Ip]
     } else {
-        session_sel
+        secpolicy.session.as_slice()
     })
     .iter()
     .filter_map(|s| select_string(&dummy_reqinfo, s, None))
     .next()
     .unwrap_or_else(|| "???".to_string());
 
-    let mut hasher = Sha224::new();
-    hasher.update(seed);
-    hasher.update(raw_session.as_bytes());
-    let bytes = hasher.finalize();
-    let session = format!("{:x}", bytes);
+    let session_string = |s: &str| {
+        let mut hasher = Sha224::new();
+        hasher.update(&secpolicy.content_filter_profile.masking_seed);
+        hasher.update(s.as_bytes());
+        let bytes = hasher.finalize();
+        format!("{:x}", bytes)
+    };
+
+    let session = session_string(&raw_session);
+    let session_ids = secpolicy
+        .session_ids
+        .iter()
+        .filter_map(|s| select_string(&dummy_reqinfo, s, None).map(|str| (s.to_string(), session_string(&str))))
+        .collect();
 
     RequestInfo {
+        timestamp: dummy_reqinfo.timestamp,
         cookies: dummy_reqinfo.cookies,
         headers: dummy_reqinfo.headers,
         rinfo: dummy_reqinfo.rinfo,
         session,
+        session_ids,
     }
 }
 
@@ -587,8 +616,8 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Company => reqinfo.rinfo.geoip.company.as_ref().map(Selected::Str),
         RequestSelector::Asn => reqinfo.rinfo.geoip.asn.map(Selected::U32),
         RequestSelector::Tags => tags.map(|tags| Selected::OStr(tags.selector())),
-        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.policyid)),
-        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.entryid)),
+        RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.policy.id)),
+        RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.entry.id)),
     }
 }
 
@@ -719,7 +748,9 @@ mod tests {
             mbody: None,
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
-        let ri = map_request(&mut logs, "a", "b", &[], b"CHANGEME", &[], &[], true, 100, false, &raw);
+        let mut secpol = SecurityPolicy::empty();
+        secpol.content_filter_profile.referer_as_uri = true;
+        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None);
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

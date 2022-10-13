@@ -68,6 +68,8 @@ services:
     restart: always
     volumes:
       - curieproxy_config:/cf-config
+      - ./filebeat/ilm.json:/usr/share/filebeat/ilm.json
+      - ./filebeat/template.json:/usr/share/filebeat/template.json
     environment:
       - ENVOY_UID
       - XFF_TRUSTED_HOPS
@@ -75,6 +77,15 @@ services:
       - TARGET_PORT_A=8080
       - TARGET_ADDRESS_B=juiceshop
       - TARGET_PORT_B=3000
+      - FILEBEAT
+      - FILEBEAT_LOG_LEVEL
+      - AGGREGATED_LOG_FILE
+      - NGINX_ACCESS_LOG
+      - NGINX_ERROR_LOG
+      - CF_LOG_LEVEL
+      - NGINX_LOG_LEVEL
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - KIBANA_URL=http://kibana:5601
     networks:
       curiemesh:
         aliases:

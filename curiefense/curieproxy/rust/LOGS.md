@@ -6,14 +6,16 @@ in ElasticSearch.
 The log file is a JSON encoded data structure, where the top level is an object with the following members:
 
  * `timestamp`: time when the request started to be processed, encoded as a string,
+ * `curiesession`: a session identifier (a string),
+ * `curiesession_ids`: extra session identifiers (a list of NV items, see below),
  * `request_id`: unique identifier for the request, currently only provided by envoy,
  * `security_config`: see the *security config* section,
- * `arguments`: an object where the keys are the argument names, and the values argument values,
+ * `arguments`: a list of NV items representing arguments,
  * `path`: query path,
- * `path_parts`: an object where the keys are the path part identifiers, and the values are path parts,
+ * `path_parts`: a list of NV items representing path parts,
  * `authority`: the authority meta data, if it exists, or the *host* header,
- * `cookies`: an object where the keys are the cookie names, and the values are cookie values,
- * `headers`: an object where the keys are the header names, and the values are header values,
+ * `cookies`: a list of NV items representing cookies,
+ * `headers`: a list of NV items representing headers,
  * `tags`: a list of strings, representing the request tags,
  * `uri`: request URI, as a string,
  * `ip`: request IP, as a string,
@@ -28,7 +30,7 @@ The log file is a JSON encoded data structure, where the top level is an object 
     * 4: rate limit stage,
     * 5: ACL stage,
     * 6: content filter stage.
- * `trigger_counters`: an object with keys of the form:
+ * `trigger_counters`: a list of KV items of the form:
     * `TRIGGER`: length of the `TRIGGER` list,
     * `TRIGGER_active`: amount of items in the `TRIGGER` list that would cause a block.
     Here, `TRIGGER` can be `acl`, `global_filters`, `flow_control`, `rate_limit` or `content_filters`.
@@ -42,6 +44,31 @@ The log file is a JSON encoded data structure, where the top level is an object 
  * `reason`: a string describing why a decision was reached,
  * `profiling`: for now, an empty object,
  * `biometrics`: for now, an empty object.
+
+## list of NV items
+
+This represents a dictionary as a list of name/values items, in order to be easier to query by databases. Example:
+
+```json
+  "headers": [
+    {
+      "name": "user-agent",
+      "value": "curl/7.68.0"
+    },
+    {
+      "name": "x-forwarded-for",
+      "value": "199.0.0.1"
+    },
+    {
+      "name": "host",
+      "value": "www.example.com"
+    },
+    {
+      "name": "accept",
+      "value": "*/*"
+    }
+  ]
+```
 
 ## Security configuration object
 
@@ -67,7 +94,8 @@ The `active` key is also always present, and is `false` for decisions that did t
 
 The following entries are all optional:
 
- * `section`, can be `attributes`, `ip`, `uri`, `referer_path`, `path`, `body`, `headers` or `body`;
+ * `request_element`, can be `ip`, `uri`, `referer_path`
+ * `section`, can be `attributes`, `path`, `body`, `headers` or `body`;
  * `part`, indicate a "path part". Path parts are elements separated by slashes;
  * `name`, name of the argument, header or cookie that triggered the response;
  * `value`, actual value that triggered the response.
@@ -153,15 +181,18 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
 ```json
 {
   "acl_triggers": [],
-  "arguments": {
-    "v": "xp_cmdshell"
-  },
-  "authority": "www.example.com",
-  "biometrics": {},
+  "arguments": [
+    {
+      "name": "lapin",
+      "value": "xp_cmdshell"
+    }
+  ],
+  "authority": "example.com",
+  "biometric": {},
   "content_filter_triggers": [
     {
       "active": true,
-      "name": "v",
+      "name": "lapin",
       "risk_level": 5,
       "ruleid": "100016",
       "section": "uri",
@@ -169,112 +200,135 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
       "value": "xp_cmdshell"
     }
   ],
-  "cookies": {},
-  "flow_control_triggers": [],
-  "global_filter_triggers": [],
-  "headers": {
-    "accept": "*/*",
-    "test": "stsd",
-    "user-agent": "curl/7.68.0",
-    "x-envoy-external-address": "172.24.0.1",
-    "x-forwarded-for": "199.0.0.1,172.24.0.1",
-    "x-forwarded-proto": "http",
-    "x-request-id": "2b486002-5f3a-49cf-85fb-7dc36c7408c7"
-  },
+  "cookies": [],
+  "curiesession": "50d7a17f95cd53700ab8af62f2faa54a570bfd5462c04bd1146750dc",
+  "curiesession_ids": [
+    {
+      "name": "ip",
+      "value": "50d7a17f95cd53700ab8af62f2faa54a570bfd5462c04bd1146750dc"
+    },
+    {
+      "name": "header_foo",
+      "value": "871b96ad16b704cde4b95bc6b52db116bfbf96c266d8daaf41646580"
+    },
+    {
+      "name": "argument_lapin",
+      "value": "9d23728b5d02834e40489ae9e0a355a6aedbd871ef680985b27a3841"
+    }
+  ],
+  "global_filter_triggers": [
+    {
+      "active": false,
+      "id": "xlbp148c",
+      "name": "API Discovery"
+    }
+  ],
+  "headers": [
+    {
+      "name": "user-agent",
+      "value": "curl/7.68.0"
+    },
+    {
+      "name": "x-forwarded-for",
+      "value": "199.0.0.1"
+    },
+    {
+      "name": "host",
+      "value": "www.example.com"
+    },
+    {
+      "name": "accept",
+      "value": "*/*"
+    },
+    {
+      "name": "foo",
+      "value": "DQSSDD"
+    }
+  ],
   "ip": "199.0.0.1",
   "logs": [
-    "D 1µs Inspection init",
-    "D 291µs Inspection starts (grasshopper active: true)",
-    "D 325µs CFGLOAD logs start",
-    "D 3485219µs Loaded profile __default__ with 188 rules",
-    "D 340µs CFGLOAD logs end",
-    "D 349µs Selected hostmap default entry",
-    "D 356µs Selected hostmap entry default",
-    "D 398µs map_request starts",
-    "D 477µs headers mapped",
-    "D 714µs geoip computed",
-    "D 789µs uri parsed",
-    "D 790µs body parsed",
-    "D 790µs args mapped",
-    "D 1197µs request tagged",
-    "D 1249µs challenge phase2 ignored",
-    "D 1257µs flow checks done",
-    "D 1259µs no limits to check",
-    "D 1263µs limit checks done (0 limits)",
-    "D 1378µs ACL result: Match { bot: None, human: None }",
-    "D 1717µs matching content filter signatures: true",
-    "D 1736µs signature matched [0..11] ContentFilterRule { id: \"100016\", operand: \"xp_(makecab|cmdshell|execresultset|regaddmultistring|regread|enumdsn|availablemedia|regdeletekey|loginconfig|regremovemultistring|regwrite|regdeletevalue|dirtree|regenumkeys|filelist|terminate|servicecontrol|ntsec_enumdomains|terminate_process|ntsec|regenumvalues|cmdshell)\", risk: 5, category: \"sqli\", subcategory: \"built-in function invocation\", tags: {} }",
-    "D 1889µs Content Filter checks done"
+    "D 23µs Loading configuration from /cf-config/current/config",
+    "D 3623004µs Loaded profile __default__ with 188 rules"
   ],
-  "method": "GET",
-  "path": "/api/ds/",
-  "path_parts": {
-    "part1": "api",
-    "part2": "ds",
-    "part2:decoded": "v",
-    "path": "/api/ds/"
-  },
+  "method": "POST",
+  "path": "/login",
+  "path_parts": [
+    {
+      "name": "part1",
+      "value": "login"
+    },
+    {
+      "name": "path",
+      "value": "/login"
+    }
+  ],
   "processing_stage": 6,
   "profiling": {},
-  "proxy": {
-    "location": [
-      37.751,
-      -97.822
-    ]
-  },
+  "proxy": [
+    {
+      "name": "geo_long",
+      "value": 37.751
+    },
+    {
+      "name": "geo_lat",
+      "value": -97.822
+    }
+  ],
   "rate_limit_triggers": [],
-  "reason": "blocking - content filter 100016[lvl5] - [URI argument v=xp_cmdshell]",
+  "reason": null,
   "request_id": null,
-  "response_code": 403,
+  "response_code": 503,
   "security_config": {
-    "acl_active": true,
-    "cf_active": true,
+    "acl_active": false,
+    "cf_active": false,
     "cf_rules": 188,
     "global_filters_active": 1,
     "rate_limit_rules": 0,
-    "revision": "0dc9b177e5858d0a26b8cb408fe1fd357cb84d65"
+    "revision": "216e288ba637dbaacec03d97cbb94b183d8b1c1f"
   },
   "tags": [
-    "aclid:--default--",
+    "flowc",
     "cf-rule-subcategory:built-in-function-invocation",
-    "cf-rule-category:sqli",
-    "api",
-    "geo-asn:1239",
-    "geo-continent-name:north-america",
-    "geo-org:sprintlink",
-    "geo-city:nil",
-    "aclname:default-acl",
-    "ip:199-0-0-1",
-    "cf-rule-risk:5",
     "cf-rule-id:100016",
-    "securitypolicy:default-entry",
+    "headers:5",
+    "geo-org:sprintlink",
+    "ip:199-0-0-1",
     "host:www-example-com",
-    "args:1",
-    "geo-region:nil",
-    "contentfiltername:default-contentfilter",
-    "contentfilterid:--default--",
-    "headers:7",
-    "bot",
-    "all",
-    "cookies:0",
-    "geo-country:united-states",
-    "geo-subregion:nil",
+    "aclname:default-acl",
+    "cf-rule-category:sqli",
+    "securitypolicy:default-entry",
+    "geo-continent-name:north-america",
     "securitypolicy-entry:default",
-    "geo-continent-code:na"
+    "aclid:--default--",
+    "geo-country:united-states",
+    "cookies:0",
+    "api",
+    "geo-region:nil",
+    "geo-city:nil",
+    "args:1",
+    "contentfilterid:--default--",
+    "geo-asn:1239",
+    "contentfiltername:default-contentfilter",
+    "flow-control-policy-example",
+    "all",
+    "cf-rule-risk:5",
+    "geo-continent-code:na",
+    "geo-subregion:nil",
+    "bot",
+    "status:503",
+    "status-class:5xx"
   ],
-  "timestamp": "2022-07-15T14:35:53.757544186Z",
+  "timestamp": "2022-10-03T09:58:41.951745024Z",
   "trigger_counters": {
     "acl": 0,
     "acl_active": 0,
     "content_filters": 1,
-    "content_filters_active": 1,
-    "flow_control": 0,
-    "flow_control_active": 0,
-    "global_filters": 0,
+    "content_filters_active": 0,
+    "global_filters": 1,
     "global_filters_active": 0,
-    "rate_limit": 0,
+    "rate_limit": 1,
     "rate_limit_active": 0
   },
-  "uri": "/api/ds/?v=xp_cmdshell"
+  "uri": "/login?lapin=xp_cmdshell"
 }
 ```

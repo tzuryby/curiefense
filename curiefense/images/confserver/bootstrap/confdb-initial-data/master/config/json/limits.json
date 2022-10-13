@@ -22,6 +22,7 @@
       }
     ],
     "timeframe": 60,
-    "global": true
+    "active": false,
+    "global": false
   }
 ]

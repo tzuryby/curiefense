@@ -5,6 +5,8 @@ local sfmt = string.format
 local redis = require "resty.redis"
 
 local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 1
+local redishost = os.getenv("REDIS_HOST") or "redis"
+local redisport = os.getenv("REDIS_PORT") or 6379
 
 local function custom_response(handle, action_params)
     if not action_params then action_params = {} end
@@ -60,18 +62,15 @@ local function make_safe_headers(rheaders)
 end
 
 local function redis_connect(handle)
-    local redishost = os.getenv("REDIS_HOST") or "redis"
-    local redisport = os.getenv("REDIS_PORT") or 6379
     local red = redis:new()
-    red:set_timeout(100) -- 100ms
-    local _, err = red:connect(redishost, redisport)
-    if err then
-        handle.log(handle.ERR, err)
+    local ok, err = red:connect(redishost, redisport)
+    if not ok then
+        handle.log(handle.ERR, "connect error: " .. err)
     end
     return red
 end
 
-function session_rust_nginx.inspect(handle)
+function session_rust_nginx.inspect(handle, loglevel, secpolid)
     local ip_str = handle.var.remote_addr
 
     local rheaders, err = handle.req.get_headers()
@@ -93,10 +92,13 @@ function session_rust_nginx.inspect(handle)
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
+    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str, hops=HOPS}
 
-    local res = curiefense.inspect_request_init_hops(
-        meta, headers, body_content, ip_str, HOPS
-    )
+    if secpolid then
+        params['secpolid'] = secpolid
+    end
+
+    local res = curiefense.inspect_request_init(params)
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_init error %s", res.error))
@@ -115,7 +117,6 @@ function session_rust_nginx.inspect(handle)
             -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
             local red = redis_connect(handle)
             red:init_pipeline()
-
             for _, flow in pairs(flows) do
                 red:llen(flow.key)
             end
@@ -134,8 +135,10 @@ function session_rust_nginx.inspect(handle)
                 end
             end
             local results, redis_err = red:commit_pipeline()
-            if not results then
-                handle.log(handle.ERR, "failed to run redis calls " .. redis_err)
+            if redis_err or not results then
+                handle.log(handle.ERR, "failed to run redis calls: " .. redis_err)
+                flows = {}
+                limits = {}
             end
 
             local result_idx = 1
@@ -164,6 +167,7 @@ function session_rust_nginx.inspect(handle)
                 table.insert(rflows, flow:result(flowtype))
             end
 
+            red:init_pipeline()
             for _, limit in pairs(limits) do
                 local key = limit.key
                 local curcount = 1
@@ -185,6 +189,9 @@ function session_rust_nginx.inspect(handle)
                 end
                 table.insert(rlimits, limit:result(curcount))
             end
+            red:commit_pipeline()
+
+            red:set_keepalive(300000, 360)
         end
 
         res = curiefense.inspect_request_process(res, rflows, rlimits)
@@ -193,7 +200,7 @@ function session_rust_nginx.inspect(handle)
         end
     end
 
-    handle.ctx.request_map = res.request_map
+    handle.ctx.res = res
 
     if res.error then
         handle.log(handle.ERR, sfmt("curiefense.inspect_request_map error %s", res.error))
@@ -213,10 +220,10 @@ function session_rust_nginx.inspect(handle)
 end
 
 -- log block stage processing
-function session_rust_nginx.log(handle)
-    local request_map = handle.ctx.request_map
-    handle.ctx.request_map = nil
-    handle.var.request_map = request_map
+function session_rust_nginx.log(handle, extra)
+    local res = handle.ctx.res
+    handle.ctx.res = nil
+    handle.var.request_map = res:request_map(extra)
 end
 
 return session_rust_nginx

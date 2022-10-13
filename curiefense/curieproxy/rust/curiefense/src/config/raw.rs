@@ -66,6 +66,10 @@ pub struct RawHostMap {
     pub id: String,
     pub name: String,
     pub map: Vec<RawSecurityPolicy>,
+    #[serde(default)]
+    pub session: Vec<HashMap<String, String>>,
+    #[serde(default)]
+    pub session_ids: Vec<HashMap<String, String>>,
 }
 
 /// a mapping of the configuration file for security policies
@@ -74,8 +78,6 @@ pub struct RawHostMap {
 pub struct RawSecurityPolicy {
     #[serde(rename = "match")]
     pub match_: String,
-    #[serde(default)]
-    pub session: Vec<HashMap<String, String>>,
     pub id: Option<String>, // set to name if absent
     pub name: String,
     pub acl_profile: String,
@@ -193,6 +195,8 @@ pub struct RawLimit {
     pub pairwith: HashMap<String, String>,
     #[serde(default)]
     pub global: bool, // global flag, if true this rule applies to all profiles
+    #[serde(default)]
+    pub active: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -469,6 +473,21 @@ pub struct RawFlowStep {
     pub headers: HashMap<String, String>,
     #[serde(default)]
     pub args: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawVirtualTag {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "match")]
+    pub match_: Vec<RawVirtualTagMatch>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RawVirtualTagMatch {
+    pub vtag: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

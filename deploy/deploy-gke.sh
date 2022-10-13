@@ -4,12 +4,15 @@
 # * images built & pushed to the registry
 # * gcloud access is set up
 # * the curiefense/curiefense-helm repository is checked out in ../curiefense-helm (at the root of the public-curiefense repository)
-# * This is run on a machine or virtualenv that has pytest & curieconfctl installed
+# * This is run on a machine or virtualenv that has curieconfctl and the following python packages installed: pytest nbconvert requests_toolbelt notebook pandas matplotlib
 
 # Some parameters can be overridden, such as:
 # * DOCKER_TAG determines which image versions get deployed
 # * KUBECONFIG determines where temp credentials are saved. Useful if you want to interact with the cluster with kubectl
 # * CLUSTER_NAME defines the name of the GKE cluster -- set this to something unique to avoid interference with other users in your GCP project
+
+# Sample perf test run, from a virtualenv that has dependencies installed:
+# (venv) user@host$ KUBECONFIG=~/perftest.kube CLUSTER_NAME=perftest-run1234 DOCKER_TAG=main ./deploy-gke.sh -c -d -b -j -l -p -C
 
 BASEDIR="$(dirname "$(readlink -f "$0")")" 
 if [ -z "$KUBECONFIG" ]; then
@@ -25,7 +28,7 @@ REGION=${REGION:-us-central1-a}
 create_cluster () {
 	echo "-- Create cluster $CLUSTER_NAME --"
 	# 4 CPUs, 16GB
-	gcloud container clusters create "$CLUSTER_NAME" --num-nodes="$nbnodes" --machine-type=n2-standard-8 --region="$REGION" --cluster-version=1.20
+	gcloud container clusters create "$CLUSTER_NAME" --num-nodes="$nbnodes" --machine-type=n2-standard-8 --region="$REGION" --cluster-version=1.23
 	gcloud container clusters get-credentials --region="$REGION" "$CLUSTER_NAME"
 
 	if [ "$nbnodes" -gt 1 ]; then
@@ -157,7 +160,7 @@ locust_perftest () {
 		./locusttest.sh istio-only $REQSIZE
 	done
 	
-	echo "Generating test report..."
+	echo "Generating test report, RESULTS_DIR=$RESULTS_DIR..."
 	jupyter nbconvert --execute "$BASEDIR/../e2e/latency/Curiefense performance report locust.ipynb" --to html --template classic
 	mv "$BASEDIR/../e2e/latency/Curiefense performance report locust.html" "$BASEDIR/../e2e/latency/Curiefense performance report-$VERSION-$DATE.html"
 }

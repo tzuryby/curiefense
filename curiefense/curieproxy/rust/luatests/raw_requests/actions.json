@@ -34,6 +34,7 @@
         "aclid:--default--",
         "geo-asn:7018",
         "tagbyip",
+        "vtag-tagbyip",
         "contentfilterid:--default--",
         "status:503",
         "status-class:5xx",

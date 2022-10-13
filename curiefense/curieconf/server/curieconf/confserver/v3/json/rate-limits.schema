@@ -21,11 +21,11 @@
                 "arguments": { "type": "string" },
                 "attrs": {
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicyid", "securitypolicyentryid", "region", "subregion"]
                  },
                 "attributes":{
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicy", "securitypolicyentry"]
+                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "securitypolicyid", "securitypolicyentryid", "region", "subregion"]
                  }
             }
         }
@@ -52,6 +52,11 @@
             "type": "boolean",
             "title": "Global Rule",
             "description": "This rate limit is evaluated for every request"
+        },
+        "active": {
+            "type": "boolean",
+            "title": "Rule active",
+            "description": "This rule will only take effect when the flag is set to true"
         },
         "timeframe": {
             "type": "integer",

@@ -15,7 +15,7 @@
       "content_filter_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_",
           "type": "signature",
           "name": "arg",
