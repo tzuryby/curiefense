@@ -1,12 +1,14 @@
 [
   {
-    "id": "default",
+    "id": "challenge",
     "name": "default blocking action",
-    "type": "default"
+    "type": "challenge",
+    "tags": []
   },
   {
     "id": "monitor",
     "name": "default monitoring action",
-    "type": "monitor"
+    "type": "monitor",
+    "tags": []
   }
 ]
