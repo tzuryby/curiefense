@@ -1,4 +1,5 @@
 use async_std::sync::Mutex;
+use chrono::Utc;
 use lazy_static::lazy_static;
 use pdatastructs::hyperloglog::HyperLogLog;
 use serde::Serialize;
@@ -244,6 +245,53 @@ impl<N: Ord + std::hash::Hash + Serialize, B: Eq + std::hash::Hash> Serialize fo
     }
 }
 
+#[derive(Debug)]
+struct IntegerMetric {
+    min: i64,
+    max: i64,
+    total: i64,
+    n_sample: u64,
+}
+
+impl Default for IntegerMetric {
+    fn default() -> Self {
+        IntegerMetric {
+            min: i64::MAX,
+            max: i64::MIN,
+            total: 0,
+            n_sample: 0,
+        }
+    }
+}
+
+impl IntegerMetric {
+    fn increment(&mut self, sample: i64) {
+        self.n_sample += 1;
+        self.min = self.min.min(sample);
+        self.max = self.max.max(sample);
+        self.total += sample;
+    }
+
+    fn average(&self) -> f64 {
+        if self.n_sample == 0 {
+            return 0.0;
+        }
+        self.total as f64 / self.n_sample as f64
+    }
+
+    fn to_json(&self) -> Value {
+        if self.n_sample == 0 {
+            // Even if min and max are u64, both u64 and f64 are represented as Number is JSON.
+            return serde_json::json!({ "min": 0, "max": 0, "average": 0.0 });
+        }
+        serde_json::json!({
+            "min": self.min,
+            "max": self.max,
+            "average": self.average(),
+        })
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 pub struct AggSection {
     headers: usize,
@@ -295,7 +343,8 @@ struct AggregatedCounters {
     challenge: usize,
 
     // per request
-    _processing: u8, // TODO
+    /// Processing time in microseconds
+    processing_time: IntegerMetric,
     ip: Metric<String>,
     session: Metric<String>,
     uri: Metric<String>,
@@ -462,6 +511,11 @@ impl AggregatedCounters {
 
         self.methods.inc(rinfo.rinfo.meta.method.clone());
 
+        match Utc::now().signed_duration_since(rinfo.timestamp).num_microseconds() {
+            Some(processing_time) => self.processing_time.increment(processing_time),
+            None => (),
+        }
+
         self.ip.inc(&rinfo.rinfo.geoip.ipstr, blocked);
         self.session.inc(&rinfo.session, blocked);
         self.uri.inc(&rinfo.rinfo.qinfo.uri, blocked);
@@ -600,6 +654,7 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
         Value::Number(serde_json::Number::from(e.requests_triggered_ratelimit_report)),
     );
 
+    content.insert("processing_time".into(), e.processing_time.to_json());
     e.ip.serialize_map("ip", &mut content);
     e.session.serialize_map("session", &mut content);
     e.uri.serialize_map("uri", &mut content);
