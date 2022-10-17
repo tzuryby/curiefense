@@ -34,6 +34,13 @@ struct AggregationKey {
     secpolentryid: String,
 }
 
+/// structure used for serialization
+#[derive(Serialize)]
+struct KV<K: Serialize, V: Serialize> {
+    key: K,
+    value: V,
+}
+
 /// implementation adapted from https://github.com/blt/quantiles/blob/master/src/misra_gries.rs
 #[derive(Debug)]
 struct TopN<N> {
@@ -77,7 +84,7 @@ impl<N: Ord> TopN<N> {
     }
 }
 
-impl<N: Eq + std::fmt::Display> Serialize for TopN<N> {
+impl<N: Eq + Serialize> Serialize for TopN<N> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -86,10 +93,11 @@ impl<N: Eq + std::fmt::Display> Serialize for TopN<N> {
         let mut v = self
             .counters
             .iter()
-            .map(|(k, v)| (k.to_string(), *v))
+            .map(|(k, v)| KV { key: k, value: *v })
             .collect::<Vec<_>>();
-        v.sort_by(|a, b| b.1.cmp(&a.1));
-        serializer.collect_map(v.into_iter().take(*TOP_AMOUNT))
+        v.sort_by(|a, b| b.value.cmp(&a.value));
+
+        serializer.collect_seq(v.iter().take(*TOP_AMOUNT))
     }
 }
 
@@ -108,26 +116,30 @@ impl<N: Eq + std::hash::Hash + std::fmt::Display> Bag<N> {
         *entry += amount;
     }
 
+    fn sorted_to_value(v: Vec<(String, usize)>) -> Value {
+        Value::Array(
+            v.into_iter()
+                .take(*TOP_AMOUNT)
+                .map(|(k, v)| {
+                    let mut mp = serde_json::Map::new();
+                    mp.insert("key".into(), Value::String(k));
+                    mp.insert("value".into(), Value::Number(serde_json::Number::from(v)));
+                    Value::Object(mp)
+                })
+                .collect(),
+        )
+    }
+
     fn serialize_top(&self) -> Value {
         let mut v = self.inner.iter().map(|(k, v)| (k.to_string(), *v)).collect::<Vec<_>>();
         v.sort_by(|a, b| b.1.cmp(&a.1));
-        Value::Object(
-            v.into_iter()
-                .take(*TOP_AMOUNT)
-                .map(|(k, v)| (k, Value::Number(serde_json::Number::from(v))))
-                .collect(),
-        )
+        Self::sorted_to_value(v)
     }
 
     fn serialize_max(&self) -> Value {
         let mut v = self.inner.iter().map(|(k, v)| (k.to_string(), *v)).collect::<Vec<_>>();
         v.sort_by(|a, b| b.0.cmp(&a.0));
-        Value::Object(
-            v.into_iter()
-                .take(*TOP_AMOUNT)
-                .map(|(k, v)| (k, Value::Number(serde_json::Number::from(v))))
-                .collect(),
-        )
+        Self::sorted_to_value(v)
     }
 }
 
@@ -136,7 +148,7 @@ impl<N: Serialize + Eq + std::hash::Hash> Serialize for Bag<N> {
     where
         S: serde::Serializer,
     {
-        self.inner.serialize(serializer)
+        serializer.collect_seq(self.inner.iter().map(|(k, v)| KV { key: k, value: v }))
     }
 }
 
@@ -174,7 +186,7 @@ impl<T: Ord + std::hash::Hash + Clone> Metric<T> {
     }
 }
 
-impl<T: Eq + Clone + std::hash::Hash + std::fmt::Display> Metric<T> {
+impl<T: Eq + Clone + std::hash::Hash + Serialize> Metric<T> {
     fn serialize_map(&self, tp: &str, mp: &mut serde_json::Map<String, Value>) {
         mp.insert(
             format!("unique_{}", tp),
@@ -214,7 +226,7 @@ impl<N: Eq + std::hash::Hash, B: Eq + std::hash::Hash> UniqueTopNBy<N, B> {
     }
 }
 
-impl<N: Ord + std::hash::Hash + std::fmt::Display, B: Eq + std::hash::Hash> Serialize for UniqueTopNBy<N, B> {
+impl<N: Ord + std::hash::Hash + Serialize, B: Eq + std::hash::Hash> Serialize for UniqueTopNBy<N, B> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -222,10 +234,13 @@ impl<N: Ord + std::hash::Hash + std::fmt::Display, B: Eq + std::hash::Hash> Seri
         let mut content = self
             .inner
             .iter()
-            .map(|(n, lgs)| (n.to_string(), lgs.count()))
+            .map(|(n, lgs)| KV {
+                key: n,
+                value: lgs.count(),
+            })
             .collect::<Vec<_>>();
-        content.sort_by(|a, b| b.1.cmp(&a.1));
-        serializer.collect_map(content.into_iter().take(*TOP_AMOUNT))
+        content.sort_by(|a, b| b.value.cmp(&a.value));
+        serializer.collect_seq(content.into_iter().take(*TOP_AMOUNT))
     }
 }
 
@@ -241,6 +256,7 @@ pub struct AggSection {
 #[derive(Debug, Default)]
 struct AggregatedCounters {
     status: Bag<u32>,
+    status_classes: Bag<u8>,
     methods: Bag<String>,
     _dbytes: usize,
     _ubytes: usize,
@@ -441,6 +457,7 @@ impl AggregatedCounters {
 
         if let Some(code) = rcode {
             self.status.inc(code);
+            self.status_classes.inc((code / 100) as u8);
         }
 
         self.methods.inc(rinfo.rinfo.meta.method.clone());
@@ -494,12 +511,7 @@ impl AggregatedCounters {
 
 fn serialize_counters(e: &AggregatedCounters) -> Value {
     let mut content = serde_json::Map::new();
-    for (k, v) in &e.status.inner {
-        content.insert(k.to_string(), Value::Number(serde_json::Number::from(*v)));
-    }
-    for (k, v) in &e.methods.inner {
-        content.insert(k.to_string(), Value::Number(serde_json::Number::from(*v)));
-    }
+
     content.insert("hits".into(), Value::Number(serde_json::Number::from(e.hits)));
     content.insert("blocks".into(), Value::Number(serde_json::Number::from(e.blocks)));
     content.insert("report".into(), Value::Number(serde_json::Number::from(e.report)));
@@ -594,6 +606,10 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     e.user_agent.serialize_map("user_agent", &mut content);
     e.country.serialize_map("country", &mut content);
     e.asn.serialize_map("asn", &mut content);
+
+    content.insert("top_status".into(), e.status.serialize_top());
+    content.insert("top_status_classes".into(), e.status_classes.serialize_top());
+    content.insert("top_methods".into(), e.methods.serialize_top());
 
     content.insert(
         "top_tags".into(),
