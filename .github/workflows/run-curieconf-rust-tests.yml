@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Test Suite
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout sources
@@ -36,5 +36,5 @@ jobs:
 
       - name: Run cargo tests
         working-directory: ./curiefense/curieproxy/rust
-        run: 'cargo test'
+        run: 'cargo test --exclude curiefense-lua --workspace'
 
