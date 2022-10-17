@@ -1,8 +1,15 @@
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001
 static_resources:
   listeners:
-  - name: main
+  - name: listener_0
     address:
       socket_address:
+        protocol: TCP
         address: 0.0.0.0
         port_value: 80
     filter_chains:
@@ -10,6 +17,8 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          scheme_header_transformation:
+            scheme_to_overwrite: https
           stat_prefix: ingress_http
           codec_type: auto
           use_remote_address: true
@@ -41,16 +50,18 @@ static_resources:
           - name: envoy.filters.http.lua
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-              inline_code: |
-                local session = require "lua.session_envoy"
-                function envoy_on_request(handle)
-                  session.inspect(handle)
-                end
-                function envoy_on_response(handle)
-                  session.on_response(handle)
-                end
+              default_source_code:
+                inline_string: |
+                  local session = require "lua.session_envoy"
+                  function envoy_on_request(handle)
+                    session.inspect(handle)
+                  end
+                  function envoy_on_response(handle)
+                    session.on_response(handle)
+                  end
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   - name: secondary
     address:
@@ -94,13 +105,15 @@ static_resources:
           - name: envoy.filters.http.lua
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-              inline_code: |
-                local session = require "lua.session_envoy"
-                function envoy_on_request(handle)
-                  session.inspect(handle)
-                end
-                function envoy_on_response(handle)
-                  session.on_response(handle)
-                end
+              default_source_code:
+                inline_string: |
+                  local session = require "lua.session_envoy"
+                  function envoy_on_request(handle)
+                    session.inspect(handle)
+                  end
+                  function envoy_on_response(handle)
+                    session.on_response(handle)
+                  end
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

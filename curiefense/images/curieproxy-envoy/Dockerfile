@@ -1,7 +1,6 @@
 ARG RUSTBIN_TAG=latest
 FROM curiefense/curiefense-rustbuild-bionic:${RUSTBIN_TAG} AS rustbin
-FROM curiefense/envoy-cf:8218a88a1ae76b7657ae226e5542e6f4058d9921 AS envoy-cf
-FROM envoyproxy/envoy:v1.21.1
+FROM envoyproxy/envoy:v1.23.1
 
 RUN apt-get update && \
     apt-get -qq -y --no-install-recommends install jq luarocks libpcre2-dev libgeoip-dev \
@@ -21,9 +20,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.13.3-amd64.deb && dpkg -i filebeat-7.13.3-amd64.deb && rm filebeat-7.13.3-amd64.deb
-
-# Overwrite stripped envoy with full symbol
-COPY --from=envoy-cf /envoy /usr/local/bin/envoy
 
 COPY init/start_curiefense.sh /start_curiefense.sh
 COPY curieproxy/lua /lua
