@@ -1,5 +1,6 @@
 use crate::interface::stats::{BStageFlow, BStageLimit, StatsCollect};
 use crate::logs::Logs;
+use crate::redis::REDIS_KEY_PREFIX;
 use redis::aio::ConnectionManager;
 
 use crate::config::limit::Limit;
@@ -12,7 +13,7 @@ fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String
     for kpart in limit.key.iter().map(|r| select_string(reqinfo, r, Some(tags))) {
         key += &kpart?;
     }
-    Some(format!("{:X}", md5::compute(key)))
+    Some(format!("{}{:X}", *REDIS_KEY_PREFIX, md5::compute(key)))
 }
 
 #[allow(clippy::too_many_arguments)]

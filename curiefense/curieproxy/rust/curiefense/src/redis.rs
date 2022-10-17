@@ -3,6 +3,12 @@ use redis::{ConnectionAddr, ConnectionInfo, RedisConnectionInfo};
 
 lazy_static! {
     static ref RPOOL: anyhow::Result<redis::aio::ConnectionManager> = async_std::task::block_on(build_pool());
+    pub static ref REDIS_KEY_PREFIX: String = std::env::var("REDIS_KEY_PREFIX")
+        .and_then(|mut prefix| {
+            prefix.push('_');
+            Ok(prefix)
+        })
+        .unwrap_or_default();
 }
 
 /// creates an async connection to a redis server

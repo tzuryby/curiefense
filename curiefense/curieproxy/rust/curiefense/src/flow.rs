@@ -6,6 +6,7 @@ use crate::Logs;
 use crate::config::flow::{FlowElement, FlowMap, SequenceKey};
 use crate::config::matchers::RequestSelector;
 use crate::interface::{Location, Tags};
+use crate::redis::REDIS_KEY_PREFIX;
 use crate::utils::{check_selector_cond, select_string, RequestInfo};
 
 fn session_sequence_key(ri: &RequestInfo) -> SequenceKey {
@@ -23,7 +24,7 @@ fn build_redis_key(
     for kpart in key.iter() {
         tohash += &select_string(reqinfo, kpart, Some(tags))?;
     }
-    Some(format!("{:X}", md5::compute(tohash)))
+    Some(format!("{}{:X}", *REDIS_KEY_PREFIX, md5::compute(tohash)))
 }
 
 fn flow_match(reqinfo: &RequestInfo, tags: &Tags, elem: &FlowElement) -> bool {
