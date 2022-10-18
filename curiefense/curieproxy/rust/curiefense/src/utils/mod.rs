@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
+use ipnet::IpNet;
 use itertools::Itertools;
-use maxminddb::geoip2::model;
+use maxminddb::geoip2::country;
 use serde_json::json;
 use sha2::{Digest, Sha224};
 use std::collections::HashMap;
@@ -212,12 +213,13 @@ pub struct GeoIp {
     pub company: Option<String>,
     pub region: Option<String>,
     pub subregion: Option<String>,
+    pub network: Option<IpNet>,
 }
 
 impl GeoIp {
     fn to_json(&self) -> HashMap<&'static str, serde_json::Value> {
         let mut out = HashMap::new();
-        for k in &["location", "country", "continent", "city"] {
+        for k in &["location", "country", "continent", "city", "network"] {
             out.insert(*k, json!({}));
         }
 
@@ -253,6 +255,10 @@ impl GeoIp {
                 "code": self.continent_code
             }),
         );
+
+        if let Some(network) = self.network {
+            out.insert("network", json!(format!("{}", network)));
+        }
 
         out.insert("asn", json!(self.asn));
         out.insert("company", json!(self.company));
@@ -409,6 +415,7 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         company: None,
         region: None,
         subregion: None,
+        network: None,
     };
 
     let ip = match pip {
@@ -423,19 +430,19 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         mmap.as_ref().and_then(|mp| mp.get("en")).map(|s| s.to_lowercase())
     };
 
-    if let Ok(asninfo) = get_asn(ip) {
+    if let Ok((asninfo, _)) = get_asn(ip) {
         geoip.asn = asninfo.autonomous_system_number;
         geoip.company = asninfo.autonomous_system_organization.map(|s| s.to_string());
     }
 
-    let extract_continent = |g: &mut GeoIp, mcnt: Option<model::Continent>| {
+    let extract_continent = |g: &mut GeoIp, mcnt: Option<country::Continent>| {
         if let Some(continent) = mcnt {
             g.continent_code = continent.code.map(|s| s.to_string());
             g.continent_name = get_name(&continent.names);
         }
     };
 
-    let extract_country = |g: &mut GeoIp, mcnt: Option<model::Country>| {
+    let extract_country = |g: &mut GeoIp, mcnt: Option<country::Country>| {
         if let Some(country) = mcnt {
             g.in_eu = country.is_in_european_union;
             g.country_iso = country.iso_code.as_ref().map(|s| s.to_lowercase());
@@ -444,15 +451,17 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     };
 
     // first put country data in the geoip
-    if let Ok(cnty) = get_country(ip) {
+    if let Ok((cnty, network)) = get_country(ip) {
         extract_continent(&mut geoip, cnty.continent);
         extract_country(&mut geoip, cnty.country);
+        geoip.network = network;
     }
 
     // potentially overwrite some with the city data
-    if let Ok(cty) = get_city(ip) {
+    if let Ok((cty, network)) = get_city(ip) {
         extract_continent(&mut geoip, cty.continent);
         extract_country(&mut geoip, cty.country);
+        geoip.network = network;
         geoip.location = cty
             .location
             .as_ref()
