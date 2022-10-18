@@ -233,8 +233,11 @@ pub fn tag_request(
         }
     }
 
-    let network_str = rinfo.rinfo.geoip.network.map(|n| format!("{}", n));
-    tags.insert_qualified("network", network_str.as_deref().unwrap_or("nil"), Location::Ip);
+    tags.insert_qualified(
+        "network",
+        rinfo.rinfo.geoip.network.as_deref().unwrap_or("nil"),
+        Location::Ip,
+    );
 
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
