@@ -26,6 +26,7 @@
         "all",
         "geo-country:united-states",
         "ip:12-13-14-15",
+        "network:12-13-0-0-20",
         "sante",
         "securitypolicy-entry:default",
         "contentfiltername:default-contentfilter",

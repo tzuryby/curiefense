@@ -454,14 +454,14 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     if let Ok((cnty, network)) = get_country(ip) {
         extract_continent(&mut geoip, cnty.continent);
         extract_country(&mut geoip, cnty.country);
-        geoip.network = network;
+        geoip.network = network.map(|n| n.trunc());
     }
 
     // potentially overwrite some with the city data
     if let Ok((cty, network)) = get_city(ip) {
         extract_continent(&mut geoip, cty.continent);
         extract_country(&mut geoip, cty.country);
-        geoip.network = network;
+        geoip.network = network.map(|n| n.trunc());
         geoip.location = cty
             .location
             .as_ref()
