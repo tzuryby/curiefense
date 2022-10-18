@@ -4,6 +4,7 @@ use std::{collections::HashMap, str::FromStr};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RequestSelector {
     Ip,
+    Network,
     Path,
     Query,
     Uri,
@@ -51,6 +52,7 @@ impl RequestSelector {
     pub fn decode_attribute(s: &str) -> Option<Self> {
         match s {
             "ip" => Some(RequestSelector::Ip),
+            "network" => Some(RequestSelector::Network),
             "path" => Some(RequestSelector::Path),
             "query" => Some(RequestSelector::Query),
             "uri" => Some(RequestSelector::Uri),
@@ -93,6 +95,7 @@ impl std::fmt::Display for RequestSelector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RequestSelector::Ip => write!(f, "ip"),
+            RequestSelector::Network => write!(f, "network"),
             RequestSelector::Path => write!(f, "path"),
             RequestSelector::Query => write!(f, "query"),
             RequestSelector::Uri => write!(f, "uri"),

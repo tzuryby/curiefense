@@ -608,6 +608,12 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
         RequestSelector::Cookie(k) => reqinfo.cookies.get(k).map(Selected::Str),
         RequestSelector::Ip => Some(&reqinfo.rinfo.geoip.ipstr).map(Selected::Str),
+        RequestSelector::Network => reqinfo
+            .rinfo
+            .geoip
+            .network
+            .map(|n| format!("{}", n))
+            .map(Selected::OStr),
         RequestSelector::Uri => Some(&reqinfo.rinfo.qinfo.uri).map(Selected::Str),
         RequestSelector::Path => Some(&reqinfo.rinfo.qinfo.qpath).map(Selected::Str),
         RequestSelector::Query => {

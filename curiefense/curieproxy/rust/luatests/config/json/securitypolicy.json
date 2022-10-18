@@ -372,6 +372,18 @@
                 ]
             },
             {
+                "match": "^/limits/network",
+                "name": "limits network",
+                "id": "limits network",
+                "acl_profile": "__default__",
+                "content_filter_profile": "__default__",
+                "acl_active": true,
+                "content_filter_active": true,
+                "limit_ids": [
+                    "limitnetwork"
+                ]
+            },
+            {
                 "match": "^/limits/include",
                 "name": "limits simple",
                 "id": "limits simple",

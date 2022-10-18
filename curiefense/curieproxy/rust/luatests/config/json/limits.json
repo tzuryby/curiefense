@@ -501,5 +501,29 @@
       }
     ],
     "timeframe": 30
+  },
+  {
+    "description": "3 requests in 3s",
+    "exclude": [],
+    "id": "limitnetwork",
+    "include": [],
+    "key": [
+      {
+        "attrs": "network"
+      }
+    ],
+    "name": "Rate Limit Example Rule 3/3",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 3
+      }
+    ],
+    "global": false,
+    "active": true,
+    "timeframe": 3
   }
 ]
