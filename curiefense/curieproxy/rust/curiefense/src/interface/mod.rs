@@ -176,7 +176,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
     map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
     map_ser.serialize_entry("path_parts", &rinfo.rinfo.qinfo.path_as_map)?;
-    map_ser.serialize_entry("authority", &rinfo.rinfo.meta.authority)?;
+    map_ser.serialize_entry("authority", &rinfo.rinfo.host)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
     map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
