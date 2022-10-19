@@ -214,6 +214,8 @@ pub struct GeoIp {
     pub region: Option<String>,
     pub subregion: Option<String>,
     pub network: Option<String>,
+    pub is_anonymous_proxy: Option<bool>,
+    pub is_satellite_provider: Option<bool>,
 }
 
 impl GeoIp {
@@ -261,6 +263,8 @@ impl GeoIp {
         out.insert("company", json!(self.company));
         out.insert("region", json!(self.region));
         out.insert("subregion", json!(self.subregion));
+        out.insert("is_anon", json!(self.is_anonymous_proxy));
+        out.insert("is_sat", json!(self.is_satellite_provider));
 
         out
     }
@@ -413,6 +417,8 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         region: None,
         subregion: None,
         network: None,
+        is_anonymous_proxy: None,
+        is_satellite_provider: None,
     };
 
     let ip = match pip {
@@ -448,12 +454,19 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     };
 
     let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
+    let extract_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
+        if let Some(traits) = mcnt {
+            g.is_anonymous_proxy = traits.is_anonymous_proxy;
+            g.is_satellite_provider = traits.is_satellite_provider;
+        }
+    };
 
     // first put country data in the geoip
     if let Ok((cnty, network)) = get_country(ip) {
         extract_continent(&mut geoip, cnty.continent);
         extract_country(&mut geoip, cnty.country);
         extract_network(&mut geoip, network);
+        extract_traits(&mut geoip, cnty.traits);
     }
 
     // potentially overwrite some with the city data
@@ -461,6 +474,7 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         extract_continent(&mut geoip, cty.continent);
         extract_country(&mut geoip, cty.country);
         extract_network(&mut geoip, network);
+        extract_traits(&mut geoip, cty.traits);
         geoip.location = cty
             .location
             .as_ref()
