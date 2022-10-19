@@ -238,6 +238,16 @@ pub fn tag_request(
         rinfo.rinfo.geoip.network.as_deref().unwrap_or("nil"),
         Location::Ip,
     );
+    if let Some(is_anonymous_proxy) = rinfo.rinfo.geoip.is_anonymous_proxy {
+        if is_anonymous_proxy {
+            tags.insert("mm-anon", Location::Ip)
+        }
+    }
+    if let Some(is_satellite_provider) = rinfo.rinfo.geoip.is_satellite_provider {
+        if is_satellite_provider {
+            tags.insert("mm-sat", Location::Ip)
+        }
+    }
 
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
