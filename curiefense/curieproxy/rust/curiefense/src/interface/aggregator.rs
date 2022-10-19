@@ -511,9 +511,8 @@ impl AggregatedCounters {
 
         self.methods.inc(rinfo.rinfo.meta.method.clone());
 
-        match Utc::now().signed_duration_since(rinfo.timestamp).num_microseconds() {
-            Some(processing_time) => self.processing_time.increment(processing_time),
-            None => (),
+        if let Some(processing_time) = Utc::now().signed_duration_since(rinfo.timestamp).num_microseconds() {
+            self.processing_time.increment(processing_time)
         }
 
         self.ip.inc(&rinfo.rinfo.geoip.ipstr, blocked);

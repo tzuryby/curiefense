@@ -4,9 +4,9 @@ use redis::{ConnectionAddr, ConnectionInfo, RedisConnectionInfo};
 lazy_static! {
     static ref RPOOL: anyhow::Result<redis::aio::ConnectionManager> = async_std::task::block_on(build_pool());
     pub static ref REDIS_KEY_PREFIX: String = std::env::var("REDIS_KEY_PREFIX")
-        .and_then(|mut prefix| {
+        .map(|mut prefix| {
             prefix.push('_');
-            Ok(prefix)
+            prefix
         })
         .unwrap_or_default();
 }
