@@ -60,7 +60,9 @@ server {
                 [ "request_time" ] = ngx.var.request_time,
                 [ "upstream_status" ] = ngx.var.upstream_status,
                 [ "upstream_response_time" ] = ngx.var.upstream_response_time,
-                [ "upstream_addr" ] = ngx.var.upstream_addr
+                [ "upstream_addr" ] = ngx.var.upstream_addr,
+                ["request_id"] = ngx.var.request_id,
+                ["status"] = ngx.var.status
             })
         }
         proxy_pass http://backend_a;
