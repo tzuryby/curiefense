@@ -40,6 +40,7 @@ fn flow_match(reqinfo: &RequestInfo, tags: &Tags, elem: &FlowElement) -> bool {
 #[derive(Clone)]
 pub struct FlowResult {
     pub tp: FlowResultType,
+    pub id: String,
     pub name: String,
     pub tags: Vec<String>,
 }
@@ -57,6 +58,7 @@ pub struct FlowCheck {
     pub step: u32,
     pub timeframe: u64,
     pub is_last: bool,
+    pub id: String,
     pub name: String,
     pub tags: Vec<String>,
 }
@@ -79,6 +81,7 @@ pub fn flow_info(logs: &mut Logs, flows: &FlowMap, reqinfo: &RequestInfo, tags: 
                             step: elem.step,
                             timeframe: elem.timeframe,
                             is_last: elem.is_last,
+                            id: elem.id.clone(),
                             name: elem.name.clone(),
                             tags: elem.tags.clone(),
                         });
@@ -133,6 +136,7 @@ pub async fn flow_resolve_query<I: Iterator<Item = Option<i64>>>(
         out.push(FlowResult {
             tp,
             name: check.name.clone(),
+            id: check.id.clone(),
             tags: check.tags.clone(),
         });
     }
@@ -154,10 +158,12 @@ pub fn flow_process(
     for result in results {
         match result.tp {
             FlowResultType::LastOk => {
-                tags.insert(&result.name, Location::Request);
+                tags.insert_qualified("fc-id", &result.id, Location::Request);
+                tags.insert_qualified("fc-name", &result.name, Location::Request);
             }
             FlowResultType::LastBlock => {
-                tags.insert(&result.name, Location::Request);
+                tags.insert_qualified("fc-id", &result.id, Location::Request);
+                tags.insert_qualified("fc-name", &result.name, Location::Request);
                 for tag in &result.tags {
                     tags.insert(tag, Location::Request);
                 }
