@@ -232,6 +232,13 @@ pub fn tag_request(
             tags.insert_qualified("geo-asn", &sasn, Location::Ip);
         }
     }
+
+    tags.insert_qualified(
+        "network",
+        rinfo.rinfo.geoip.network.as_deref().unwrap_or("nil"),
+        Location::Ip,
+    );
+
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
     for psection in globalfilters {

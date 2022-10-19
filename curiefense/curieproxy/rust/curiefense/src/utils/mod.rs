@@ -213,7 +213,7 @@ pub struct GeoIp {
     pub company: Option<String>,
     pub region: Option<String>,
     pub subregion: Option<String>,
-    pub network: Option<IpNet>,
+    pub network: Option<String>,
 }
 
 impl GeoIp {
@@ -256,11 +256,8 @@ impl GeoIp {
             }),
         );
 
-        if let Some(network) = self.network {
-            out.insert("network", json!(format!("{}", network)));
-        }
-
         out.insert("asn", json!(self.asn));
+        out.insert("network", json!(self.network));
         out.insert("company", json!(self.company));
         out.insert("region", json!(self.region));
         out.insert("subregion", json!(self.subregion));
@@ -450,18 +447,20 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         }
     };
 
+    let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
+
     // first put country data in the geoip
     if let Ok((cnty, network)) = get_country(ip) {
         extract_continent(&mut geoip, cnty.continent);
         extract_country(&mut geoip, cnty.country);
-        geoip.network = network;
+        extract_network(&mut geoip, network);
     }
 
     // potentially overwrite some with the city data
     if let Ok((cty, network)) = get_city(ip) {
         extract_continent(&mut geoip, cty.continent);
         extract_country(&mut geoip, cty.country);
-        geoip.network = network;
+        extract_network(&mut geoip, network);
         geoip.location = cty
             .location
             .as_ref()
@@ -608,6 +607,7 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
         RequestSelector::Cookie(k) => reqinfo.cookies.get(k).map(Selected::Str),
         RequestSelector::Ip => Some(&reqinfo.rinfo.geoip.ipstr).map(Selected::Str),
+        RequestSelector::Network => reqinfo.rinfo.geoip.network.as_ref().map(Selected::Str),
         RequestSelector::Uri => Some(&reqinfo.rinfo.qinfo.uri).map(Selected::Str),
         RequestSelector::Path => Some(&reqinfo.rinfo.qinfo.qpath).map(Selected::Str),
         RequestSelector::Query => {

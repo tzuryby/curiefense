@@ -24,6 +24,7 @@
         "geo-org:orange",
         "all",
         "ip:2-3-4-5",
+        "network:2-3-4-0-23",
         "sante",
         "securitypolicy-entry:default",
         "contentfiltername:default-contentfilter",

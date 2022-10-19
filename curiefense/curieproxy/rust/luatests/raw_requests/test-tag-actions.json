@@ -26,7 +26,8 @@
         "bot",
         "status:503",
         "status-class:5xx",
-        "ip:23-129-64-253"
+        "ip:23-129-64-253",
+        "network:23-129-64-0-24"
       ],
       "action": "custom_response",
       "block_mode": true,
@@ -68,7 +69,8 @@
         "bot",
         "status:323",
         "status-class:3xx",
-        "ip:23-129-64-253"
+        "ip:23-129-64-253",
+        "network:23-129-64-0-24"
       ],
       "action": "custom_response",
       "block_mode": true,
@@ -109,7 +111,8 @@
         "bot",
         "status:503",
         "status-class:5xx",
-        "ip:23-129-64-253"
+        "ip:23-129-64-253",
+        "network:23-129-64-0-24"
       ],
       "action": "custom_response",
       "block_mode": true,
@@ -150,7 +153,8 @@
         "bot",
         "status:456",
         "status-class:4xx",
-        "ip:23-129-64-253"
+        "ip:23-129-64-253",
+        "network:23-129-64-0-24"
       ],
       "action": "custom_response",
       "block_mode": true,
@@ -191,7 +195,8 @@
         "bot",
         "status:503",
         "status-class:5xx",
-        "ip:23-129-64-253"
+        "ip:23-129-64-253",
+        "network:23-129-64-0-24"
       ],
       "action": "custom_response",
       "block_mode": true,
