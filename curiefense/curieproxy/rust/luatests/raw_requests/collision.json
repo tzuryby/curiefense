@@ -39,9 +39,12 @@
         "flowc3",
         "flowall",
         "flowc",
-        "flow-control--action-collision-3-",
-        "flow-control--action-collision-1-",
-        "flow-control--action-collision-2-"
+        "fc-name:flow-control--action-collision-3-",
+        "fc-name:flow-control--action-collision-1-",
+        "fc-name:flow-control--action-collision-2-",
+        "fc-id:col1",
+        "fc-id:col2",
+        "fc-id:col3"
       ]
     }
   }

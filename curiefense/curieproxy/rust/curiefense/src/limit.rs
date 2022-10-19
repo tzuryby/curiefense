@@ -18,7 +18,8 @@ fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String
 
 #[allow(clippy::too_many_arguments)]
 fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) -> SimpleDecision {
-    tags.insert(&limit.name, Location::Request);
+    tags.insert_qualified("limit-id", &limit.id, Location::Request);
+    tags.insert_qualified("limit-name", &limit.name, Location::Request);
     let action = threshold.action.clone();
     let decision = action.atype.to_bdecision();
     SimpleDecision::Action(

@@ -398,8 +398,12 @@ local function test_ratelimit(request_path)
 
     if raw_request_map.tag and not contains(request_map.tags, raw_request_map.tag) then
       show_logs(request_map.logs)
-      error("curiefense.session_limit_check should have returned tag '" .. raw_request_map.tag ..
-            "', but returned: " .. r.response)
+      print("curiefense.session_limit_check should have returned tag '" .. raw_request_map.tag ..
+            "', but returned:")
+      for _, t in pairs(request_map.tags) do
+        print(" * " .. t)
+      end
+      error("...")
     end
 
     if raw_request_map.pass then

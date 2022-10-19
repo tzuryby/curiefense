@@ -214,6 +214,7 @@ impl mlua::UserData for LuaFlowCheck {
             };
             Ok(LuaFlowResult(FlowResult {
                 tp,
+                id: this.0.id.clone(),
                 name: this.0.name.clone(),
                 tags: this.0.tags.clone(),
             }))

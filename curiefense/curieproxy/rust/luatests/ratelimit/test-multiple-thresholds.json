@@ -32,7 +32,7 @@
     },
     "delay": 0,
     "pass": true,
-    "tag": "first-tag-then-ban"
+    "tag": "limit-name:first-tag-then-ban"
   },
   {
     "headers": {
@@ -44,7 +44,7 @@
     },
     "delay": 0,
     "pass": true,
-    "tag": "first-tag-then-ban"
+    "tag": "limit-name:first-tag-then-ban"
   },
   {
     "headers": {
@@ -56,6 +56,6 @@
     },
     "delay": 0,
     "pass": false,
-    "tag": "first-tag-then-ban"
+    "tag": "limit-name:first-tag-then-ban"
   }
 ]
