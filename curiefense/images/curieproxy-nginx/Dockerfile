@@ -2,6 +2,7 @@ ARG RUSTBIN_TAG=latest
 FROM curiefense/curiefense-rustbuild-bionic:${RUSTBIN_TAG} AS rustbin
 FROM docker.io/openresty/openresty:1.19.9.1-1-bionic
 COPY conf.d /etc/nginx/conf.d
+COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY curieproxy/lua /lua
 COPY curieproxy/lua/shared-objects/*.so /usr/local/lib/lua/5.1/
 COPY --from=rustbin /root/curiefense.so /usr/local/lib/lua/5.1/
