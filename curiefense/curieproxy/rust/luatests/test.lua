@@ -70,7 +70,7 @@ local function compare_tag_list(name, actual, expected)
   end
 
   for _, e in ipairs(expected) do
-    if (should_skip_tag(a) and not m_actual[e]) then
+    if (not should_skip_tag(a) and not m_actual[e]) then
       good = false
       print(name .. " - missing expected tag: " .. e)
     end
