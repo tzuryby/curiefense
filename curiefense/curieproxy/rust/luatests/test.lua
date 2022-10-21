@@ -52,6 +52,7 @@ local function should_skip_tag(tag)
       return true
     end
   end
+  return false
 end
 -- test that two lists contain the same tags
 local function compare_tag_list(name, actual, expected)
@@ -63,16 +64,18 @@ local function compare_tag_list(name, actual, expected)
   local m_actual = {}
   local good = true
 
-  for _, a in ipairs(actual) do
-    if (not should_skip_tag(a)) then
-      m_actual[a] = 1
+  for _, atag in ipairs(actual) do
+    if (not should_skip_tag(atag)) then
+      m_actual[atag] = 1
     end
   end
 
   for _, e in ipairs(expected) do
-    if (not should_skip_tag(a) and not m_actual[e]) then
-      good = false
-      print(name .. " - missing expected tag: " .. e)
+    if (not should_skip_tag(e)) then
+      if not m_actual[e] then
+        good = false
+        print(name .. " - missing expected tag: " .. e)
+      end
     end
     m_actual[e] = nil
   end
