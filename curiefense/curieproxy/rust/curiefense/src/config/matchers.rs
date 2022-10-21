@@ -9,6 +9,8 @@ pub enum RequestSelector {
     Query,
     Uri,
     Country,
+    Region,
+    SubRegion,
     Method,
     Asn,
     Args(String),
@@ -17,6 +19,7 @@ pub enum RequestSelector {
     Company,
     Authority,
     Tags,
+    Session,
     SecpolId,
     SecpolEntryId,
 }
@@ -57,11 +60,14 @@ impl RequestSelector {
             "query" => Some(RequestSelector::Query),
             "uri" => Some(RequestSelector::Uri),
             "country" => Some(RequestSelector::Country),
+            "region" => Some(RequestSelector::Region),
+            "subregion" => Some(RequestSelector::SubRegion),
             "method" => Some(RequestSelector::Method),
             "asn" => Some(RequestSelector::Asn),
             "company" => Some(RequestSelector::Company),
             "authority" => Some(RequestSelector::Authority),
             "tags" => Some(RequestSelector::Tags),
+            "session" => Some(RequestSelector::Session),
             "secpolid" | "securitypolicyid" | "securitypolicy" => Some(RequestSelector::SecpolId),
             "secpolentryid" | "securitypolicyentryid" | "securitypolicyentry" => Some(RequestSelector::SecpolEntryId),
             _ => None,
@@ -110,6 +116,9 @@ impl std::fmt::Display for RequestSelector {
             RequestSelector::Tags => write!(f, "tags"),
             RequestSelector::SecpolId => write!(f, "security_policy_id"),
             RequestSelector::SecpolEntryId => write!(f, "security_policy_entry_id"),
+            RequestSelector::Region => write!(f, "region"),
+            RequestSelector::SubRegion => write!(f, "subregion"),
+            RequestSelector::Session => write!(f, "session"),
         }
     }
 }
