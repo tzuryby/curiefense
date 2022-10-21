@@ -37,11 +37,12 @@ if [ -n "$IF_NO_CONFIG_INIT_FROM" ]; then
 	cp -R "$IF_NO_CONFIG_INIT_FROM/_internal_base/." .
 	git add .
 	git commit -m "Initial empty config"
-	git checkout -b master
+	git checkout -b prod
 	rm -rf config
-	cp -R "$IF_NO_CONFIG_INIT_FROM/master/." .
+	cp -R "$IF_NO_CONFIG_INIT_FROM/prod/." .
 	git add .
-	git commit -m "Create config [master]"
+	git commit -m "Create config [prod]"
+	git checkout -b stage
 	git remote add db "$TARGETDIR"
 	git push --all db
 	cd ..
