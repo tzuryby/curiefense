@@ -6,11 +6,6 @@
         "cookies:0",
         "headers:1",
         "args:0",
-        "geo-continent-code:eu",
-        "geo-city:paris",
-        "geo-continent-name:europe",
-        "geo-region:idf",
-        "geo-subregion:75",
         "securitypolicy-entry:default",
         "contentfilterid:--default--",
         "sante",
@@ -21,12 +16,9 @@
         "contentfiltername:default-contentfilter",
         "bot",
         "parisien",
-        "geo-org:free-sas",
         "francilien",
         "ip:82-64-131-193",
-        "network:82-64-131-0-24",
-        "geo-country:france",
-        "geo-asn:12322"
+        "network:82-64-131-0-24"
       ],
       "action": "pass"
     },

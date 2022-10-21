@@ -31,15 +31,7 @@
         "contentfilterid:--default--",
         "bot",
         "status:503",
-        "status-class:5xx",
-        "geo-continent-code:eu",
-        "geo-subregion:bne",
-        "geo-country:united-kingdom",
-        "geo-continent-name:europe",
-        "geo-region:eng",
-        "geo-asn:5089",
-        "geo-city:edgware",
-        "geo-org:virgin-media-limited"
+        "status-class:5xx"
       ]
     }
   }
