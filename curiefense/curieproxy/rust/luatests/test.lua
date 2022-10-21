@@ -70,14 +70,14 @@ local function compare_tag_list(name, actual, expected)
     end
   end
 
-  for _, e in ipairs(expected) do
-    if (not should_skip_tag(e)) then
-      if not m_actual[e] then
+  for _, exptag in ipairs(expected) do
+    if (not should_skip_tag(exptag)) then
+      if not m_actual[exptag] then
         good = false
-        print(name .. " - missing expected tag: " .. e)
+        print(name .. " - missing expected tag: " .. exptag)
       end
     end
-    m_actual[e] = nil
+    m_actual[exptag] = nil
   end
 
   if not good then
