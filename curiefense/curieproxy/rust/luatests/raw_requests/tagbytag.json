@@ -33,7 +33,6 @@
         "status:503",
         "status-class:5xx",
         "geo-continent-code:eu",
-        "geo-org:virgin-media-limited",
         "geo-subregion:bne",
         "geo-country:united-kingdom",
         "geo-continent-name:europe",
