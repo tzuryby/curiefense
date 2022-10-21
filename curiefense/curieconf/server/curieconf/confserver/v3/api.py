@@ -89,6 +89,7 @@ m_securitypolicy = api.model(
         "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
+        "tags": fields.List(fields.String()),
         "match": fields.String(required=True),
         "curiesession": AnyType(),
         "curiesession_ids": AnyType(),
