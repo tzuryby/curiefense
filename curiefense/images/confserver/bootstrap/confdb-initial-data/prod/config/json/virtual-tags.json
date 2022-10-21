@@ -1,17 +1,1 @@
-[
-  {
-    "id": "ba1d1175094f",
-    "name": "Virtual Tag Example",
-    "description": "New Virtual Tag",
-    "match": [
-      {
-        "vtag": "vtag1",
-        "tags": ["tag1", "tag2", "tag3"]
-      },
-      {
-        "vtag": "vtag2",
-        "tags": ["tag4", "tag5", "tag6"]
-      }
-    ]
-  }
-]
+[{"id":"bot-categorization","name":"Bot Categorization","description":"categorize bots","match":[{"vtag":"rtc:good-bots","tags":["apple-crawler","baidu-crawler","bing-crawler","facebook","google-crawler","yahoo-crawler","yandex-crawler","newrelic-probe","pingdom-probe","site24x7-probe"]},{"vtag":"rtc:legitimate-crawlers","tags":["apple-crawler","baidu-crawler","bing-crawler","facebook","google-crawler","yahoo-crawler","yandex-crawler"]},{"vtag":"rtc:monitoring","tags":["newrelic-probe","pingdom-probe","site24x7-probe"]},{"vtag":"rtc:threat-intel","tags":["spamhaus"]},{"vtag":"rtc:bad-bots","tags":["rtc:account-takeover","rtc:spamming","rtc:scrapping","rtc:ddos","rtc:abuse","rtc:carding"]}]}]
