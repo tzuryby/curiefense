@@ -641,6 +641,9 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Tags => tags.map(|tags| Selected::OStr(tags.selector())),
         RequestSelector::SecpolId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.policy.id)),
         RequestSelector::SecpolEntryId => Some(Selected::Str(&reqinfo.rinfo.secpolicy.entry.id)),
+        RequestSelector::Region => reqinfo.rinfo.geoip.region.as_ref().map(Selected::Str),
+        RequestSelector::SubRegion => reqinfo.rinfo.geoip.subregion.as_ref().map(Selected::Str),
+        RequestSelector::Session => Some(Selected::Str(&reqinfo.session)),
     }
 }
 
