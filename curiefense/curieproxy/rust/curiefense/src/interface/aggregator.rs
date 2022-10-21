@@ -335,8 +335,8 @@ struct AggregatedCounters {
     location_report: AggSection,
     ruleid_active: TopN<String>,
     ruleid_report: TopN<String>,
-    risk_level_active: TopN<u8>,
-    risk_level_report: TopN<u8>,
+    risk_level_active: Bag<u8>,
+    risk_level_report: Bag<u8>,
 
     bot: usize,
     human: usize,
@@ -613,11 +613,11 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
         serde_json::to_value(&e.secpolentryid_report).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf_top_risk_level_active".into(),
+        "cf_risk_level_active".into(),
         serde_json::to_value(&e.risk_level_active).unwrap_or(Value::Null),
     );
     content.insert(
-        "cf_top_risk_level_report".into(),
+        "cf_risk_level_report".into(),
         serde_json::to_value(&e.risk_level_report).unwrap_or(Value::Null),
     );
     content.insert(
@@ -661,9 +661,9 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     e.country.serialize_map("country", &mut content);
     e.asn.serialize_map("asn", &mut content);
 
-    content.insert("top_status".into(), e.status.serialize_top());
-    content.insert("top_status_classes".into(), e.status_classes.serialize_top());
-    content.insert("top_methods".into(), e.methods.serialize_top());
+    content.insert("status".into(), e.status.serialize_top());
+    content.insert("status_classes".into(), e.status_classes.serialize_top());
+    content.insert("methods".into(), e.methods.serialize_top());
 
     content.insert(
         "top_tags".into(),
