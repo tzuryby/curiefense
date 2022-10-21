@@ -27,10 +27,10 @@ def update():
     for doc in documents:
         print (f"pushing {doc}")
         json=open(f"{doc}.json", "r+b").read()
-
-        response = requests.put(f"{url}/api/v3/configs/{branch}/d/{doc}/",
-            data=json,
-            headers={
+        response = requests.delete(f"{url}/api/v3/configs/{branch}/d/{doc}/")
+        response = requests.post(f"{url}/api/v3/configs/{branch}/d/{doc}/",
+            data = json,
+            headers = {
                 "content-type": "application/json"
             })
         if response.status_code > 399:
