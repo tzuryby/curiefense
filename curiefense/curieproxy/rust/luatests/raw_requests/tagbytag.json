@@ -30,15 +30,16 @@
         "tagbyiptag",
         "contentfilterid:--default--",
         "bot",
-        "geo-continent-code:eu",
-        "geo-city:hendon",
-        "geo-country:united-kingdom",
-        "geo-asn:5089",
-        "geo-subregion:bne",
-        "geo-region:eng",
-        "geo-continent-name:europe",
         "status:503",
         "status-class:5xx",
+        "geo-continent-code:eu",
+        "geo-org:virgin-media-limited",
+        "geo-subregion:bne",
+        "geo-country:united-kingdom",
+        "geo-continent-name:europe",
+        "geo-region:eng",
+        "geo-asn:5089",
+        "geo-city:edgware",
         "geo-org:virgin-media-limited"
       ]
     }
