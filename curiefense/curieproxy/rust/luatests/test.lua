@@ -64,7 +64,10 @@ local function compare_tag_list(name, actual, expected)
     end
   end
   for _, e in ipairs(expected) do
-    if not startswith(e, "container:") and not m_actual[e] then
+    if (not startswith(e, "container:")
+        and not startswith(a, "geo-")
+        and not startswith(a, "network:")
+        and not m_actual[e]) then
       good = false
       print(name .. " - missing expected tag: " .. e)
     end
