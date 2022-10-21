@@ -16,10 +16,17 @@ documents = [
     "custom",
 ]
 
+
 branch = "prod"
 host = "34.65.106.27"
 port = "30000"
 url = f"http://{host}:{port}"
+
+# branch = "prod"
+# host = "control.nightly.app.reblaze.io"
+# port = "80"
+# url = f"http://{host}:{port}"
+
 
 
 def update():
@@ -38,3 +45,8 @@ def update():
 
 if __name__ == "__main__":
     update()
+
+# branch = "prod"
+# host = "34.65.106.27"
+# port = "30000"
+# url = f"http://{host}:{port}"
