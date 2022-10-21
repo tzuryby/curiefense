@@ -45,6 +45,14 @@ local function load_json_file(path)
     end
 end
 
+local function should_skip_tag(tag)
+  local prefixes = {"container:", "geo-", "network:"}
+  for _, prefix in ipairs(prefixes) do
+    if startswith(tag, prefix) then
+      return true
+    end
+  end
+end
 -- test that two lists contain the same tags
 local function compare_tag_list(name, actual, expected)
   -- do not check tags when they are unspecified
@@ -56,16 +64,13 @@ local function compare_tag_list(name, actual, expected)
   local good = true
 
   for _, a in ipairs(actual) do
-    if (not startswith(a, "container:") and not startswith(a, "geo-") and not startswith(a, "network:")) then
+    if (not should_skip_tag(a)) then
       m_actual[a] = 1
     end
   end
 
   for _, e in ipairs(expected) do
-    if (not startswith(e, "container:")
-        and not startswith(e, "geo-")
-        and not startswith(e, "network:")
-        and not m_actual[e]) then
+    if (should_skip_tag(a) and not m_actual[e]) then
       good = false
       print(name .. " - missing expected tag: " .. e)
     end
