@@ -21,11 +21,11 @@
                 "arguments": { "type": "string" },
                 "attrs": {
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "network"]
+                     "enum": ["asn","authority","company","country","ip","method","network","path","query","region","secpolentryid","securitypolicyentryid","securitypolicyentry","secpolid","securitypolicyid","securitypolicy","session","subregion","tags","uri"]
                  },
                 "attributes":{
                     "type": "string",
-                     "enum": ["ip", "path", "query", "uri", "country", "method", "asn", "company", "authority", "tags", "network"]
+                     "enum": ["asn","authority","company","country","ip","method","network","path","query","region","secpolentryid","securitypolicyentryid","securitypolicyentry","secpolid","securitypolicyid","securitypolicy","session","subregion","tags","uri"]
                  }
             }
         },
@@ -55,7 +55,7 @@
     "active": {
       "type": "boolean",
       "title": "Active flag",
-      "description": ""
+      "description": "This flow is active"
     },
     "timeframe": {
       "type": "number",
@@ -111,6 +111,7 @@
     "key",
     "include",
     "exclude",
-    "sequence"
+    "sequence",
+    "tags"
   ]
 }

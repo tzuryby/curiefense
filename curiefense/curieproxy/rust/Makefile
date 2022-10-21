@@ -18,13 +18,13 @@ ctarget/target/release/libcuriefense_lua.so: container ctarget/registry ctarget/
 
 fuzz: fuzzcontainer
 	docker run --rm -v `pwd`:/home/builder/rust -v `pwd`/ctarget/registry:/home/builder/.cargo/registry \
-			-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/master/config:/cf-config/current/config \
+			-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/prod/config:/cf-config/current/config \
 			-v `pwd`/luatests/config/json:/cf-config/current/config/json \
 			-w /home/builder/rust/curiefense -it curiefense/rustfuzz:latest /home/builder/.cargo/bin/cargo +nightly fuzz run -j 8 fuzz_target_1 -- -dict=fuzz/dict.txt
 
 fuzzshell: fuzzcontainer
 	docker run --rm -v `pwd`:/home/builder/rust -v `pwd`/ctarget/registry:/home/builder/.cargo/registry \
-			-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/master/config:/cf-config/current/config \
+			-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/prod/config:/cf-config/current/config \
 			-v `pwd`/luatests/config/json:/cf-config/current/config/json \
 			-w /home/builder/rust/curiefense -it curiefense/rustfuzz:latest /bin/bash
 
@@ -58,7 +58,7 @@ test-nodeps:
 						 -v `pwd`/../lua/shared-objects/luahs.so:/usr/local/lib/lua/5.1/luahs.so \
 						 -v `pwd`/../lua/shared-objects/libinjection.so:/usr/local/lib/lua/5.1/libinjection.so \
 						 -v `pwd`/../lua/shared-objects/grasshopper.so:/usr/local/lib/lua/5.1/grasshopper.so \
-						 -v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/master/config:/cf-config/current/config \
+						 -v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/prod/config:/cf-config/current/config \
 						 -v `pwd`/luatests/test.lua:/home/builder/test.lua \
 						 -v `pwd`/luatests/run.sh:/home/builder/run.sh \
 						 -v `pwd`/luatests/config/json:/cf-config/current/config/json \
@@ -77,7 +77,7 @@ gowaftest-nodeps:
 						-v `pwd`/../lua/shared-objects/luahs.so:/usr/local/lib/lua/5.1/luahs.so \
 						-v `pwd`/../lua/shared-objects/libinjection.so:/usr/local/lib/lua/5.1/libinjection.so \
 						-v `pwd`/../lua/shared-objects/grasshopper.so:/usr/local/lib/lua/5.1/grasshopper.so \
-						-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/master/config:/cf-config/current/config \
+						-v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/prod/config:/cf-config/current/config \
 						-v `pwd`/luatests/test.lua:/home/builder/test.lua \
 						-v `pwd`/luatests/run.sh:/home/builder/run.sh \
 						-v `pwd`/luatests:/home/builder/luatests \
