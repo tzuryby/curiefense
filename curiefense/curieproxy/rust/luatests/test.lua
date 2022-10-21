@@ -54,9 +54,13 @@ local function compare_tag_list(name, actual, expected)
 
   local m_actual = {}
   local good = true
+
   for _, a in ipairs(actual) do
-    m_actual[a] = 1
+    if (not startswith(a, "container:") and not startswith(a, "geo-") and not startswith(a, "network:")) then
+      m_actual[a] = 1
+    end
   end
+
   for _, e in ipairs(expected) do
     if (not startswith(e, "container:")
         and not startswith(e, "geo-")
@@ -67,6 +71,7 @@ local function compare_tag_list(name, actual, expected)
     end
     m_actual[e] = nil
   end
+
   if not good then
     print("Actual tags:")
     for _, e in ipairs(actual) do
