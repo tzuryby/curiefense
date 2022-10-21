@@ -55,7 +55,7 @@
     "active": {
       "type": "boolean",
       "title": "Active flag",
-      "description": ""
+      "description": "This flow is active"
     },
     "timeframe": {
       "type": "number",
@@ -111,6 +111,7 @@
     "key",
     "include",
     "exclude",
-    "sequence"
+    "sequence",
+    "tags"
   ]
 }
