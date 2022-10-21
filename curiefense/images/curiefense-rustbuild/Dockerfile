@@ -34,7 +34,7 @@ RUN apt-get update && \
 COPY --from=builder /root/curiefense.so /usr/local/lib/lua/5.1/curiefense.so
 COPY curieproxy/rust/static/libgrasshopper.so /usr/lib/
 RUN ln -s /usr/local/lib/lua/5.1/curiefense.so /root/curiefense.so && mkdir -p /cf-config/current
-COPY confdb-initial-data/master/config /cf-config/current/config
+COPY confdb-initial-data/prod/config /cf-config/current/config
 COPY curieproxy/rust/luatests/config/json /cf-config/current/config/json
 
 RUN useradd -m -s /bin/bash builder
