@@ -12,9 +12,9 @@ from prometheus_client import start_http_server, Counter, REGISTRY
 
 from utils.prometheus_counters_dict import (
     REGULAR,
-    METHOD,
-    STATUS_CODE,
-    STATUS_CLASS,
+    METHODS,
+    STATUS_CODES,
+    STATUS_CLASSES,
     counters_format,
     name_changes,
 )
@@ -59,7 +59,7 @@ def get_config(key):
     config = {
         "mongodb": {
             "url": os.getenv("MONGODB_URI", "mongodb://mongodb:27017/"),
-            "db": os.getenv("MONGODB_METRICS_DB", "reblaze"),
+            "db": os.getenv("MONGODB_METRICS_DB", "curiemetrics"),
             "collection": os.getenv("MONGODB_METRICS_COLLECTION", "metrics1s"),
         },
         "t2_source": {"url": os.getenv("METRICS_URI", "http://curieproxyngx:8999/")},
@@ -80,13 +80,12 @@ def _get_counter_type(counter_name):
         return counter_type
     else:
         if counter_name in http_methods:
-            return METHOD
+            return METHODS
         if re.fullmatch(r"[1-9][0-9][0-9]", counter_name):
-            return STATUS_CODE
+            return STATUS_CODES
         if re.fullmatch(r"[1-9]xx", counter_name):
-            return STATUS_CLASS
+            return STATUS_CLASSES
     return False
-
 
 def switch_hyphens(name):
     return name.replace("-", "_")
@@ -98,11 +97,11 @@ def get_t3_counter(metric_name, counter_type):
 
     if counter_type == REGULAR:
         return t3_counters[metric_name]
-    elif counter_type == STATUS_CODE:
+    elif counter_type == STATUS_CODES:
         return t3_counters["status_code"]
-    elif counter_type == STATUS_CLASS:
+    elif counter_type == STATUS_CLASSES:
         return t3_counters["status_class"]
-    elif counter_type == METHOD:
+    elif counter_type == METHODS:
         return t3_counters["method"]
 
     return False
@@ -121,8 +120,9 @@ def update_t3_counters(t2_dict):
         counter = get_t3_counter(valid_name, counter_type)
         if counter_type == REGULAR:
             counter.labels(app, proxy, profile).inc(counter_value)
-        elif counter_type in [STATUS_CODE, STATUS_CLASS, METHOD]:
-            counter.labels(app, proxy, profile, valid_name).inc(counter_value)
+        elif counter_type in [STATUS_CODES, STATUS_CLASSES, METHODS]:
+            for value in counter_value:
+                counter.labels(app, proxy, profile, value['key']).inc(value['value'])
 
 
 def export_t2(t2: dict):
