@@ -25,7 +25,7 @@ import subprocess
 import time
 
 # --- Helpers ---
-TEST_CONFIG_NAME = "master"
+TEST_CONFIG_NAME = "prod"
 
 
 class CliHelper:
@@ -68,7 +68,7 @@ class CliHelper:
 
     def initial_version(self):
         if not self._initial_version_cache:
-            versions = self.call("conf list-versions master")
+            versions = self.call("conf list-versions prod")
             if "version" not in versions[-3]:
                 print("Unsupported curieconfctl output", versions)
                 raise TypeError("Unsupported curieconfctl output")
@@ -77,7 +77,7 @@ class CliHelper:
 
     def empty_acl(self):
         version = self.initial_version()
-        return self.call(f"doc get master aclprofiles --version {version}")
+        return self.call(f"doc get prod aclprofiles --version {version}")
 
     def publish_and_apply(self):
         buckets = self.call("key get system publishinfo")
@@ -86,7 +86,7 @@ class CliHelper:
         for bucket in buckets["buckets"]:
             if bucket["name"] == "prod":
                 url = bucket["url"]
-        self.call(f"tool publish master {url}")
+        self.call(f"tool publish prod {url}")
         time.sleep(20)
 
     def set_configuration(self, luatests_path: str):
