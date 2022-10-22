@@ -1,10 +1,9 @@
 FROM node:16.17.0 as builder
 
-git clone https://github.com/reblaze/ui.git
-cd ui
-git checkout main
+RUN git clone https://github.com/reblaze/ui.git && cd ui && git checkout main
 
 COPY . /ui
+
 WORKDIR /ui
 RUN npm install
 RUN npm run build
