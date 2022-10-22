@@ -1,10 +1,12 @@
-FROM node:14.18.0 as builder
+FROM node:16.17.0 as builder
 
-COPY ui /ui
+RUN git clone https://github.com/reblaze/ui.git && cd ui && git checkout main
+
+COPY . /ui
+
 WORKDIR /ui
 RUN npm install
 RUN npm run build
-
 
 FROM nginx:1.23.1
 
