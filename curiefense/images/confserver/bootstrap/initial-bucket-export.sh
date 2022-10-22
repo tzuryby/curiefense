@@ -59,7 +59,7 @@ until [ "$RETRIES" -ge 10 ]
 do
 	echo "Trying to request export to bucket $BUCKET..."
 	sleep 5
-	if curl --silent --show-error --fail -X PUT "$URL" -H  "accept: application/json" -H  "Content-Type: application/json" -d "[{\"name\": \"local\", \"url\": \"$BUCKET\"}]"; then
+	if curl --silent --show-error --fail -X PUT "$URL" -H  "accept: application/json" -H  "Content-Type: application/json" -d "[{\"name\": \"prod\", \"url\": \"$BUCKET\"}]"; then
 		STATUS=0
 		break
 	fi
