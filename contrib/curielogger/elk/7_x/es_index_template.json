@@ -27,6 +27,27 @@
         "timestamp": {
           "type": "date_nanos"
         },
+        "processing_stage": {
+          "type": "integer"
+        },
+        "uri": {
+          "type": "keyword"
+        },
+        "reason": {
+          "type": "text"
+        },
+        "curiesession": {
+          "type": "keyword"
+        },
+        "curiesession_ids": {
+          "type": "flattened"
+        },
+        "request_id": {
+          "type": "keyword"
+        },
+        "path": {
+          "type": "keyword"
+        },
         "acl_triggers": {
           "type": "nested"
         },
@@ -35,6 +56,9 @@
         },
         "authority": {
           "type": "keyword"
+        },
+        "global_filter_triggers": {
+          "type": "nested"
         },
         "content_filter_triggers": {
           "type": "nested"
