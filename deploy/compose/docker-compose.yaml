@@ -68,8 +68,8 @@ services:
     restart: always
     volumes:
       - curieproxy_config:/cf-config
-      # - ./filebeat/ilm.json:/usr/share/filebeat/ilm.json
-      # - ./filebeat/template.json:/usr/share/filebeat/template.json
+      - ./filebeat/ilm.json:/usr/share/filebeat/ilm.json
+      - ./filebeat/template.json:/usr/share/filebeat/template.json
     environment:
       # - ENVOY_UID
       - XFF_TRUSTED_HOPS
@@ -84,8 +84,8 @@ services:
       - NGINX_ERROR_LOG
       - CF_LOG_LEVEL
       - NGINX_LOG_LEVEL
-      # - ELASTICSEARCH_URL=http://elasticsearch:9200
-      # - KIBANA_URL=http://kibana:5601
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - KIBANA_URL=http://kibana:5601
     networks:
       curiemesh:
         aliases:
@@ -98,24 +98,6 @@ services:
     secrets:
       - curieproxysslcrt
       - curieproxysslkey
-
-  # extproc:
-  #   container_name: extproc
-  #   hostname: extproc
-  #   image: "curiefense/extproc:${DOCKER_TAG}"
-  #   restart: always
-  #   volumes:
-  #     - curieproxy_config:/cf-config
-  #   environment:
-  #     - XFF_TRUSTED_HOPS
-  #     - EXTPROC_LOG_LEVEL
-  #     - ELASTICSEARCH
-  #   networks:
-  #     curiemesh:
-  #       aliases:
-  #         - extproc
-  #   ports:
-  #     - "50051:50051"
 
   confserver:
     container_name: confserver
@@ -149,7 +131,7 @@ services:
     networks:
       curiemesh:
         aliases:
-          - curieproxy
+          - juiceshop
     ports:
       - "3000:3000"
 
@@ -238,42 +220,42 @@ services:
     ports:
       - 30300:3000
 
-  # elasticsearch:
-  #   container_name: elasticsearch
-  #   hostname: elasticsearch
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:7.13.3
-  #   restart: always
-  #   volumes:
-  #     - persistent_elasticsearch:/usr/share/elasticsearch/data
-  #   environment:
-  #     - node.name=es
-  #     - cluster.name=curiefense-es-cluster
-  #     - discovery.type=single-node
-  #     - bootstrap.memory_lock=true
-  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-  #   networks:
-  #     - curiemesh
-  #   ports:
-  #     - 9200:9200
-  #   ulimits:
-  #     memlock:
-  #       soft: -1
-  #       hard: -1
+  elasticsearch:
+    container_name: elasticsearch
+    hostname: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.3
+    restart: always
+    volumes:
+      - persistent_elasticsearch:/usr/share/elasticsearch/data
+    environment:
+      - node.name=es
+      - cluster.name=curiefense-es-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    networks:
+      - curiemesh
+    ports:
+      - 9200:9200
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
 
-  # kibana:
-  #   container_name: kibana
-  #   hostname: kibana
-  #   image: docker.elastic.co/kibana/kibana:7.13.3
-  #   restart: always
-  #   environment:
-  #     - ELASTICSEARCH_URL=http://elasticsearch:9200
-  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #     - TELEMETRY_ENABLED=false
-  #     - TELEMETRY_OPTIN=false
-  #   networks:
-  #     - curiemesh
-  #   ports:
-  #     - 5601:5601
+  kibana:
+    container_name: kibana
+    hostname: kibana
+    image: docker.elastic.co/kibana/kibana:7.13.3
+    restart: always
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - TELEMETRY_ENABLED=false
+      - TELEMETRY_OPTIN=false
+    networks:
+      - curiemesh
+    ports:
+      - 5601:5601
 
 networks:
   curiemesh:
