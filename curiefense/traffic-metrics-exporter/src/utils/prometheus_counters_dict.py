@@ -4,17 +4,17 @@ from enum import Enum
 class CounterTypes(Enum):
     REGULAR = 1
     # response codes
-    STATUS_CODE = 2
+    STATUS_CODES = 2
     # 2xx, 3xx, etc..
-    STATUS_CLASS = 3
+    STATUS_CLASSES = 3
     # http methods , GET, PUT, etc...
-    METHOD = 4
+    METHODS = 4
 
 
 REGULAR = CounterTypes.REGULAR
-STATUS_CODE = CounterTypes.STATUS_CODE
-STATUS_CLASS = CounterTypes.STATUS_CLASS
-METHOD = CounterTypes.METHOD
+STATUS_CODES = CounterTypes.STATUS_CODES
+STATUS_CLASSES = CounterTypes.STATUS_CLASSES
+METHODS = CounterTypes.METHODS
 
 # mapping of counters to REGULAR, SESSION and PROCESSING_TIME. the two other ones are recognized by regex
 counters_format = {
@@ -44,12 +44,18 @@ counters_format = {
     "max_process_time": REGULAR,
     "min_process_time": REGULAR,
     "avg_process_time": REGULAR,
+    "methods": METHODS,
+    "status": STATUS_CODES,
+    "status_classes": STATUS_CLASSES
 }
 
 # counters
-name_changes = {"d_bytes": "total_downstream_bytes", "u_bytes": "total_upstream_bytes"}
+name_changes = {
+    "d_bytes": "total_downstream_bytes",
+    "u_bytes": "total_upstream_bytes"
+}
 
 # validating format validity, in case new keys will be entered
 for counter, value in counters_format.items():
-    if value not in [REGULAR, STATUS_CODE, STATUS_CLASS, METHOD]:
+    if value not in [REGULAR, STATUS_CODES, STATUS_CLASSES, METHODS]:
         raise TypeError(f"{counter} is not of a legal type in counters_format")
