@@ -136,9 +136,10 @@ pub async fn jsonlog(
 ) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
     let status_code = rcode.or_else(|| proxy.get("status").and_then(|stt_str| stt_str.parse().ok()));
+    let bytes_sent = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
     match mrinfo {
         Some(rinfo) => {
-            aggregator::aggregate(dec, status_code, rinfo, tags).await;
+            aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
             match jsonlog_rinfo(dec, rinfo, status_code, tags, stats, logs, proxy, &now) {
                 Err(rr) => {
                     println!("JSON creation error: {}", rr);
