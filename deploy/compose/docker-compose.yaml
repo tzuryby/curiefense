@@ -240,7 +240,7 @@ services:
   elasticsearch:
     container_name: elasticsearch
     hostname: elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.3
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.6
     restart: always
     volumes:
       - persistent_elasticsearch:/usr/share/elasticsearch/data
@@ -262,7 +262,7 @@ services:
   kibana:
     container_name: kibana
     hostname: kibana
-    image: docker.elastic.co/kibana/kibana:7.13.3
+    image: docker.elastic.co/kibana/kibana:7.17.6
     restart: always
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
