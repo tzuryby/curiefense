@@ -48,6 +48,17 @@
             "title": "Match",
             "description": "Regex to match host headers (domain names)"
         },
+        "description": {
+            "type": "string",
+            "title": "Description",
+            "description": "Description of entity shown in UI"
+        },
+        "tags": {
+            "title": "Tags List",
+            "description": "List of tags to apply",
+            "type": "array",
+            "items": { "type": "string" }
+        },
         "curiesession": { "$ref": "#/definitions/key-array" },
         "curiesession_ids": { "$ref": "#/definitions/key-array" },
         "map": {
@@ -66,11 +77,6 @@
                         "type": "string",
                         "title": "Name",
                         "description": "Name of Security Policy entry shown in UI"
-                    },
-                    "description": {
-                        "type": "string",
-                        "title": "Description",
-                        "description": "Entry for specific URLs"
                     },
                     "match": {
                         "type": "string",
