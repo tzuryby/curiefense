@@ -1,5 +1,6 @@
 FROM node:16.17.0 as builder
 
+# grab latest commit 
 WORKDIR /
 RUN git clone --depth=1 https://github.com/reblaze/ui.git
 
