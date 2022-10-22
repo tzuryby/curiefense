@@ -59,7 +59,7 @@ def get_config(key):
     config = {
         "mongodb": {
             "url": os.getenv("MONGODB_URI", "mongodb://mongodb:27017/"),
-            "db": os.getenv("MONGODB_METRICS_DB", "reblaze"),
+            "db": os.getenv("MONGODB_METRICS_DB", "curiemetrics"),
             "collection": os.getenv("MONGODB_METRICS_COLLECTION", "metrics1s"),
         },
         "t2_source": {"url": os.getenv("METRICS_URI", "http://curieproxyngx:8999/")},
