@@ -165,7 +165,7 @@ services:
     environment:
       - PROMETHEUS_DISABLE_CREATED_SERIES=true
       - MONGODB_URI=mongodb://mongodb:27017/
-      - MONGODB_METRICS_DB=reblaze
+      - MONGODB_METRICS_DB=curiemetrics
       - MONGODB_METRICS_COLLECTION=metrics1s
       - METRICS_URI=http://curieproxyngx:8999/
     networks:
