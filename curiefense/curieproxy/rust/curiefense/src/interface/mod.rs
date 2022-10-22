@@ -173,7 +173,8 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
-    map_ser.serialize_entry("request_id", &rinfo.rinfo.meta.requestid)?;
+    let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
+    map_ser.serialize_entry("request_id", &request_id)?;
     map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
     map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
     map_ser.serialize_entry("path_parts", &rinfo.rinfo.qinfo.path_as_map)?;
@@ -323,9 +324,6 @@ pub fn jsonlog_rinfo(
             mp.end()
         }
     }
-    map_ser.serialize_entry("profiling", &EmptyMap)?;
-    map_ser.serialize_entry("biometric", &EmptyMap)?;
-
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
 }
