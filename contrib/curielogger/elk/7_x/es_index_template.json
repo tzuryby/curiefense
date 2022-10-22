@@ -1,4 +1,4 @@
-{
+
   "index_patterns": [
     "curieaccesslog-*"
   ],
@@ -156,8 +156,5 @@
         "type": "text"
       }
     }
-  },
-  "aliases": {
-
   }
 }
