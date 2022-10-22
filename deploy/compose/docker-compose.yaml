@@ -286,6 +286,18 @@ services:
     networks:
       - curiemesh
 
+  mongodb:
+    container_name: mongodb
+    hostname: mongodb
+    image: docker.io/bitnami/mongodb:6.0
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - 'mongodb_data:/bitnami/mongodb'
+    networks:
+      - curiemesh
+
 networks:
   curiemesh:
     name: curiemesh

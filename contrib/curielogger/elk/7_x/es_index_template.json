@@ -4,7 +4,9 @@
   ],
   "version": 1,
   "priority": 200,
-  "composed_of": [],
+  "composed_of": [
+
+  ],
   "_meta": {
     "description": "Curiefense's index template "
   },
@@ -18,7 +20,9 @@
       }
     },
     "mappings": {
-      "dynamic_templates": [],
+      "dynamic_templates": [
+
+      ],
       "properties": {
         "timestamp": {
           "type": "date_nanos"
@@ -38,12 +42,6 @@
         "cookies": {
           "type": "flattened"
         },
-        "custom_response": {
-          "type": "boolean"
-        },
-        "flow_control_triggers": {
-          "type": "nested"
-        },
         "global_filters_triggers": {
           "type": "nested"
         },
@@ -62,94 +60,80 @@
         "path_parts": {
           "type": "flattened"
         },
-        "profiling": {
-          "type": "nested"
-        },
         "proxy": {
-          "type": "object",
-          "properties": {
-            "location": {
-              "type": "geo_point",
-              "ignore_malformed": true,
-              "ignore_z_value": true
-            }
-          }
-        },
-        "rate_limit_triggers": {
-          "type": "nested"
-        },
-        "requestid": {
-          "type": "keyword"
-        },
-        "security_config": {
-          "type": "object",
-          "properties": {
-            "global_filters_active": {
-              "type": "integer"
-            },
-            "rate_limit_rules": {
-              "type": "integer"
-            },
-            "revision": {
-              "type": "keyword"
-            },
-            "acl_active": {
-              "type": "boolean"
-            },
-            "cf_active": {
-              "type": "boolean"
-            },
-            "cf_rules": {
-              "type": "integer"
-            }
-          }
-        },
-        "response_code": {
-          "type": "integer"
-        },
-        "tags": {
-          "type": "text"
-        },
-        "trigger_counters": {
-          "type": "object",
-          "properties": {
-            "acl": {
-              "type": "integer"
-            },
-            "acl_active": {
-              "type": "integer"
-            },
-            "content_filters": {
-              "type": "integer"
-            },
-            "content_filters_active": {
-              "type": "integer"
-            },
-            "flow_control": {
-              "type": "integer"
-            },
-            "flow_control_active": {
-              "type": "integer"
-            },
-            "global_filters": {
-              "type": "integer"
-            },
-            "global_filters_active": {
-              "type": "integer"
-            },
-            "rate_limit": {
-              "type": "integer"
-            },
-            "rate_limit_active": {
-              "type": "integer"
-            }
-          }
-        },
-        "uri": {
-          "type": "text"
+          "type": "flattened"
         }
+      },
+      "rate_limit_triggers": {
+        "type": "nested"
+      },
+      "requestid": {
+        "type": "keyword"
+      },
+      "security_config": {
+        "type": "object",
+        "properties": {
+          "global_filters_active": {
+            "type": "integer"
+          },
+          "rate_limit_rules": {
+            "type": "integer"
+          },
+          "revision": {
+            "type": "keyword"
+          },
+          "acl_active": {
+            "type": "boolean"
+          },
+          "cf_active": {
+            "type": "boolean"
+          },
+          "cf_rules": {
+            "type": "integer"
+          }
+        }
+      },
+      "response_code": {
+        "type": "integer"
+      },
+      "tags": {
+        "type": "text"
+      },
+      "trigger_counters": {
+        "type": "object",
+        "properties": {
+          "acl": {
+            "type": "integer"
+          },
+          "acl_active": {
+            "type": "integer"
+          },
+          "content_filters": {
+            "type": "integer"
+          },
+          "content_filters_active": {
+            "type": "integer"
+          },
+          "global_filters": {
+            "type": "integer"
+          },
+          "global_filters_active": {
+            "type": "integer"
+          },
+          "rate_limit": {
+            "type": "integer"
+          },
+          "rate_limit_active": {
+            "type": "integer"
+          }
+        }
+      },
+      "uri": {
+        "type": "text"
       }
-    },
-    "aliases": {}
+    }
+  },
+  "aliases": {
+
   }
 }
