@@ -412,7 +412,7 @@ def validateJson(json_data, schema_type):
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
         return False
-    return True, ""
+    return True
 
 
 ### DB Schema validation
