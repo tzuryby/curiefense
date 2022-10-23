@@ -212,9 +212,9 @@ m_action = api.model(
 
 # Virtual Tag
 
-
+## match entry
 nested_fields = api.model(
-    "VtagMatch",
+    "VTagMatch",
     {
         "vtag": fields.String(),
         "tags": fields.List(fields.String())
@@ -228,7 +228,6 @@ m_virtualtag = api.model(
         "name": fields.String(required=True),
         "description": fields.String(),
         "match": fields.List(fields.Nested(nested_fields)),
-        # "match": fields.List(fields.Raw(required=True)),
     },
 )
 
