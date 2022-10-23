@@ -411,7 +411,7 @@ def validateJson(json_data, schema_type):
         validate(instance=json_data, schema=schema_type_map[schema_type])
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
-        return False, str(err)
+        return False
     return True, ""
 
 
@@ -423,7 +423,7 @@ def validateDbJson(json_data, schema):
         validate(instance=json_data, schema=schema)
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
-        return False, str(err)
+        return False
     return True
 
 
