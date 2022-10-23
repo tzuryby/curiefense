@@ -5,10 +5,14 @@ class CounterTypes(Enum):
     REGULAR = 1
     # counter additionally labeled by "key"
     COUNTER_BY_KEY = 2
+    # elements that looks like dict
+    # E.g. {"args":0,"attrs":0,"body":0,"headers":0,"uri":0}
+    COUNTER_OBJECT_BY_KEY = 3
 
 
 REGULAR = CounterTypes.REGULAR
 COUNTER_BY_KEY = CounterTypes.COUNTER_BY_KEY
+COUNTER_OBJECT_BY_KEY = CounterTypes.COUNTER_OBJECT_BY_KEY
 
 
 # mapping of counters to REGULAR, SESSION and PROCESSING_TIME. the two other ones are recognized by regex
@@ -76,11 +80,9 @@ counters_format = {
     "methods": {"type": COUNTER_BY_KEY, "label": "method"},
     "status": {"type": COUNTER_BY_KEY, "label": "code"},
     "status_classes": {"type": COUNTER_BY_KEY, "label": "code_class"},
-    # TODO: special case
-    # "section_active":{"args":0,"attrs":0,"body":0,"headers":0,"uri":0}
-    # "section_active": {"type": COUNTER_BY_KEY, "label": "section"},
-    # "section_passed": {"type": COUNTER_BY_KEY, "label": "section"},
-    # "section_reported": {"type": COUNTER_BY_KEY, "label": "section"},
+    "section_active": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
+    "section_passed": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
+    "section_reported": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
 }
 
 # TODO there are no those keys anymore, delete or rebuild to an actual ones
@@ -89,5 +91,5 @@ name_changes = {"d_bytes": "total_downstream_bytes", "u_bytes": "total_upstream_
 
 # validating format validity, in case new keys will be entered
 for counter, value in counters_format.items():
-    if value["type"] not in [REGULAR, COUNTER_BY_KEY]:
+    if value["type"] not in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         raise TypeError(f"{counter} is not of a legal type in counters_format")

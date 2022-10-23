@@ -13,6 +13,7 @@ from prometheus_client import start_http_server, Counter, REGISTRY
 from utils.prometheus_counters_dict import (
     REGULAR,
     COUNTER_BY_KEY,
+    COUNTER_OBJECT_BY_KEY,
     counters_format,
     name_changes,
 )
@@ -46,9 +47,7 @@ for name, counter_label in counters_format.items():
     type = counter_label["type"]
     label = counter_label.get("label")
     more_labels = [label] if label else []
-    if type == REGULAR:
-        t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
-    elif type == COUNTER_BY_KEY:
+    if type in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
 
 q = Queue()
@@ -100,6 +99,9 @@ def update_t3_counters(t2_dict):
         elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
+        elif counter_type == COUNTER_OBJECT_BY_KEY:
+            for key, value in counter_value.items():
+                counter.labels(app, proxy, profile, key).inc(value)
 
 
 def export_t2(t2: dict):
