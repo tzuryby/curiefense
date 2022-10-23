@@ -254,7 +254,7 @@ models = {
     "globalfilters": m_globalfilter,
     "flowcontrol": m_flowcontrol,
     "actions": m_action,
-    "virtualtags": m_virtualtag,
+    "virtualtags": m_custom,
     "custom": m_custom,
 }
 

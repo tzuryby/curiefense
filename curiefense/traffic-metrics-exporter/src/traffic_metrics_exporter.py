@@ -87,6 +87,7 @@ def _get_counter_type(counter_name):
             return STATUS_CLASSES
     return False
 
+
 def switch_hyphens(name):
     return name.replace("-", "_")
 
@@ -122,7 +123,7 @@ def update_t3_counters(t2_dict):
             counter.labels(app, proxy, profile).inc(counter_value)
         elif counter_type in [STATUS_CODES, STATUS_CLASSES, METHODS]:
             for value in counter_value:
-                counter.labels(app, proxy, profile, value['key']).inc(value['value'])
+                counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
 
 
 def export_t2(t2: dict):
