@@ -2,67 +2,71 @@
   "index_patterns": [
     "curieaccesslog-*"
   ],
-  "version": 1,
-  "priority": 200,
-  "composed_of": [
-
-  ],
-  "_meta": {
-    "description": "Curiefense's index template "
-  },
-  "template": {
-    "settings": {
-      "index": {
-        "lifecycle": {
-          "name": "curieaccesslog",
-          "rollover_alias": "curieaccesslog"
-        }
-      }
-    },
-    "mappings": {
-      "dynamic_templates": [
-
-      ],
-      "properties": {
-        "timestamp": {
-          "type": "date_nanos"
-        },
-        "acl_triggers": {
-          "type": "nested"
-        },
-        "arguments": {
-          "type": "flattened"
-        },
-        "authority": {
-          "type": "keyword"
-        },
-        "content_filter_triggers": {
-          "type": "nested"
-        },
-        "cookies": {
-          "type": "flattened"
-        },
-        "global_filters_triggers": {
-          "type": "nested"
-        },
-        "headers": {
-          "type": "flattened"
-        },
-        "ip": {
-          "type": "ip"
-        },
-        "logs": {
-          "type": "text"
-        },
-        "method": {
-          "type": "keyword"
-        },
-        "path_parts": {
-          "type": "flattened"
-        },
-        "proxy": {
-          "type": "flattened"
-        }
+  "settings": {},
+  "mappings": {
+    "properties": {
+      "timestamp": {
+        "type": "date_nanos"
+      },
+      "processing_stage": {
+        "type": "integer"
+      },
+      "uri": {
+        "type": "keyword"
+      },
+      "reason": {
+        "type": "text"
+      },
+      "curiesession": {
+        "type": "keyword"
+      },
+      "curiesession_ids": {
+        "type": "flattened"
+      },
+      "request_id": {
+        "type": "keyword"
+      },
+      "path": {
+        "type": "keyword"
+      },
+      "acl_triggers": {
+        "type": "nested"
+      },
+      "arguments": {
+        "type": "flattened"
+      },
+      "authority": {
+        "type": "keyword"
+      },
+      "global_filter_triggers": {
+        "type": "nested"
+      },
+      "content_filter_triggers": {
+        "type": "nested"
+      },
+      "cookies": {
+        "type": "flattened"
+      },
+      "global_filters_triggers": {
+        "type": "nested"
+      },
+      "headers": {
+        "type": "flattened"
+      },
+      "ip": {
+        "type": "ip"
+      },
+      "logs": {
+        "type": "text"
+      },
+      "method": {
+        "type": "keyword"
+      },
+      "path_parts": {
+        "type": "flattened"
+      },
+      "proxy": {
+        "type": "flattened"
       },
       "rate_limit_triggers": {
         "type": "nested"
@@ -127,13 +131,7 @@
             "type": "integer"
           }
         }
-      },
-      "uri": {
-        "type": "text"
       }
     }
-  },
-  "aliases": {
-
   }
 }
