@@ -267,7 +267,6 @@ m_document_mask = api.model(
         "thresholds": fields.List(fields.Nested(m_threshold)),
         "pairwith": fields.Raw(),
         "content_type": fields.List(fields.String()),
-        "params": fields.Raw(),
         "decoding": fields.Raw(),
         "category": fields.String(),
         "subcategory": fields.String(),
@@ -414,7 +413,7 @@ def validateDbJson(json_data, schema):
         validate(instance=json_data, schema=schema)
     except jsonschema.exceptions.ValidationError as err:
         print(str(err))
-        return False
+        return False, str(err)
     return True
 
 
@@ -664,7 +663,7 @@ class DocumentResource(Resource):
         for entry in request.json:
             isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched: \n" + err)
+                abort(400, "schema mismatched: \n" + err)
         res = current_app.backend.documents_create(
             config, document, data, get_gitactor()
         )
@@ -679,7 +678,7 @@ class DocumentResource(Resource):
         for entry in request.json:
             isValid, err = validateJson(entry, document)
             if isValid is False:
-                abort(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
+                abort(400, "schema mismatched for entry: " + str(entry) + "\n" + err)
         res = current_app.backend.documents_update(
             config, document, data, get_gitactor()
         )
@@ -749,7 +748,7 @@ class EntriesResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched: \n" + err)
+            abort(400, "schema mismatched: \n" + err)
 
 
 @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
@@ -774,7 +773,7 @@ class EntryResource(Resource):
             )
             return res
         else:
-            abort(500, "schema mismatched: \n" + err)
+            abort(400, "schema mismatched: \n" + err)
 
     def delete(self, config, document, entry):
         "Delete an entry from a document"
@@ -916,7 +915,7 @@ class KeyResource(Resource):
             if schema:
                 isValid = validateDbJson(request.json, schema)
                 if isValid is False:
-                    abort(500, "schema mismatched")
+                    abort(400, "schema mismatched")
         return current_app.backend.key_set(nsname, key, request.json, get_gitactor())
 
     def delete(self, nsname, key):
