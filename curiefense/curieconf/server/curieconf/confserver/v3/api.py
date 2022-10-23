@@ -218,7 +218,8 @@ m_virtualtag = api.model(
         "id": fields.String(required=True),
         "name": fields.String(required=True),
         "description": fields.String(),
-        "match": fields.List(fields.Raw(required=True)),
+        "match": fields.List(fields.Raw()),
+        # "match": fields.List(fields.Raw(required=True)),
     },
 )
 
