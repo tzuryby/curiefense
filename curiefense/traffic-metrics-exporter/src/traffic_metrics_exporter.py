@@ -15,6 +15,7 @@ from utils.prometheus_counters_dict import (
     REGULAR,
     AVERAGE,
     MAX_PER_REQUEST,
+    AVG_PER_REQUEST,
     COUNTER_BY_KEY,
     COUNTER_OBJECT_BY_KEY,
     counters_format,
@@ -52,7 +53,7 @@ for name, counter_label in counters_format.items():
     more_labels = [label] if label else []
     if type in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
-    elif type in [AVERAGE, MAX_PER_REQUEST]:
+    elif type in [AVERAGE, MAX_PER_REQUEST, AVG_PER_REQUEST]:
         t3_counters[counter_name] = Gauge(counter_name, "", base_labels + more_labels)
 
 q = Queue()
@@ -103,6 +104,16 @@ def _get_numbers_group(number):
         return ">32"
 
 
+def _round_mean(x):
+    return round(mean(x), 3)
+
+
+def collect_values(acc, key, value):
+    if not acc.get(key):
+        acc[key] = []
+    acc[key].append(value)
+
+
 def update_t3_counters(t2_dict, acc_avg):
     proxy = t2_dict.get("proxy", "")
     app = t2_dict.get("secpolid", "")
@@ -120,26 +131,21 @@ def update_t3_counters(t2_dict, acc_avg):
             # Find average for collected values. The last one will be the right number for the whole period.
             key = f"{proxy}-{app}-{profile}-{valid_name}"
             collect_values(acc_avg, key, counter_value)
-            counter.labels(app, proxy, profile).set(round(mean(acc_avg[key]), 3))
-        elif counter_type == MAX_PER_REQUEST:
+            counter.labels(app, proxy, profile).set(_round_mean(acc_avg[key]))
+        elif counter_type in [MAX_PER_REQUEST, AVG_PER_REQUEST]:
+            func = max if counter_type == MAX_PER_REQUEST else _round_mean
             for value in counter_value:
-                # Collect all and get max, group by intervals of values
+                # Collect all and get max/mean. Group by intervals of values.
                 group = _get_numbers_group(value["key"])
                 key = f"{proxy}-{app}-{profile}-{valid_name}-{group}"
                 collect_values(acc_avg, key, value["value"])
-                counter.labels(app, proxy, profile, group).set(max(acc_avg[key]))
+                counter.labels(app, proxy, profile, group).set(func(acc_avg[key]))
         elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
         elif counter_type == COUNTER_OBJECT_BY_KEY:
             for key, value in counter_value.items():
                 counter.labels(app, proxy, profile, key).inc(value)
-
-
-def collect_values(acc, key, value):
-    if not acc.get(key):
-        acc[key] = []
-    acc[key].append(value)
 
 
 def export_t2(t2: dict):

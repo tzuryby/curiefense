@@ -11,11 +11,13 @@ class CounterTypes(Enum):
     AVERAGE = 4
     # args, cookies, headers amounts per request
     MAX_PER_REQUEST = 5
+    AVG_PER_REQUEST = 6
 
 
 REGULAR = CounterTypes.REGULAR
 AVERAGE = CounterTypes.AVERAGE
 MAX_PER_REQUEST = CounterTypes.MAX_PER_REQUEST
+AVG_PER_REQUEST = CounterTypes.AVG_PER_REQUEST
 COUNTER_BY_KEY = CounterTypes.COUNTER_BY_KEY
 COUNTER_OBJECT_BY_KEY = CounterTypes.COUNTER_OBJECT_BY_KEY
 
@@ -115,6 +117,9 @@ counters_format = {
     "top_max_args_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
     "top_max_cookies_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
     "top_max_headers_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
+    "top_request_per_args": {"type": AVG_PER_REQUEST, "label": "group"},
+    "top_request_per_cookies": {"type": AVG_PER_REQUEST, "label": "group"},
+    "top_request_per_headers": {"type": AVG_PER_REQUEST, "label": "group"},
 }
 
 
@@ -126,6 +131,7 @@ for counter, value in counters_format.items():
         REGULAR,
         AVERAGE,
         MAX_PER_REQUEST,
+        AVG_PER_REQUEST,
         COUNTER_BY_KEY,
         COUNTER_OBJECT_BY_KEY,
     ]:
