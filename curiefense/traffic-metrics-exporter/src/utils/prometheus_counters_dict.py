@@ -46,14 +46,11 @@ counters_format = {
     "avg_process_time": REGULAR,
     "methods": METHODS,
     "status": STATUS_CODES,
-    "status_classes": STATUS_CLASSES
+    "status_classes": STATUS_CLASSES,
 }
 
 # counters
-name_changes = {
-    "d_bytes": "total_downstream_bytes",
-    "u_bytes": "total_upstream_bytes"
-}
+name_changes = {"d_bytes": "total_downstream_bytes", "u_bytes": "total_upstream_bytes"}
 
 # validating format validity, in case new keys will be entered
 for counter, value in counters_format.items():
