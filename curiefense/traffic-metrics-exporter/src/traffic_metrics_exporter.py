@@ -12,9 +12,7 @@ from prometheus_client import start_http_server, Counter, REGISTRY
 
 from utils.prometheus_counters_dict import (
     REGULAR,
-    METHODS,
-    STATUS_CODES,
-    STATUS_CLASSES,
+    COUNTER_BY_KEY,
     counters_format,
     name_changes,
 )
@@ -45,12 +43,13 @@ start_http_server(8911)
 
 for name, counter_label in counters_format.items():
     counter_name = name
-    if counter_label == REGULAR:
-        t3_counters[counter_name] = Counter(counter_name, "", base_labels)
-
-t3_counters["method"] = Counter("method", "", base_labels + ["method"])
-t3_counters["status_code"] = Counter("status_code", "", base_labels + ["code"])
-t3_counters["status_class"] = Counter("status_class", "", base_labels + ["class"])
+    type = counter_label["type"]
+    label = counter_label.get("label")
+    more_labels = [label] if label else []
+    if type == REGULAR:
+        t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
+    elif type == COUNTER_BY_KEY:
+        t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
 
 q = Queue()
 
@@ -77,35 +76,12 @@ def get_mongodb():
 def _get_counter_type(counter_name):
     counter_type = counters_format.get(counter_name, False)
     if counter_type:
-        return counter_type
-    else:
-        if counter_name in http_methods:
-            return METHODS
-        if re.fullmatch(r"[1-9][0-9][0-9]", counter_name):
-            return STATUS_CODES
-        if re.fullmatch(r"[1-9]xx", counter_name):
-            return STATUS_CLASSES
+        return counter_type["type"]
     return False
 
 
 def switch_hyphens(name):
     return name.replace("-", "_")
-
-
-def get_t3_counter(metric_name, counter_type):
-    if not counter_type:
-        return False
-
-    if counter_type == REGULAR:
-        return t3_counters[metric_name]
-    elif counter_type == STATUS_CODES:
-        return t3_counters["status_code"]
-    elif counter_type == STATUS_CLASSES:
-        return t3_counters["status_class"]
-    elif counter_type == METHODS:
-        return t3_counters["method"]
-
-    return False
 
 
 def update_t3_counters(t2_dict):
@@ -118,10 +94,10 @@ def update_t3_counters(t2_dict):
         counter_type = _get_counter_type(valid_name)
         if not counter_type:
             continue
-        counter = get_t3_counter(valid_name, counter_type)
+        counter = t3_counters[valid_name]
         if counter_type == REGULAR:
             counter.labels(app, proxy, profile).inc(counter_value)
-        elif counter_type in [STATUS_CODES, STATUS_CLASSES, METHODS]:
+        elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
 
@@ -149,7 +125,11 @@ def get_t2():
     while True:
         start_time = time.time()
         time.time() - start_time
-        five_sec_t2 = requests.get(config["url"]).content.decode()
+        try:
+            five_sec_t2 = requests.get(config["url"]).content.decode()
+        except Exception as e:
+            logger.exception(e)
+
         q.put(five_sec_t2)
 
         time.sleep(5 - (time.time() - start_time))
