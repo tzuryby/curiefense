@@ -20,6 +20,7 @@ counters_format = {
     "bot": {"type": REGULAR},
     "challenge": {"type": REGULAR},
     "active": {"type": REGULAR},
+    "passed": {"type": REGULAR},
     "reported": {"type": REGULAR},
     "total_downstream_bytes": {"type": REGULAR},
     "total_upstream_bytes": {"type": REGULAR},
