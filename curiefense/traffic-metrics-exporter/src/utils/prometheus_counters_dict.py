@@ -9,10 +9,13 @@ class CounterTypes(Enum):
     # E.g. {"args":0,"attrs":0,"body":0,"headers":0,"uri":0}
     COUNTER_OBJECT_BY_KEY = 3
     AVERAGE = 4
+    # args, cookies, headers amounts per request
+    MAX_PER_REQUEST = 5
 
 
 REGULAR = CounterTypes.REGULAR
 AVERAGE = CounterTypes.AVERAGE
+MAX_PER_REQUEST = CounterTypes.MAX_PER_REQUEST
 COUNTER_BY_KEY = CounterTypes.COUNTER_BY_KEY
 COUNTER_OBJECT_BY_KEY = CounterTypes.COUNTER_OBJECT_BY_KEY
 
@@ -109,6 +112,9 @@ counters_format = {
     "unique_session": {"type": AVERAGE},
     "unique_uri": {"type": AVERAGE},
     "unique_user_agent": {"type": AVERAGE},
+    "top_max_args_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
+    "top_max_cookies_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
+    "top_max_headers_per_request": {"type": MAX_PER_REQUEST, "label": "group"},
 }
 
 
@@ -116,5 +122,11 @@ name_changes = {}
 
 # validating format validity, in case new keys will be entered
 for counter, value in counters_format.items():
-    if value["type"] not in [REGULAR, AVERAGE, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
+    if value["type"] not in [
+        REGULAR,
+        AVERAGE,
+        MAX_PER_REQUEST,
+        COUNTER_BY_KEY,
+        COUNTER_OBJECT_BY_KEY,
+    ]:
         raise TypeError(f"{counter} is not of a legal type in counters_format")

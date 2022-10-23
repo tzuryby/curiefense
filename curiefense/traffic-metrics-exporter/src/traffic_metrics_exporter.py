@@ -14,6 +14,7 @@ from prometheus_client import start_http_server, Counter, REGISTRY, Gauge
 from utils.prometheus_counters_dict import (
     REGULAR,
     AVERAGE,
+    MAX_PER_REQUEST,
     COUNTER_BY_KEY,
     COUNTER_OBJECT_BY_KEY,
     counters_format,
@@ -51,8 +52,8 @@ for name, counter_label in counters_format.items():
     more_labels = [label] if label else []
     if type in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
-    elif type in [AVERAGE]:
-        t3_counters[counter_name] = Gauge(counter_name, "", base_labels)
+    elif type in [AVERAGE, MAX_PER_REQUEST]:
+        t3_counters[counter_name] = Gauge(counter_name, "", base_labels + more_labels)
 
 q = Queue()
 
@@ -87,6 +88,21 @@ def switch_hyphens(name):
     return name.replace("-", "_")
 
 
+def _get_numbers_group(number):
+    if 0 == int(number):
+        return "0"
+    elif 1 <= int(number) <= 5:
+        return "1-5"
+    elif 6 <= int(number) <= 10:
+        return "6-10"
+    elif 11 <= int(number) <= 20:
+        return "6-20"
+    elif 21 <= int(number) <= 32:
+        return "21-32"
+    else:
+        return ">32"
+
+
 def update_t3_counters(t2_dict, acc_avg):
     proxy = t2_dict.get("proxy", "")
     app = t2_dict.get("secpolid", "")
@@ -105,6 +121,13 @@ def update_t3_counters(t2_dict, acc_avg):
             key = f"{proxy}-{app}-{profile}-{valid_name}"
             collect_values(acc_avg, key, counter_value)
             counter.labels(app, proxy, profile).set(round(mean(acc_avg[key]), 3))
+        elif counter_type == MAX_PER_REQUEST:
+            for value in counter_value:
+                # Collect all and get max, group by intervals of values
+                group = _get_numbers_group(value["key"])
+                key = f"{proxy}-{app}-{profile}-{valid_name}-{group}"
+                collect_values(acc_avg, key, value["value"])
+                counter.labels(app, proxy, profile, group).set(max(acc_avg[key]))
         elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
