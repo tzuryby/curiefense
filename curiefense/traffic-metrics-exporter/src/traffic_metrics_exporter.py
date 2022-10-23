@@ -8,12 +8,15 @@ from functools import lru_cache
 import pymongo
 import requests
 import logging
+from copy import deepcopy
 from statistics import mean
 from prometheus_client import start_http_server, Counter, REGISTRY, Gauge
 
 from utils.prometheus_counters_dict import (
     REGULAR,
     AVERAGE,
+    MAX,
+    MIN,
     MAX_PER_REQUEST,
     AVG_PER_REQUEST,
     COUNTER_BY_KEY,
@@ -38,6 +41,8 @@ http_methods = [
     "PATCH",
 ]
 base_labels = ["secpolid", "proxy", "secpolentryid"]
+# Object fields that will be flattened process_time: {"avg": 0} -> process_time_avg
+flat_properties = ["processing_time", "bytes_sent"]
 
 
 t3_counters = dict()
@@ -53,7 +58,7 @@ for name, counter_label in counters_format.items():
     more_labels = [label] if label else []
     if type in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
-    elif type in [AVERAGE, MAX_PER_REQUEST, AVG_PER_REQUEST]:
+    elif type in [AVERAGE, MAX, MIN, MAX_PER_REQUEST, AVG_PER_REQUEST]:
         t3_counters[counter_name] = Gauge(counter_name, "", base_labels + more_labels)
 
 q = Queue()
@@ -114,10 +119,30 @@ def collect_values(acc, key, value):
     acc[key].append(value)
 
 
+def flatten_object_properties(t2_dict: dict):
+    t2 = deepcopy(t2_dict)
+    for counter_name, counter_value in t2_dict.get("counters", {}).items():
+        if counter_name in flat_properties:
+            for key, value in counter_value.items():
+                t2["counters"][f"{counter_name}_{key}"] = value
+    return t2
+
+
+def choose_func(counter_type):
+    return {
+        MAX_PER_REQUEST: max,
+        AVG_PER_REQUEST: _round_mean,
+        AVERAGE: _round_mean,
+        MAX: max,
+        MIN: min,
+    }.get(counter_type)
+
+
 def update_t3_counters(t2_dict, acc_avg):
     proxy = t2_dict.get("proxy", "")
     app = t2_dict.get("secpolid", "")
     profile = t2_dict.get("secpolentryid", "")
+    t2_dict = flatten_object_properties(t2_dict)
     for counter_name, counter_value in t2_dict.get("counters", {}).items():
         counter_name = name_changes.get(counter_name, counter_name)
         valid_name = switch_hyphens(counter_name)
@@ -127,19 +152,22 @@ def update_t3_counters(t2_dict, acc_avg):
         counter = t3_counters[valid_name]
         if counter_type == REGULAR:
             counter.labels(app, proxy, profile).inc(counter_value)
-        elif counter_type == AVERAGE:
+        elif counter_type in [AVERAGE, MAX, MIN]:
             # Find average for collected values. The last one will be the right number for the whole period.
             key = f"{proxy}-{app}-{profile}-{valid_name}"
             collect_values(acc_avg, key, counter_value)
-            counter.labels(app, proxy, profile).set(_round_mean(acc_avg[key]))
+            counter.labels(app, proxy, profile).set(
+                choose_func(counter_type)(acc_avg[key])
+            )
         elif counter_type in [MAX_PER_REQUEST, AVG_PER_REQUEST]:
-            func = max if counter_type == MAX_PER_REQUEST else _round_mean
             for value in counter_value:
                 # Collect all and get max/mean. Group by intervals of values.
                 group = _get_numbers_group(value["key"])
                 key = f"{proxy}-{app}-{profile}-{valid_name}-{group}"
                 collect_values(acc_avg, key, value["value"])
-                counter.labels(app, proxy, profile, group).set(func(acc_avg[key]))
+                counter.labels(app, proxy, profile, group).set(
+                    choose_func(counter_type)(acc_avg[key])
+                )
         elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])

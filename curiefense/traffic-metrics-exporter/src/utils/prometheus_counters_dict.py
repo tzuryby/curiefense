@@ -9,13 +9,17 @@ class CounterTypes(Enum):
     # E.g. {"args":0,"attrs":0,"body":0,"headers":0,"uri":0}
     COUNTER_OBJECT_BY_KEY = 3
     AVERAGE = 4
+    MAX = 5
+    MIN = 6
     # args, cookies, headers amounts per request
-    MAX_PER_REQUEST = 5
-    AVG_PER_REQUEST = 6
+    MAX_PER_REQUEST = 7
+    AVG_PER_REQUEST = 8
 
 
 REGULAR = CounterTypes.REGULAR
 AVERAGE = CounterTypes.AVERAGE
+MAX = CounterTypes.MAX
+MIN = CounterTypes.MIN
 MAX_PER_REQUEST = CounterTypes.MAX_PER_REQUEST
 AVG_PER_REQUEST = CounterTypes.AVG_PER_REQUEST
 COUNTER_BY_KEY = CounterTypes.COUNTER_BY_KEY
@@ -120,6 +124,12 @@ counters_format = {
     "top_request_per_args": {"type": AVG_PER_REQUEST, "label": "group"},
     "top_request_per_cookies": {"type": AVG_PER_REQUEST, "label": "group"},
     "top_request_per_headers": {"type": AVG_PER_REQUEST, "label": "group"},
+    "processing_time_average": {"type": AVERAGE},
+    "processing_time_max": {"type": AVERAGE},
+    "processing_time_min": {"type": MIN},
+    "bytes_sent_average": {"type": MAX},
+    "bytes_sent_min": {"type": MAX},
+    "bytes_sent_max": {"type": MIN},
 }
 
 
@@ -130,6 +140,8 @@ for counter, value in counters_format.items():
     if value["type"] not in [
         REGULAR,
         AVERAGE,
+        MAX,
+        MIN,
         MAX_PER_REQUEST,
         AVG_PER_REQUEST,
         COUNTER_BY_KEY,
