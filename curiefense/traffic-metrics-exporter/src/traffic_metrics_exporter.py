@@ -8,10 +8,12 @@ from functools import lru_cache
 import pymongo
 import requests
 import logging
-from prometheus_client import start_http_server, Counter, REGISTRY
+from statistics import mean
+from prometheus_client import start_http_server, Counter, REGISTRY, Gauge
 
 from utils.prometheus_counters_dict import (
     REGULAR,
+    AVERAGE,
     COUNTER_BY_KEY,
     COUNTER_OBJECT_BY_KEY,
     counters_format,
@@ -49,6 +51,8 @@ for name, counter_label in counters_format.items():
     more_labels = [label] if label else []
     if type in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         t3_counters[counter_name] = Counter(counter_name, "", base_labels + more_labels)
+    elif type in [AVERAGE]:
+        t3_counters[counter_name] = Gauge(counter_name, "", base_labels)
 
 q = Queue()
 
@@ -83,7 +87,7 @@ def switch_hyphens(name):
     return name.replace("-", "_")
 
 
-def update_t3_counters(t2_dict):
+def update_t3_counters(t2_dict, acc_avg):
     proxy = t2_dict.get("proxy", "")
     app = t2_dict.get("secpolid", "")
     profile = t2_dict.get("secpolentryid", "")
@@ -96,12 +100,23 @@ def update_t3_counters(t2_dict):
         counter = t3_counters[valid_name]
         if counter_type == REGULAR:
             counter.labels(app, proxy, profile).inc(counter_value)
+        elif counter_type == AVERAGE:
+            # Find average for collected values. The last one will be the right number for the whole period.
+            key = f"{proxy}-{app}-{profile}-{valid_name}"
+            collect_values(acc_avg, key, counter_value)
+            counter.labels(app, proxy, profile).set(round(mean(acc_avg[key]), 3))
         elif counter_type == COUNTER_BY_KEY:
             for value in counter_value:
                 counter.labels(app, proxy, profile, value["key"]).inc(value["value"])
         elif counter_type == COUNTER_OBJECT_BY_KEY:
             for key, value in counter_value.items():
                 counter.labels(app, proxy, profile, key).inc(value)
+
+
+def collect_values(acc, key, value):
+    if not acc.get(key):
+        acc[key] = []
+    acc[key].append(value)
 
 
 def export_t2(t2: dict):
@@ -114,12 +129,13 @@ def export_t2(t2: dict):
 
 def export_t3():
     while True:
+        acc_avg = {}
         five_sec_string = q.get()
         five_sec_json = json.loads(five_sec_string)
         export_t2(five_sec_json)
         for agg_sec in five_sec_json:
             start_time = time.time()
-            update_t3_counters(agg_sec)
+            update_t3_counters(agg_sec, acc_avg)
 
 
 def get_t2():

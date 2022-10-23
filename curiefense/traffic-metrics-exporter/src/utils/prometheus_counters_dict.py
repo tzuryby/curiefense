@@ -8,9 +8,11 @@ class CounterTypes(Enum):
     # elements that looks like dict
     # E.g. {"args":0,"attrs":0,"body":0,"headers":0,"uri":0}
     COUNTER_OBJECT_BY_KEY = 3
+    AVERAGE = 4
 
 
 REGULAR = CounterTypes.REGULAR
+AVERAGE = CounterTypes.AVERAGE
 COUNTER_BY_KEY = CounterTypes.COUNTER_BY_KEY
 COUNTER_OBJECT_BY_KEY = CounterTypes.COUNTER_OBJECT_BY_KEY
 
@@ -83,13 +85,36 @@ counters_format = {
     "section_active": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
     "section_passed": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
     "section_reported": {"type": COUNTER_OBJECT_BY_KEY, "label": "section"},
+    "unique_active_asn": {"type": AVERAGE},
+    "unique_active_country": {"type": AVERAGE},
+    "unique_active_ip": {"type": AVERAGE},
+    "unique_active_session": {"type": AVERAGE},
+    "unique_active_uri": {"type": AVERAGE},
+    "unique_active_user_agent": {"type": AVERAGE},
+    "unique_asn": {"type": AVERAGE},
+    "unique_country": {"type": AVERAGE},
+    "unique_ip": {"type": AVERAGE},
+    "unique_passed_asn": {"type": AVERAGE},
+    "unique_passed_country": {"type": AVERAGE},
+    "unique_passed_ip": {"type": AVERAGE},
+    "unique_passed_session": {"type": AVERAGE},
+    "unique_passed_uri": {"type": AVERAGE},
+    "unique_passed_user_agent": {"type": AVERAGE},
+    "unique_reported_asn": {"type": AVERAGE},
+    "unique_reported_country": {"type": AVERAGE},
+    "unique_reported_ip": {"type": AVERAGE},
+    "unique_reported_session": {"type": AVERAGE},
+    "unique_reported_uri": {"type": AVERAGE},
+    "unique_reported_user_agent": {"type": AVERAGE},
+    "unique_session": {"type": AVERAGE},
+    "unique_uri": {"type": AVERAGE},
+    "unique_user_agent": {"type": AVERAGE},
 }
 
-# TODO there are no those keys anymore, delete or rebuild to an actual ones
-# counters
-name_changes = {"d_bytes": "total_downstream_bytes", "u_bytes": "total_upstream_bytes"}
+
+name_changes = {}
 
 # validating format validity, in case new keys will be entered
 for counter, value in counters_format.items():
-    if value["type"] not in [REGULAR, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
+    if value["type"] not in [REGULAR, AVERAGE, COUNTER_BY_KEY, COUNTER_OBJECT_BY_KEY]:
         raise TypeError(f"{counter} is not of a legal type in counters_format")
