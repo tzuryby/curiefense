@@ -202,12 +202,11 @@ def get_t2():
         time.time() - start_time
         try:
             five_sec_t2 = requests.get(config["url"]).content.decode()
+            q.put(five_sec_t2)
         except Exception as e:
             logger.exception(e)
 
-        q.put(five_sec_t2)
-
-        time.sleep(5 - (time.time() - start_time))
+        time.sleep(10 - (time.time() - start_time))
 
 
 if __name__ == "__main__":
