@@ -29,6 +29,8 @@ LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
 
+METRICS_PULL_INTERVAL = 10
+
 http_methods = [
     "GET",
     "HEAD",
@@ -92,6 +94,11 @@ def _get_counter_type(counter_name):
 
 def switch_hyphens(name):
     return name.replace("-", "_")
+
+
+def _get_sleep_interval(start_time):
+    sleep = METRICS_PULL_INTERVAL - (time.time() - start_time)
+    return 0 if sleep < 0 else sleep
 
 
 def _get_numbers_group(number):
@@ -206,7 +213,7 @@ def get_t2():
         except Exception as e:
             logger.exception(e)
 
-        time.sleep(10 - (time.time() - start_time))
+        time.sleep(_get_sleep_interval(start_time))
 
 
 if __name__ == "__main__":
