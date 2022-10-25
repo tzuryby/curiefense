@@ -191,7 +191,7 @@ def export_t2(t2: dict):
     client = get_mongodb()
     try:
         for item in t2:
-            item["timestamp"] = isoparse(item['timestamp'])
+            item["timestamp"] = isoparse(item["timestamp"])
         client.insert_many(t2)
     except Exception as e:
         logger.exception(e)
