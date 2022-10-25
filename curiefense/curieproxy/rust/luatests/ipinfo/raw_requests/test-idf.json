@@ -1,0 +1,38 @@
+[
+  {
+    "response": {
+      "tags": [
+        "network:82-64-0-0-14",
+        "cookies:0",
+        "host:localhost:30081",
+        "geo-continent-code:nil",
+        "all",
+        "geo-org:proxad---free-sas",
+        "contentfiltername:default-contentfilter",
+        "args:0",
+        "geo-city:courbevoie",
+        "securitypolicy:default-entry",
+        "aclid:--default--",
+        "geo-region:-le-de-france",
+        "geo-continent-name:nil",
+        "geo-country:fr",
+        "headers:1",
+        "ip:82-64-131-193",
+        "contentfilterid:--default--",
+        "securitypolicy-entry:default",
+        "aclname:default-acl",
+        "geo-asn:12322",
+        "geo-subregion:92409-cedex",
+        "bot"
+      ],
+      "action": "pass"
+    },
+    "name": "test geo tagging",
+    "headers": {
+      "x-forwarded-for": "82.64.131.193",
+      ":path": "/",
+      ":method": "GET",
+      ":authority": "localhost:30081"
+    }
+  }
+]

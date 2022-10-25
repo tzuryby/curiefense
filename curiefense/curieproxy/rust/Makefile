@@ -67,6 +67,28 @@ test-nodeps:
 						 -w /home/builder -t curiefense/rustbuild:latest \
 						 /bin/sh /home/builder/run.sh
 
+test-ipinfo: ctarget/target/debug/libcuriefense_lua.so
+	docker run -v `pwd`/ctarget/target/debug/libcuriefense_lua.so:/usr/local/lib/lua/5.1/curiefense.so \
+						 -v `pwd`/../lua:/home/builder/lua \
+						 -v `pwd`/luatests/redis.lua:/home/builder/lua/redis.lua \
+						 -v `pwd`/../lua/shared-objects/luahs.so:/usr/local/lib/lua/5.1/luahs.so \
+						 -v `pwd`/../lua/shared-objects/libinjection.so:/usr/local/lib/lua/5.1/libinjection.so \
+						 -v `pwd`/../lua/shared-objects/grasshopper.so:/usr/local/lib/lua/5.1/grasshopper.so \
+						 -v `pwd`/../../images/confserver/bootstrap/confdb-initial-data/prod/config:/cf-config/current/config \
+						 -v `pwd`/luatests/run.sh:/home/builder/run.sh \
+						 -v `pwd`/luatests/ipinfo/test-ipinfo.lua:/home/builder/test.lua \
+						 -v `pwd`/luatests/ipinfo/config/json:/cf-config/current/config/json \
+						 -v `pwd`/luatests/ipinfo:/home/builder/luatests \
+						 -e DISABLE_MAXMIND_GEO=true \
+						 -e IPINFO_ROOT=/cf-config/current/config/ipinfo \
+						 -e IPINFO_LOCATION=artifacts_standard_location.mmdb \
+						 -e IPINFO_COMPANY=artifacts_standard_company.mmdb \
+						 -e IPINFO_PRIVACY=artifacts_privacy.mmdb \
+						 -e IPINFO_CARRIER=artifacts_carrier.mmdb \
+						 --rm \
+						 -w /home/builder -it curiefense/rustbuild:latest \
+						 /bin/sh /home/builder/run.sh
+
 gowaftest: ctarget/target/debug/libcuriefense_lua.so gowaftest-nodeps
 	echo DONE
 

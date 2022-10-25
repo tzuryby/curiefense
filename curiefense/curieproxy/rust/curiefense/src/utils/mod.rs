@@ -19,10 +19,13 @@ use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
+use crate::geo::{
+    get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn, get_maxmind_city,
+    get_maxmind_country,
+};
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
-use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
 use crate::utils::decoders::{parse_urlencoded_params, urldecode_str, DecodingResult};
 
@@ -218,6 +221,12 @@ pub struct GeoIp {
     pub network: Option<String>,
     pub is_anonymous_proxy: Option<bool>,
     pub is_satellite_provider: Option<bool>,
+    pub is_vpn: Option<bool>,
+    pub is_tor: Option<bool>,
+    pub is_relay: Option<bool>,
+    pub is_hosting: Option<bool>,
+    pub privacy_service: Option<String>,
+    pub is_mobile: Option<bool>,
 }
 
 impl GeoIp {
@@ -422,6 +431,12 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         network: None,
         is_anonymous_proxy: None,
         is_satellite_provider: None,
+        is_hosting: None,
+        is_relay: None,
+        is_tor: None,
+        is_vpn: None,
+        privacy_service: None,
+        is_mobile: None,
     };
 
     let ip = match pip {
@@ -432,11 +447,12 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         }
     };
 
+    // fill struct using maxmind
     let get_name = |mmap: &Option<std::collections::BTreeMap<&str, &str>>| {
         mmap.as_ref().and_then(|mp| mp.get("en")).map(|s| s.to_lowercase())
     };
 
-    if let Ok((asninfo, _)) = get_asn(ip) {
+    if let Ok((asninfo, _)) = get_maxmind_asn(ip) {
         geoip.asn = asninfo.autonomous_system_number;
         geoip.company = asninfo.autonomous_system_organization.map(|s| s.to_string());
     }
@@ -457,7 +473,7 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     };
 
     let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
-    let extract_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
+    let extract_mm_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
         if let Some(traits) = mcnt {
             g.is_anonymous_proxy = traits.is_anonymous_proxy;
             g.is_satellite_provider = traits.is_satellite_provider;
@@ -465,19 +481,19 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     };
 
     // first put country data in the geoip
-    if let Ok((cnty, network)) = get_country(ip) {
+    if let Ok((cnty, network)) = get_maxmind_country(ip) {
         extract_continent(&mut geoip, cnty.continent);
         extract_country(&mut geoip, cnty.country);
         extract_network(&mut geoip, network);
-        extract_traits(&mut geoip, cnty.traits);
+        extract_mm_traits(&mut geoip, cnty.traits);
     }
 
     // potentially overwrite some with the city data
-    if let Ok((cty, network)) = get_city(ip) {
+    if let Ok((cty, network)) = get_maxmind_city(ip) {
         extract_continent(&mut geoip, cty.continent);
         extract_country(&mut geoip, cty.country);
         extract_network(&mut geoip, network);
-        extract_traits(&mut geoip, cty.traits);
+        extract_mm_traits(&mut geoip, cty.traits);
         geoip.location = cty
             .location
             .as_ref()
@@ -494,6 +510,46 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
             }
         }
         geoip.city_name = cty.city.as_ref().and_then(|c| get_name(&c.names));
+    }
+
+    let extract_string = |s: String| {
+        if !s.is_empty() {
+            Some(s)
+        } else {
+            None
+        }
+    };
+
+    // override using ipinfo
+    if let Ok((loc, network)) = get_ipinfo_location(ip) {
+        extract_network(&mut geoip, network);
+        geoip.city_name = Some(loc.city);
+        geoip.country_name = Some(loc.country);
+        geoip.region = Some(loc.region);
+        geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
+        if let (Ok(lat), Ok(lng)) = (loc.lat.parse(), loc.lng.parse()) {
+            geoip.location = Some((lat, lng))
+        };
+    }
+
+    if let Ok((privacy, _)) = get_ipinfo_privacy(ip) {
+        geoip.is_vpn = privacy.vpn.parse().ok();
+        geoip.is_anonymous_proxy = privacy.proxy.parse().ok();
+        geoip.is_tor = privacy.tor.parse().ok();
+        geoip.is_relay = privacy.relay.parse().ok();
+        geoip.is_hosting = privacy.hosting.parse().ok();
+        geoip.privacy_service = extract_string(privacy.service)
+    }
+
+    if let Ok((company, network)) = get_ipinfo_company(ip) {
+        extract_network(&mut geoip, network);
+        geoip.company = extract_string(company.name);
+        geoip.asn = company.asn.strip_prefix("AS").and_then(|asn| asn.parse().ok());
+    }
+
+    if let Ok((carrier, _)) = get_ipinfo_carrier(ip) {
+        geoip.is_mobile = Some(true);
+        geoip.network = Some(carrier.network)
     }
 
     geoip.ip = Some(ip);

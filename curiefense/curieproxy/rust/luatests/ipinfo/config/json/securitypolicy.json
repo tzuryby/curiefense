@@ -1,0 +1,19 @@
+[
+  {
+    "match": "__default__",
+    "id": "__default__",
+    "name": "default entry",
+    "map": [
+      {
+        "match": "/",
+        "name": "default",
+        "id": "default",
+        "acl_profile": "__default__",
+        "acl_active": false,
+        "content_filter_profile": "__default__",
+        "content_filter_active": false,
+        "limit_ids": []
+      }
+    ]
+  }
+]
