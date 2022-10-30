@@ -91,8 +91,8 @@ m_securitypolicy = api.model(
         "description": fields.String(),
         "tags": fields.List(fields.String()),
         "match": fields.String(required=True),
-        "curiesession": AnyType(),
-        "curiesession_ids": AnyType(),
+        "session": AnyType(),
+        "session_ids": AnyType(),
         "map": fields.List(fields.Nested(m_secprofilemap)),
     },
 )
