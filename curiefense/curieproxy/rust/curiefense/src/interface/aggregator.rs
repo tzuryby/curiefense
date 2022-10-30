@@ -452,10 +452,13 @@ impl AggregatedCounters {
                         self.requests_triggered_globalfilter_report += 1;
                     }
                 }
-                Acl { tags: _, stage: _ } => {
+                Acl { tags: _, stage } => {
                     if this_blocked {
                         acl_blocked = true;
                         self.requests_triggered_acl_active += 1;
+                        if stage == &crate::interface::AclStage::DenyBot {
+                            self.challenge += 1;
+                        }
                     } else {
                         acl_report = true;
                         self.requests_triggered_acl_report += 1;
