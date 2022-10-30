@@ -8,6 +8,7 @@ metadata:
   annotations: {
     {{- if eq (len $containers) 1 }}
     kubectl.kubernetes.io/default-logs-container: "{{ index $containers 0 }}",
+    kubectl.kubernetes.io/default-container: "{{ index $containers 0 }}",
     {{ end }}
   }
 spec:
@@ -16,7 +17,7 @@ spec:
   {{- if contains "/" .Values.global.proxy.image }}
     image: "{{ annotation .ObjectMeta `sidecar.istio.io/proxyImage` .Values.global.proxy.image }}"
   {{- else }}
-    image: "{{ .Values.global.hub }}/{{ .Values.global.proxy.image }}:{{ .Values.global.tag }}"
+    image: "{{ .ProxyImage }}"
   {{- end }}
     ports:
     - containerPort: 15090
@@ -27,12 +28,6 @@ spec:
     - router
     - --domain
     - $(POD_NAMESPACE).svc.{{ .Values.global.proxy.clusterDomain }}
-    - --serviceCluster
-    {{ if ne "" (index .ObjectMeta.Labels "app") -}}
-    - "{{ index .ObjectMeta.Labels `app` }}.$(POD_NAMESPACE)"
-    {{ else -}}
-    - "{{ valueOrDefault .DeploymentMeta.Name `istio-proxy` }}.{{ valueOrDefault .DeploymentMeta.Namespace `default` }}"
-    {{ end -}}
     - --proxyLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/logLevel` .Values.global.proxy.logLevel }}
     - --proxyComponentLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/componentLogLevel` .Values.global.proxy.componentLogLevel }}
     - --log_output_level={{ annotation .ObjectMeta `sidecar.istio.io/agentLogLevel` .Values.global.logging.level }}
@@ -77,14 +72,6 @@ spec:
       valueFrom:
         fieldRef:
           fieldPath: status.hostIP
-    - name: CANONICAL_SERVICE
-      valueFrom:
-        fieldRef:
-          fieldPath: metadata.labels['service.istio.io/canonical-name']
-    - name: CANONICAL_REVISION
-      valueFrom:
-        fieldRef:
-          fieldPath: metadata.labels['service.istio.io/canonical-revision']
     - name: PROXY_CONFIG
       value: |
              {{ protoToJSON .ProxyConfig }}
@@ -111,11 +98,6 @@ spec:
     - name: ISTIO_META_NETWORK
       value: "{{ .Values.global.network }}"
     {{- end }}
-    {{ if .ObjectMeta.Annotations }}
-    - name: ISTIO_METAJSON_ANNOTATIONS
-      value: |
-             {{ toJSON .ObjectMeta.Annotations }}
-    {{ end }}
     {{- if .DeploymentMeta.Name }}
     - name: ISTIO_META_WORKLOAD_NAME
       value: "{{ .DeploymentMeta.Name }}"
@@ -149,6 +131,18 @@ spec:
       timeoutSeconds: 3
       failureThreshold: {{ .Values.global.proxy.readinessFailureThreshold }}
     volumeMounts:
+    - name: workload-socket
+      mountPath: /var/run/secrets/workload-spiffe-uds
+    - name: credential-socket
+      mountPath: /var/run/secrets/credential-uds
+    {{- if eq .Values.global.caName "GkeWorkloadCertificate" }}
+    - name: gke-workload-certificate
+      mountPath: /var/run/secrets/workload-spiffe-credentials
+      readOnly: true
+    {{- else }}
+    - name: workload-certs
+      mountPath: /var/run/secrets/workload-spiffe-credentials
+    {{- end }}
     {{- if eq .Values.global.pilotCertProvider "istiod" }}
     - mountPath: /var/run/secrets/istio
       name: istiod-ca-cert
@@ -171,6 +165,18 @@ spec:
     - name: istio-podinfo
       mountPath: /etc/istio/pod
   volumes:
+  - emptyDir: {}
+    name: workload-socket
+  - emptyDir: {}
+    name: credential-socket
+  {{- if eq .Values.global.caName "GkeWorkloadCertificate" }}
+  - name: gke-workload-certificate
+    csi:
+      driver: workloadcertificates.security.cloud.google.com
+  {{- else}}
+  - emptyDir: {}
+    name: workload-certs
+  {{- end }}
   # SDS channel between istioagent and Envoy
   - emptyDir:
       medium: Memory
@@ -186,16 +192,6 @@ spec:
         - path: "annotations"
           fieldRef:
             fieldPath: metadata.annotations
-        - path: "cpu-limit"
-          resourceFieldRef:
-            containerName: istio-proxy
-            resource: limits.cpu
-            divisor: 1m
-        - path: "cpu-request"
-          resourceFieldRef:
-            containerName: istio-proxy
-            resource: requests.cpu
-            divisor: 1m
   {{- if eq .Values.global.jwtPolicy "third-party-jwt" }}
   - name: istio-token
     projected:
@@ -227,7 +223,7 @@ spec:
     - name: {{ . }}
     {{- end }}
   {{- end }}
-  {{- if eq (env "ENABLE_LEGACY_FSGROUP_INJECTION" "true") "true" }}
+  {{- if eq (env "ENABLE_LEGACY_FSGROUP_INJECTION" "false") "true" }}
   securityContext:
     fsGroup: 1337
   {{- end }}

@@ -36,7 +36,7 @@ data:
 {{ toYaml .Values.sidecarInjectorWebhook.neverInjectSelector | trim | indent 6 }}
     injectedAnnotations:
       {{- range $key, $val := .Values.sidecarInjectorWebhook.injectedAnnotations }}
-      "{{ $key }}": "{{ $val }}"
+      "{{ $key }}": {{ $val | quote }}
       {{- end }}
     {{- /* If someone ends up with this new template, but an older Istiod image, they will attempt to render this template
          which will fail with "Pod injection failed: template: inject:1: function "Istio_1_9_Required_Template_And_Version_Mismatched" not defined".
@@ -51,6 +51,14 @@ data:
 {{- if not (hasKey .Values.sidecarInjectorWebhook.templates "gateway") }}
       gateway: |
 {{ .Files.Get "files/gateway-injection-template.yaml" | trim | indent 8 }}
+{{- end }}
+{{- if not (hasKey .Values.sidecarInjectorWebhook.templates "grpc-simple") }}
+      grpc-simple: |
+{{ .Files.Get "files/grpc-simple.yaml" | trim | indent 8 }}
+{{- end }}
+{{- if not (hasKey .Values.sidecarInjectorWebhook.templates "grpc-agent") }}
+      grpc-agent: |
+{{ .Files.Get "files/grpc-agent.yaml" | trim | indent 8 }}
 {{- end }}
 {{- with .Values.sidecarInjectorWebhook.templates }}
 {{ toYaml . | trim | indent 6 }}
