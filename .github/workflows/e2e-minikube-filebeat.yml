@@ -10,7 +10,7 @@ on:
 
 jobs:
   e2e-minikube-filebeat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         python-version: [3.8]
@@ -20,16 +20,19 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.3.0
+        id: minikube
+        uses: medyagh/setup-minikube@v0.0.8
         with:
+          minikube-version: 1.27.1
           driver: docker
-          minikube version: 'v1.22.0'
-          kubernetes version: 'v1.20.2'
-          github token: ${{ secrets.GITHUB_TOKEN }}
-          start args: "--memory='3Gi' --addons=ingress"
+          container-runtime: docker
+          kubernetes-version: v1.25.2
+          cpus: 2
+          memory: 4000m
 
       - name: Interact with the cluster
         run: |
+            minikube addons enable ingress
             export BASEDIR=$(git rev-parse --show-toplevel)
             export VERSION=$(git rev-parse --short=12 HEAD)
             export JWT_WORKAROUND=1
