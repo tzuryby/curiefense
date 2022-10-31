@@ -178,8 +178,11 @@ impl Config {
                 limits: olimits,
             };
             if rawmap.match_ == "__default__"
+                || securitypolicy.entry.id == "__default__"
                 || (rawmap.match_ == "/"
-                    && (securitypolicy.entry.id == "default" || securitypolicy.entry.id == "__default__"))
+                    && (securitypolicy.entry.id == "default"
+                        || securitypolicy.entry.name == "default"
+                        || securitypolicy.entry.name == "__default__"))
             {
                 if default.is_some() {
                     logs.warning("Multiple __default__ maps");
