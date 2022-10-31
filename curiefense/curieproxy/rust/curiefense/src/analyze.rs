@@ -90,9 +90,13 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         Location::Request,
     );
 
-    if !securitypolicy.content_filter_profile.content_type.is_empty()
-        && reqinfo.rinfo.qinfo.body_decoding != BodyDecodingResult::ProperlyDecoded
-    {
+    let body_problem = matches!(
+        &reqinfo.rinfo.qinfo.body_decoding,
+        BodyDecodingResult::DecodingFailed(_)
+    );
+
+    if !securitypolicy.content_filter_profile.content_type.is_empty() && body_problem {
+        // note that having no body is perfectly OK
         let reason = if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
             BlockReason::body_malformed(rr)
         } else {
