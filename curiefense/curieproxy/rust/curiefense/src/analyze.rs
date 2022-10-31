@@ -263,6 +263,18 @@ pub fn analyze_finish<GH: Grasshopper>(
         let blocking = br.decision == BDecision::Blocking;
         brs.push(br);
 
+        // insert the extra tags
+        if !secpol.acl_profile.tags.is_empty() {
+            let locs = brs
+                .iter()
+                .flat_map(|r| r.location.iter())
+                .cloned()
+                .collect::<HashSet<_>>();
+            for t in &secpol.acl_profile.tags {
+                tags.insert_locs(t, locs.clone());
+            }
+        }
+
         if secpol.acl_active && bypass {
             return AnalyzeResult {
                 decision: Decision::pass(brs),
@@ -274,13 +286,6 @@ pub fn analyze_finish<GH: Grasshopper>(
 
         if blocking {
             let acl_block = |reasons: Vec<BlockReason>, tags: &mut Tags| {
-                if !secpol.acl_profile.tags.is_empty() {
-                    // insert extra tags
-                    let locs: HashSet<Location> = reasons.iter().flat_map(|r| r.location.iter()).cloned().collect();
-                    for t in &secpol.acl_profile.tags {
-                        tags.insert_locs(t, locs.clone());
-                    }
-                }
                 secpol
                     .acl_profile
                     .action

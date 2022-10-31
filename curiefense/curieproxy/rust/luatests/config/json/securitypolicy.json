@@ -198,6 +198,16 @@
         "name": "default entry",
         "map": [
             {
+                "match": "/acl/deny-all-inactive",
+                "name": "denyallinactive",
+                "id": "denyallinactive",
+                "acl_profile": "ba-acl",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": []
+            },
+            {
                 "match": "/flow-test",
                 "name": "flowtest",
                 "id": "flowtest",
