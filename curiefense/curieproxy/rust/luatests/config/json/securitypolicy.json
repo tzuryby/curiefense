@@ -222,6 +222,16 @@
         "tags": [],
         "map": [
             {
+                "match": "/limits/always-blocking/xx",
+                "name": "ablock",
+                "id": "ablock",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": ["ablock"]
+            },
+            {
                 "match": "/acl/deny-all-inactive",
                 "name": "denyallinactive",
                 "id": "denyallinactive",

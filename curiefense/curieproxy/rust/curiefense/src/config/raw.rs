@@ -198,6 +198,8 @@ pub struct RawLimit {
     pub global: bool, // global flag, if true this rule applies to all profiles
     #[serde(default)]
     pub active: bool,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

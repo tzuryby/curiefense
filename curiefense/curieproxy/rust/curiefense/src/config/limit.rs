@@ -20,6 +20,7 @@ pub struct Limit {
     pub include: HashSet<String>,
     pub pairwith: Option<RequestSelector>,
     pub key: Vec<RequestSelector>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +79,7 @@ impl Limit {
                 thresholds,
                 pairwith,
                 key,
+                tags: rawlimit.tags,
             },
             rawlimit.active,
         ))

@@ -22,6 +22,9 @@ fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) 
     tags.insert_qualified("limit-name", &limit.name, Location::Request);
     let action = threshold.action.clone();
     let decision = action.atype.to_bdecision();
+    for t in &limit.tags {
+        tags.insert(t, Location::Request);
+    }
     SimpleDecision::Action(
         action,
         vec![BlockReason::limit(
