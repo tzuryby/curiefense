@@ -524,7 +524,7 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     if let Ok((loc, network)) = get_ipinfo_location(ip) {
         extract_network(&mut geoip, network);
         geoip.city_name = Some(loc.city);
-        geoip.country_name = Some(loc.country);
+        geoip.country_iso = Some(loc.country);
         geoip.region = Some(loc.region);
         geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
         if let (Ok(lat), Ok(lng)) = (loc.lat.parse(), loc.lng.parse()) {
