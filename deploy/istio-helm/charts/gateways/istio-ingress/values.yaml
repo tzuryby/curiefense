@@ -225,7 +225,7 @@ global:
     curiefense_minio_host: "minio.curiefense:9000"
     # set to true to disable TLS for minio, for testing environments
     curiefense_minio_insecure: false
-    # namespace where curiefense components are running (redis, curielogger)
+    # namespace where curiefense components are running (redis)
     curiefense_namespace: "curiefense"
     # typically "redis.$curiefense_namespace", can be changed to use an external redis instance
     redis_host: "redis.curiefense"

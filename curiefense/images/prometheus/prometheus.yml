@@ -11,10 +11,6 @@ scrape_configs:
     metrics_path: /stats/prometheus
     static_configs:
       - targets: ['curieproxy:8001']
-  - job_name: 'curiefense'
-    scrape_interval: 5s
-    static_configs:
-      - targets: ['curielogger:2112']
   - job_name: 'trafficmetricsexporter'
     scrape_interval: 5s
     static_configs:
