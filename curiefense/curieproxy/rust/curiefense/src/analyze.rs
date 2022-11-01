@@ -90,9 +90,13 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         Location::Request,
     );
 
-    if !securitypolicy.content_filter_profile.content_type.is_empty()
-        && reqinfo.rinfo.qinfo.body_decoding != BodyDecodingResult::ProperlyDecoded
-    {
+    let body_problem = matches!(
+        &reqinfo.rinfo.qinfo.body_decoding,
+        BodyDecodingResult::DecodingFailed(_)
+    );
+
+    if !securitypolicy.content_filter_profile.content_type.is_empty() && body_problem {
+        // note that having no body is perfectly OK
         let reason = if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
             BlockReason::body_malformed(rr)
         } else {
@@ -259,6 +263,18 @@ pub fn analyze_finish<GH: Grasshopper>(
         let blocking = br.decision == BDecision::Blocking;
         brs.push(br);
 
+        // insert the extra tags
+        if !secpol.acl_profile.tags.is_empty() {
+            let locs = brs
+                .iter()
+                .flat_map(|r| r.location.iter())
+                .cloned()
+                .collect::<HashSet<_>>();
+            for t in &secpol.acl_profile.tags {
+                tags.insert_locs(t, locs.clone());
+            }
+        }
+
         if secpol.acl_active && bypass {
             return AnalyzeResult {
                 decision: Decision::pass(brs),
@@ -270,13 +286,6 @@ pub fn analyze_finish<GH: Grasshopper>(
 
         if blocking {
             let acl_block = |reasons: Vec<BlockReason>, tags: &mut Tags| {
-                if !secpol.acl_profile.tags.is_empty() {
-                    // insert extra tags
-                    let locs: HashSet<Location> = reasons.iter().flat_map(|r| r.location.iter()).cloned().collect();
-                    for t in &secpol.acl_profile.tags {
-                        tags.insert_locs(t, locs.clone());
-                    }
-                }
                 secpol
                     .acl_profile
                     .action
