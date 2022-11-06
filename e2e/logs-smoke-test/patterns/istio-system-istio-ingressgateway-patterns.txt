@@ -37,3 +37,4 @@
 ^\s*\]+,?$
 ^\s+"\*"$
 ^\s+"inline_code": "local
+^\{"timestamp":"
