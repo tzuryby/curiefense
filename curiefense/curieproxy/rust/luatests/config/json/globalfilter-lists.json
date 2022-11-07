@@ -649,22 +649,17 @@
     ]
   },
   {
-    "action": "fq8faptj",
+    "action": "addipheader",
     "active": true,
     "description": "Add headers",
     "id": "addheaders",
     "mdate": "2021-07-01T09:50:58.505Z",
     "name": "add headers",
-    "rule": {
-      "relation": "AND",
-      "entries": [
-        [
-          "ip",
-          "82.13.8.87",
-          null
-        ]
-      ]
-    },
+    "rule": [
+      "ip",
+      "82.13.8.87",
+      null
+    ],
     "source": "self-managed",
     "tags": [
       "wheaders"

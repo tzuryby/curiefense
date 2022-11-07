@@ -79,10 +79,10 @@
         "h1": "${ip} - ${args.dd} - ${args.ee}"
       }
     },
-    "type": "monitor",
-    "id": "fq8faptj",
+    "type": "custom",
+    "id": "addipheader",
     "tags": [],
-    "name": "fq8faptj"
+    "name": "Add IP header to response"
   },
   {
     "type": "monitor",
