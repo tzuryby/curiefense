@@ -61,7 +61,7 @@
     "response": {
       "action": "custom_response",
       "block_mode": true,
-      "status": 403,
+      "status": 473,
       "content_filter_triggers": [
         {
           "active": true,
@@ -85,7 +85,7 @@
         "aclid:fromtags",
         "contentfilterid:expectjson",
         "jsonmatched",
-        "status:403",
+        "status:473",
         "status-class:4xx",
         "bot"
       ]
@@ -105,7 +105,7 @@
     "response": {
       "action": "custom_response",
       "block_mode": true,
-      "status": 403,
+      "status": 473,
       "content_filter_triggers": [
         {
           "active": true,
@@ -129,7 +129,7 @@
         "aclid:fromtags",
         "contentfilterid:expectjson",
         "jsonmatched",
-        "status:403",
+        "status:473",
         "status-class:4xx",
         "bot"
       ]
