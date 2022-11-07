@@ -202,11 +202,11 @@ pub async fn analyze_query<'t>(logs: &mut Logs, p1: APhase1) -> APhase2 {
     };
 
     let flow_results = eat_errors(logs, flow_resolve_query(&mut redis, &mut lst, p1.flows).await);
-    logs.debug("flow checks done");
+    logs.debug("query - flow checks done");
 
     let limit_results_err = limit_resolve_query(logs, &mut redis, &mut lst, p1.limits).await;
     let limit_results = eat_errors(logs, limit_results_err);
-    logs.debug("limit checks done");
+    logs.debug("query - limit checks done");
 
     AnalysisPhase {
         flows: flow_results,
