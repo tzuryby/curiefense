@@ -706,5 +706,129 @@
     "tags": [
       "global-trigger"
     ]
+  },
+  {
+    "action": "monitor",
+    "active": true,
+    "description": "flow last step",
+    "entries_relation": "OR",
+    "id": "flowlaststep",
+    "mdate": "2020-05-23T00:04:41",
+    "name": "marker for the last step of flow control rules",
+    "rule": {
+      "relation": "OR",
+      "entries": [
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.example.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/flowheader",
+              "..."
+            ],
+            [
+              "args",
+              [
+                "step",
+                "^2$"
+              ],
+              "..."
+            ]
+          ]
+        },
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.example.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/action",
+              "..."
+            ],
+            [
+              "args",
+              [
+                "step",
+                "^3$"
+              ],
+              "..."
+            ]
+          ]
+        },
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.example.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/step3",
+              "..."
+            ]
+          ]
+        },
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.example.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/fcban2",
+              "..."
+            ]
+          ]
+        },
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.collision.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/step2",
+              "..."
+            ]
+          ]
+        },
+        {
+          "relation": "AND",
+          "entries": [
+            [
+              "authority",
+              "www.byquery.com",
+              "..."
+            ],
+            [
+              "path",
+              "/flow-test/fc/by-query-step2",
+              "..."
+            ]
+          ]
+        }
+      ]
+    },
+    "source": "self-managed",
+    "tags": [
+      "flow-last-step"
+    ]
   }
 ]

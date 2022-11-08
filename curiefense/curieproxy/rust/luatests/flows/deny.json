@@ -8,6 +8,7 @@
     },
     "delay": 0,
     "tag": "flow2",
+    "last_step": false,
     "pass": true
   }
 ]

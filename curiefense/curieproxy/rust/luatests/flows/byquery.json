@@ -8,7 +8,8 @@
     },
     "delay": 0,
     "tag": "flowquery",
-    "pass": true
+    "pass": false,
+    "last_step": false
   },
   {
     "headers": {
@@ -19,7 +20,8 @@
     },
     "delay": 0,
     "tag": "flowquery",
-    "pass": false
+    "pass": false,
+    "last_step": true
   },
   {
     "headers": {
@@ -30,6 +32,7 @@
     },
     "delay": 0,
     "tag": "flowquery",
+    "last_step": false,
     "pass": true
   },
   {
@@ -41,6 +44,7 @@
     },
     "delay": 0,
     "tag": "flowquery",
+    "last_step": true,
     "pass": true
   }
 ]

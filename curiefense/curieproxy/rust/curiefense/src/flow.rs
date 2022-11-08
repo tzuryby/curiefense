@@ -160,15 +160,12 @@ pub fn flow_process(
             FlowResultType::LastOk => {
                 tags.insert_qualified("fc-id", &result.id, Location::Request);
                 tags.insert_qualified("fc-name", &result.name, Location::Request);
-            }
-            FlowResultType::LastBlock => {
-                tags.insert_qualified("fc-id", &result.id, Location::Request);
-                tags.insert_qualified("fc-name", &result.name, Location::Request);
                 for tag in &result.tags {
                     tags.insert(tag, Location::Request);
                 }
             }
-            FlowResultType::NonLast => {}
+            FlowResultType::LastBlock => (),
+            FlowResultType::NonLast => (),
         }
     }
     stats.flow(flow_total, results.len())
