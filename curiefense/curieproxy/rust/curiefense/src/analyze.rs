@@ -244,7 +244,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     logs.debug("limit checks done");
 
     let acl_result = check_acl(&tags, &secpol.acl_profile);
-    logs.debug(|| format!("ACL result: {:?}", acl_result));
+    logs.debug(|| format!("ACL result: {}", acl_result));
 
     let acl_decision = acl_result.decision(is_human);
     let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });

@@ -256,6 +256,14 @@ pub struct Tags {
     vtags: VirtualTags,
 }
 
+impl std::fmt::Display for Tags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut tgs = self.tags.keys().collect::<Vec<_>>();
+        tgs.sort();
+        write!(f, "{:?}", tgs)
+    }
+}
+
 pub fn tagify(tag: &str) -> String {
     fn filter_char(c: char) -> char {
         if c.is_ascii_alphanumeric() || c == ':' {

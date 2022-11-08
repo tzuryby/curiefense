@@ -21,6 +21,35 @@ pub enum AclResult {
     },
 }
 
+impl std::fmt::Display for AclResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pair = |f: &mut std::fmt::Formatter, m: Option<&(bool, Tags)>| -> std::fmt::Result {
+            match m {
+                Some((allowed, tags)) => {
+                    if *allowed {
+                        write!(f, "(allowed {})", tags)
+                    } else {
+                        write!(f, "(denied {})", tags)
+                    }
+                }
+                None => "(none)".fmt(f),
+            }
+        };
+        match self {
+            AclResult::Passthrough(pr) => {
+                "passthrough".fmt(f)?;
+                pair(f, Some(pr))
+            }
+            AclResult::Match { bot, human } => {
+                "bot".fmt(f)?;
+                pair(f, bot.as_ref())?;
+                "/human".fmt(f)?;
+                pair(f, human.as_ref())
+            }
+        }
+    }
+}
+
 pub fn check_acl(tags: &Tags, acl: &AclProfile) -> AclResult {
     let subcheck = |checks: &HashSet<String>, allowed: bool| {
         let tags = tags.intersect_tags(checks);
