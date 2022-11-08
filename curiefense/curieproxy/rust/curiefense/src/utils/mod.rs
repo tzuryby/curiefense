@@ -157,22 +157,24 @@ fn map_args(
     logs.debug("uri parsed");
 
     let body_decoding = if let Some(body) = mbody {
+        logs.debug("body parsing start");
         if let Err(rr) = parse_body(logs, &mut args, max_depth, mcontent_type, accepted_types, body) {
-            logs.debug(|| format!("Body parsing failed: {}", rr));
             // if the body could not be parsed, store it in an argument, as if it was text
             args.add(
                 "RAW_BODY".to_string(),
                 Location::Body,
                 String::from_utf8_lossy(body).to_string(),
             );
+            logs.debug(|| format!("body parsing failed: {}", rr));
             BodyDecodingResult::DecodingFailed(rr)
         } else {
+            logs.debug("body parsing succeeded");
             BodyDecodingResult::ProperlyDecoded
         }
     } else {
+        logs.debug("no body to parse");
         BodyDecodingResult::NoBody
     };
-    logs.debug("body parsed");
 
     QueryInfo {
         qpath,

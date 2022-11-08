@@ -22,6 +22,9 @@ fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) 
     tags.insert_qualified("limit-name", &limit.name, Location::Request);
     let action = threshold.action.clone();
     let decision = action.atype.to_bdecision();
+    for t in &limit.tags {
+        tags.insert(t, Location::Request);
+    }
     SimpleDecision::Action(
         action,
         vec![BlockReason::limit(
@@ -126,13 +129,18 @@ pub async fn limit_resolve_query<I: Iterator<Item = Option<i64>>>(
     let mut pipe = redis::pipe();
 
     for check in checks {
-        let curcount = match iter.next() {
-            None => anyhow::bail!("Empty iterator when getting curcount for {:?}", check.limit),
-            Some(r) => r.unwrap_or(0),
-        };
-        let expire = match iter.next() {
-            None => anyhow::bail!("Empty iterator when getting expire for {:?}", check.limit),
-            Some(r) => r.unwrap_or(-1),
+        let (curcount, expire) = if check.zero_limits() {
+            (1, 0)
+        } else {
+            let curcount = match iter.next() {
+                None => anyhow::bail!("Empty iterator when getting curcount for {:?}", check.limit),
+                Some(r) => r.unwrap_or(0),
+            };
+            let expire = match iter.next() {
+                None => anyhow::bail!("Empty iterator when getting expire for {:?}", check.limit),
+                Some(r) => r.unwrap_or(-1),
+            };
+            (curcount, expire)
         };
         logs.debug(|| format!("limit {} curcount={} expire={}", check.limit.id, curcount, expire));
         if expire < 0 {

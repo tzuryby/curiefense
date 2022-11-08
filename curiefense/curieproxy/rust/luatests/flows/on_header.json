@@ -8,7 +8,8 @@
     },
     "delay": 0,
     "tag": "flowheader",
-    "pass": true
+    "last_step": false,
+    "pass": false
   },
   {
     "headers": {
@@ -20,6 +21,7 @@
     },
     "delay": 0,
     "tag": "flowheader",
+    "last_step": true,
     "pass": false
   },
   {
@@ -32,6 +34,7 @@
     },
     "delay": 0,
     "tag": "flowheader",
+    "last_step": false,
     "pass": true
   },
   {
@@ -44,6 +47,7 @@
     },
     "delay": 0,
     "tag": "flowheader",
+    "last_step": true,
     "pass": true
   }
 ]

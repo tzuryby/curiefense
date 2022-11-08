@@ -466,11 +466,7 @@ impl SimpleAction {
             RawActionType::Skip => SimpleActionT::Skip,
             RawActionType::Monitor => SimpleActionT::Monitor,
             RawActionType::Custom => SimpleActionT::Custom {
-                content: rawaction
-                    .params
-                    .content
-                    .clone()
-                    .unwrap_or_else(|| "default content".into()),
+                content: rawaction.params.content.clone().unwrap_or_default(),
             },
             RawActionType::Challenge => SimpleActionT::Challenge,
         };

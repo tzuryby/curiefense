@@ -8,9 +8,7 @@ use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query, FlowCheck, FlowResult};
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
-use crate::interface::{
-    AclStage, Action, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
-};
+use crate::interface::{AclStage, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags};
 use crate::limit::{limit_build_query, limit_info, limit_process, limit_resolve_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::redis::redis_async_conn;
@@ -90,33 +88,29 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         Location::Request,
     );
 
-    let body_problem = matches!(
-        &reqinfo.rinfo.qinfo.body_decoding,
-        BodyDecodingResult::DecodingFailed(_)
-    );
-
-    if !securitypolicy.content_filter_profile.content_type.is_empty() && body_problem {
+    if !securitypolicy.content_filter_profile.content_type.is_empty() {
         // note that having no body is perfectly OK
-        let reason = if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
-            BlockReason::body_malformed(rr)
-        } else {
-            BlockReason::body_missing()
-        };
-        // we expect the body to be properly decoded
-        let action = Action {
-            status: 403,
-            ..Action::default()
-        };
-        // add extra tags
-        for t in &securitypolicy.content_filter_profile.tags {
-            tags.insert(t, Location::Body);
+        if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
+            let reason = BlockReason::body_malformed(rr);
+            // we expect the body to be properly decoded
+            let decision = securitypolicy.content_filter_profile.action.to_decision(
+                is_human,
+                mgh,
+                &reqinfo,
+                &mut tags,
+                vec![reason],
+            );
+            // add extra tags
+            for t in &securitypolicy.content_filter_profile.tags {
+                tags.insert(t, Location::Body);
+            }
+            return InitResult::Res(AnalyzeResult {
+                decision,
+                tags,
+                rinfo: masking(reqinfo),
+                stats: stats.mapped_stage_build(),
+            });
         }
-        return InitResult::Res(AnalyzeResult {
-            decision: Decision::action(action, vec![reason]),
-            tags,
-            rinfo: masking(reqinfo),
-            stats: stats.mapped_stage_build(),
-        });
     }
 
     if let Some(decision) = mgh.and_then(|gh| challenge_phase02(gh, &reqinfo.rinfo.qinfo.uri, &reqinfo.headers)) {
@@ -202,11 +196,11 @@ pub async fn analyze_query<'t>(logs: &mut Logs, p1: APhase1) -> APhase2 {
     };
 
     let flow_results = eat_errors(logs, flow_resolve_query(&mut redis, &mut lst, p1.flows).await);
-    logs.debug("flow checks done");
+    logs.debug("query - flow checks done");
 
     let limit_results_err = limit_resolve_query(logs, &mut redis, &mut lst, p1.limits).await;
     let limit_results = eat_errors(logs, limit_results_err);
-    logs.debug("limit checks done");
+    logs.debug("query - limit checks done");
 
     AnalysisPhase {
         flows: flow_results,
@@ -250,7 +244,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     logs.debug("limit checks done");
 
     let acl_result = check_acl(&tags, &secpol.acl_profile);
-    logs.debug(|| format!("ACL result: {:?}", acl_result));
+    logs.debug(|| format!("ACL result: {}", acl_result));
 
     let acl_decision = acl_result.decision(is_human);
     let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });

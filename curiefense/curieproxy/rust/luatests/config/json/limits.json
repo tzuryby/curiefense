@@ -477,6 +477,35 @@
     "timeframe": 30
   },
   {
+    "description": "always blocking limit",
+    "exclude": [],
+    "global": false,
+    "active": true,
+    "id": "ablock",
+    "tags": [
+      "alwaysblock"
+    ],
+    "include": [
+      "all"
+    ],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "always blocking limit",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 0
+      }
+    ],
+    "timeframe": 30
+  },
+  {
     "description": "Inactive limit",
     "exclude": [],
     "global": false,

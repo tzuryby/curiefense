@@ -4,17 +4,21 @@
     "tags": [],
     "allow": [],
     "allow_bot": [],
-    "deny": [],
+    "deny": [
+      "flow-last-step"
+    ],
     "deny_bot": [],
-    "force_deny": [
+    "force_deny": [],
+    "id": "flowcontrol",
+    "name": "flowcontrol",
+    "passthrough": [
       "flowquery",
       "flow2",
       "flowheader",
-      "flow1"
-    ],
-    "id": "flowcontrol",
-    "name": "flowcontrol",
-    "passthrough": []
+      "flow1",
+      "flowc3",
+      "deny"
+    ]
   },
   {
     "action": "b403",
