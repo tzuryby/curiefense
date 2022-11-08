@@ -231,7 +231,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "count(count(top_passed_asn_total) by (asn))",
+          "expr": "count(count(top_active_asn_total) by (asn)) + count(count(top_reported_asn_total) by (asn))",
           "hide": false,
           "interval": "",
           "legendFormat": "",
@@ -1649,7 +1649,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Reblaze 5.0 Traffic Overview",
-  "uid": "tUZcMWHVz",
-  "version": 2
+  "title": "xReblaze 5.0 Traffic Overview",
+  "uid": "tUZcMWHVd",
+  "version": 1
 }
