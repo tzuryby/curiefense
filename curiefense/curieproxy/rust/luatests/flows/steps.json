@@ -8,6 +8,7 @@
     },
     "delay": 0,
     "tag": "flow2",
+    "last_step": false,
     "pass": true
   },
   {
@@ -19,6 +20,7 @@
     },
     "delay": 0,
     "tag": "flow2",
+    "last_step": false,
     "pass": true
   },
   {
@@ -30,6 +32,7 @@
     },
     "delay": 4,
     "tag": "flow2",
+    "last_step": true,
     "pass": true
   },
   {
@@ -41,6 +44,7 @@
     },
     "delay": 0,
     "tag": "flow2",
+    "last_step": true,
     "pass": false
   }
 ]

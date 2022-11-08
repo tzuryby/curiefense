@@ -7,6 +7,7 @@ local json_decode = json_safe.decode
 
 local nativeutils = require "nativeutils"
 local startswith = nativeutils.startswith
+local endswith = nativeutils.endswith
 
 local ffi = require "ffi"
 ffi.load("crypto", true)
@@ -211,8 +212,18 @@ local function run_inspect_request(raw_request_map, mode)
 end
 
 local function show_logs(logs)
+  local config_passed = false
   for _, log in ipairs(logs) do
+    if not config_passed then
+      if not (startswith(log, "D ") or endswith(log, "error: no rules were selected, empty profile")) then
+        print(log)
+      end
+      if endswith(log, "CFGLOAD logs end") then
+        config_passed = true
+      end
+    else
       print(log)
+    end
   end
 end
 
@@ -471,27 +482,49 @@ local function test_flow(request_path, mode)
       end
     end
 
-    if raw_request_map.pass then
+    if raw_request_map.last_step then
+      if raw_request_map.pass then
+        if not tag_found then
+          print("we did not find the tag " .. expected_tag .. " in the request info. All tags:")
+          for _, tag in pairs(request_map["tags"]) do
+            print(" * " .. tag)
+          end
+          good = false
+        end
+      else
+        if tag_found then
+          print("we found the tag " .. expected_tag .. " in the request info, but it should have been absent")
+          good = false
+        end
+      end
+    else
       if tag_found then
-        print("we found the tag " .. expected_tag .. " in the request info, but it should have been absent")
+        print("we found the tag " .. expected_tag .. " in the request info, " ..
+              "but it should have been absent (not the last step)")
+        good = false
+      end
+    end
+
+    local response = r.response
+    local res = cjson.decode(response)
+    if raw_request_map.pass then
+      if res["action"] ~= "pass" then
+        print("curiefense.session_limit_check should have returned pass")
         good = false
       end
     else
-      if not tag_found then
-        print("we did not find the tag " .. expected_tag .. " in the request info. All tags:")
-        for _, tag in pairs(request_map["tags"]) do
-          print(" * " .. tag)
-        end
+      if res["action"] ~= "custom_response" then
+        print("curiefense.session_limit_check should have returned custom_response")
         good = false
       end
     end
 
     if not good then
-        for _, log in ipairs(request_map.logs) do
-            print(log)
-        end
-        print(r.response)
-        print(r.request_map)
+        show_logs(request_map.logs)
+        print("response: " .. response)
+        local tags = request_map["tags"]
+        table.sort(tags)
+        print("tags: " .. cjson.encode(tags))
         error("mismatch in flow control")
     end
 
