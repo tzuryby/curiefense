@@ -4,14 +4,12 @@
 global:
   requests:
     cpu:
-      curielogger: "1m"
       redis: "1m"
-      logstash: "1m"
-      kibana: "1m"
       uiserver: "1m"
       confserver-init: "1m"
+      confserver-nginx: "1m"
       confserver-uwsgi: "1m"
-      prometheus: "1m"
-      grafana: "1m"
-      elasticsearch: "1m"
 
+  enable:
+    # set to false to disable parts of this deployment, ex. if you prefer to use your own versions
+    minio: true

@@ -1,193 +1,11 @@
 {{- if and .Values.telemetry.enabled .Values.telemetry.v2.enabled }}
-# Note: metadata exchange filter is wasm enabled only in sidecars.
-apiVersion: networking.istio.io/v1alpha3
-kind: EnvoyFilter
-metadata:
-  name: metadata-exchange-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
-  {{- if .Values.meshConfig.rootNamespace }}
-  namespace: {{ .Values.meshConfig.rootNamespace }}
-  {{- else }}
-  namespace: {{ .Release.Namespace }}
-  {{- end }}
-  labels:
-    istio.io/rev: {{ .Values.revision | default "default" }}
-    install.operator.istio.io/owning-resource: {{ .Values.ownerName | default "unknown" }}
-    operator.istio.io/component: "Pilot"
-spec:
-  configPatches:
-    - applyTo: HTTP_FILTER
-      match:
-        context: SIDECAR_INBOUND
-        proxy:
-          proxyVersion: '^1\.8.*'
-        listener:
-          filterChain:
-            filter:
-              name: "envoy.filters.network.http_connection_manager"
-      patch:
-        operation: INSERT_BEFORE
-        value:
-          name: istio.metadata_exchange
-          typed_config:
-            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-            type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
-            value:
-              config:
-                configuration:
-                  "@type": "type.googleapis.com/google.protobuf.StringValue"
-                  value: |
-                    {}
-                vm_config:
-                  {{- if .Values.telemetry.v2.metadataExchange.wasmEnabled }}
-                  runtime: envoy.wasm.runtime.v8
-                  allow_precompiled: true
-                  code:
-                    local:
-                      filename: /etc/istio/extensions/metadata-exchange-filter.compiled.wasm
-                  {{- else }}
-                  runtime: envoy.wasm.runtime.null
-                  code:
-                    local:
-                      inline_string: envoy.wasm.metadata_exchange
-                  {{- end }}
-    - applyTo: HTTP_FILTER
-      match:
-        context: SIDECAR_OUTBOUND
-        proxy:
-          proxyVersion: '^1\.8.*'
-        listener:
-          filterChain:
-            filter:
-              name: "envoy.filters.network.http_connection_manager"
-      patch:
-        operation: INSERT_BEFORE
-        value:
-          name: istio.metadata_exchange
-          typed_config:
-            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-            type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
-            value:
-              config:
-                configuration:
-                  "@type": "type.googleapis.com/google.protobuf.StringValue"
-                  value: |
-                    {}
-                vm_config:
-                  {{- if .Values.telemetry.v2.metadataExchange.wasmEnabled }}
-                  runtime: envoy.wasm.runtime.v8
-                  allow_precompiled: true
-                  code:
-                    local:
-                      filename: /etc/istio/extensions/metadata-exchange-filter.compiled.wasm
-                  {{- else }}
-                  runtime: envoy.wasm.runtime.null
-                  code:
-                    local:
-                      inline_string: envoy.wasm.metadata_exchange
-                  {{- end }}
-    - applyTo: HTTP_FILTER
-      match:
-        context: GATEWAY
-        proxy:
-          proxyVersion: '^1\.8.*'
-        listener:
-          filterChain:
-            filter:
-              name: "envoy.filters.network.http_connection_manager"
-      patch:
-        operation: INSERT_BEFORE
-        value:
-          name: istio.metadata_exchange
-          typed_config:
-            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-            type_url: type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
-            value:
-              config:
-                configuration:
-                  "@type": "type.googleapis.com/google.protobuf.StringValue"
-                  value: |
-                    {}
-                vm_config:
-                  {{- if .Values.telemetry.v2.metadataExchange.wasmEnabled }}
-                  runtime: envoy.wasm.runtime.v8
-                  allow_precompiled: true
-                  code:
-                    local:
-                      filename: /etc/istio/extensions/metadata-exchange-filter.compiled.wasm
-                  {{- else }}
-                  runtime: envoy.wasm.runtime.null
-                  code:
-                    local:
-                      inline_string: envoy.wasm.metadata_exchange
-                  {{- end }}
----
-apiVersion: networking.istio.io/v1alpha3
-kind: EnvoyFilter
-metadata:
-  name: tcp-metadata-exchange-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
-  {{- if .Values.meshConfig.rootNamespace }}
-  namespace: {{ .Values.meshConfig.rootNamespace }}
-  {{- else }}
-  namespace: {{ .Release.Namespace }}
-  {{- end }}
-  labels:
-    istio.io/rev: {{ .Values.revision | default "default" }}
-spec:
-  configPatches:
-    - applyTo: NETWORK_FILTER
-      match:
-        context: SIDECAR_INBOUND
-        proxy:
-          proxyVersion: '^1\.8.*'
-        listener: {}
-      patch:
-        operation: INSERT_BEFORE
-        value:
-          name: istio.metadata_exchange
-          typed_config:
-            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-            type_url: type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange
-            value:
-              protocol: istio-peer-exchange
-    - applyTo: CLUSTER
-      match:
-        context: SIDECAR_OUTBOUND
-        proxy:
-          proxyVersion: '^1\.8.*'
-        cluster: {}
-      patch:
-        operation: MERGE
-        value:
-          filters:
-          - name: istio.metadata_exchange
-            typed_config:
-              "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-              type_url: type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange
-              value:
-                protocol: istio-peer-exchange
-    - applyTo: CLUSTER
-      match:
-        context: GATEWAY
-        proxy:
-          proxyVersion: '^1\.8.*'
-        cluster: {}
-      patch:
-        operation: MERGE
-        value:
-          filters:
-          - name: istio.metadata_exchange
-            typed_config:
-              "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-              type_url: type.googleapis.com/envoy.tcp.metadataexchange.config.MetadataExchange
-              value:
-                protocol: istio-peer-exchange
 ---
 # Note: http stats filter is wasm enabled only in sidecars.
 {{- if .Values.telemetry.v2.prometheus.enabled }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: stats-filter-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
+  name: stats-filter-1.13{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
   {{- if .Values.meshConfig.rootNamespace }}
   namespace: {{ .Values.meshConfig.rootNamespace }}
   {{- else }}
@@ -196,12 +14,13 @@ metadata:
   labels:
     istio.io/rev: {{ .Values.revision | default "default" }}
 spec:
+  priority: -1
   configPatches:
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_OUTBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -223,16 +42,8 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.outboundSidecar }}
                     {
-                      {{- if .Values.global.multiCluster.clusterName }}
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "node.metadata['CLUSTER_ID']",
-                            "destination_cluster": "upstream_peer.cluster_id"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio"
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.outboundSidecar | indent 18 }}
@@ -255,7 +66,7 @@ spec:
       match:
         context: SIDECAR_INBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -277,16 +88,9 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.inboundSidecar }}
                     {
-                      {{- if .Values.global.multiCluster.clusterName }}
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "downstream_peer.cluster_id",
-                            "destination_cluster": "node.metadata['CLUSTER_ID']"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio",
+                      "disable_host_header_fallback": true
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.inboundSidecar | indent 18 }}
@@ -309,7 +113,7 @@ spec:
       match:
         context: GATEWAY
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -331,16 +135,9 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.gateway }}
                     {
-                      "disable_host_header_fallback": true{{- if .Values.global.multiCluster.clusterName }},
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "node.metadata['CLUSTER_ID']",
-                            "destination_cluster": "upstream_peer.cluster_id"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio",
+                      "disable_host_header_fallback": true
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.gateway | indent 18 }}
@@ -364,7 +161,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: tcp-stats-filter-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
+  name: tcp-stats-filter-1.13{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
   {{- if .Values.meshConfig.rootNamespace }}
   namespace: {{ .Values.meshConfig.rootNamespace }}
   {{- else }}
@@ -373,12 +170,13 @@ metadata:
   labels:
     istio.io/rev: {{ .Values.revision | default "default" }}
 spec:
+  priority: -1
   configPatches:
     - applyTo: NETWORK_FILTER
       match:
         context: SIDECAR_INBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -398,16 +196,8 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.inboundSidecar }}
                     {
-                      {{- if .Values.global.multiCluster.clusterName }}
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "downstream_peer.cluster_id",
-                            "destination_cluster": "node.metadata['CLUSTER_ID']"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio"
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.inboundSidecar | indent 18 }}
@@ -430,7 +220,7 @@ spec:
       match:
         context: SIDECAR_OUTBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -450,16 +240,8 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.outboundSidecar }}
                     {
-                      {{- if .Values.global.multiCluster.clusterName }}
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "node.metadata['CLUSTER_ID']",
-                            "destination_cluster": "upstream_peer.cluster_id"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio"
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.outboundSidecar | indent 18 }}
@@ -482,7 +264,7 @@ spec:
       match:
         context: GATEWAY
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -502,16 +284,8 @@ spec:
                   value: |
                     {{- if not .Values.telemetry.v2.prometheus.configOverride.gateway }}
                     {
-                      {{- if .Values.global.multiCluster.clusterName }}
-                      "metrics": [
-                        {
-                          "dimensions": {
-                            "source_cluster": "node.metadata['CLUSTER_ID']",
-                            "destination_cluster": "upstream_peer.cluster_id"
-                          }
-                        }
-                      ]
-                      {{- end }}
+                      "debug": "false",
+                      "stat_prefix": "istio"
                     }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.prometheus.configOverride.gateway | indent 18 }}
@@ -536,7 +310,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: stackdriver-filter-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
+  name: stackdriver-filter-1.13{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
   {{- if .Values.meshConfig.rootNamespace }}
   namespace: {{ .Values.meshConfig.rootNamespace }}
   {{- else }}
@@ -545,13 +319,14 @@ metadata:
   labels:
     istio.io/rev: {{ .Values.revision | default "default" }}
 spec:
+  priority: -1
   configPatches:
 {{- if not .Values.telemetry.v2.stackdriver.disableOutbound }}
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_OUTBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -572,7 +347,10 @@ spec:
                   "@type": "type.googleapis.com/google.protobuf.StringValue"
                   value: |
                     {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                    {"enable_mesh_edges_reporting": {{ .Values.telemetry.v2.stackdriver.topology }}, "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}", "meshEdgesReportingDuration": "600s"}
+                    {
+                      "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}",
+                      "metric_expiry_duration": "3600s"
+                    }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                     {{- end }}
@@ -586,7 +364,7 @@ spec:
       match:
         context: SIDECAR_INBOUND
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -607,7 +385,12 @@ spec:
                   "@type": "type.googleapis.com/google.protobuf.StringValue"
                   value: |
                     {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                    {"enable_mesh_edges_reporting": {{ .Values.telemetry.v2.stackdriver.topology }}, "disable_server_access_logging": {{ not .Values.telemetry.v2.stackdriver.logging }}, "access_logging": "{{ .Values.telemetry.v2.stackdriver.inboundAccessLogging }}", "meshEdgesReportingDuration": "600s", "disable_host_header_fallback": true}
+                    {
+                      "disable_server_access_logging": {{ not .Values.telemetry.v2.stackdriver.logging }},
+                      "access_logging": "{{ .Values.telemetry.v2.stackdriver.inboundAccessLogging }}",
+                      "disable_host_header_fallback": true,
+                      "metric_expiry_duration": "3600s"
+                    }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                     {{- end }}
@@ -620,7 +403,7 @@ spec:
       match:
         context: GATEWAY
         proxy:
-          proxyVersion: '^1\.8.*'
+          proxyVersion: '^1\.13.*'
         listener:
           filterChain:
             filter:
@@ -641,7 +424,11 @@ spec:
                   "@type": "type.googleapis.com/google.protobuf.StringValue"
                   value: |
                     {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                    {"enable_mesh_edges_reporting": {{ .Values.telemetry.v2.stackdriver.topology }}, "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}", "meshEdgesReportingDuration": "600s", "disable_host_header_fallback": true}
+                    {
+                      "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}",
+                      "disable_host_header_fallback": true,
+                      "metric_expiry_duration": "3600s"
+                    }
                     {{- else }}
                     {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                     {{- end }}
@@ -654,7 +441,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: tcp-stackdriver-filter-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
+  name: tcp-stackdriver-filter-1.13{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
   {{- if .Values.meshConfig.rootNamespace }}
   namespace: {{ .Values.meshConfig.rootNamespace }}
   {{- else }}
@@ -663,13 +450,14 @@ metadata:
   labels:
     istio.io/rev: {{ .Values.revision | default "default" }}
 spec:
+  priority: -1
   configPatches:
   {{- if not .Values.telemetry.v2.stackdriver.disableOutbound }}
   - applyTo: NETWORK_FILTER
     match:
       context: SIDECAR_OUTBOUND
       proxy:
-        proxyVersion: '^1\.8.*'
+        proxyVersion: '^1\.13.*'
       listener:
         filterChain:
           filter:
@@ -688,7 +476,10 @@ spec:
                 "@type": "type.googleapis.com/google.protobuf.StringValue"
                 value: |
                   {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                  {"access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}"}
+                  {
+                    "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}",
+                    "metric_expiry_duration": "3600s"
+                  }
                   {{- else }}
                   {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                   {{- end }}
@@ -702,7 +493,7 @@ spec:
     match:
       context: SIDECAR_INBOUND
       proxy:
-        proxyVersion: '^1\.8.*'
+        proxyVersion: '^1\.13.*'
       listener:
         filterChain:
           filter:
@@ -721,7 +512,11 @@ spec:
                 "@type": "type.googleapis.com/google.protobuf.StringValue"
                 value: |
                   {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                  {"disable_server_access_logging": {{ not .Values.telemetry.v2.stackdriver.logging }}, "access_logging": "{{ .Values.telemetry.v2.stackdriver.inboundAccessLogging }}"}
+                  {
+                    "disable_server_access_logging": {{ not .Values.telemetry.v2.stackdriver.logging }},
+                    "access_logging": "{{ .Values.telemetry.v2.stackdriver.inboundAccessLogging }}",
+                    "metric_expiry_duration": "3600s"
+                  }
                   {{- else }}
                   {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                   {{- end }}
@@ -734,7 +529,7 @@ spec:
     match:
       context: GATEWAY
       proxy:
-        proxyVersion: '^1\.8.*'
+        proxyVersion: '^1\.13.*'
       listener:
         filterChain:
           filter:
@@ -753,7 +548,10 @@ spec:
                 "@type": "type.googleapis.com/google.protobuf.StringValue"
                 value: |
                   {{- if not .Values.telemetry.v2.stackdriver.configOverride }}
-                  {"access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}"}
+                  {
+                    "access_logging": "{{ .Values.telemetry.v2.stackdriver.outboundAccessLogging }}",
+                    "metric_expiry_duration": "3600s"
+                  }
                   {{- else }}
                   {{ toJson .Values.telemetry.v2.stackdriver.configOverride | indent 18 }}
                   {{- end }}
@@ -767,7 +565,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: stackdriver-sampling-accesslog-filter-1.8{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
+  name: stackdriver-sampling-accesslog-filter-1.13{{- if not (eq .Values.revision "") }}-{{ .Values.revision }}{{- end }}
   {{- if .Values.meshConfig.rootNamespace }}
   namespace: {{ .Values.meshConfig.rootNamespace }}
   {{- else }}
@@ -776,12 +574,13 @@ metadata:
   labels:
     istio.io/rev: {{ .Values.revision | default "default" }}
 spec:
+  priority: -1
   configPatches:
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_INBOUND
         proxy:
-          proxyVersion: '1\.8.*'
+          proxyVersion: '1\.13.*'
         listener:
           filterChain:
             filter:

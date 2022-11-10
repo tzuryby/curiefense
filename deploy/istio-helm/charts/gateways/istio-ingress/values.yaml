@@ -24,20 +24,11 @@ gateways:
       targetPort: 8443
       name: https
       protocol: TCP
-    - port: 15012
-      targetPort: 15012
-      name: tcp-istiod
-      protocol: TCP
-    # This is the port where sni routing happens
-    - port: 15443
-      targetPort: 15443
-      name: tls
-      protocol: TCP
 
     waf:
       enabled: false
 
-    # Scalability tunning
+    # Scalability tuning
     # replicaCount: 1
     rollingMaxSurge: 100%
     rollingMaxUnavailable: 25%
@@ -60,11 +51,6 @@ gateways:
     loadBalancerSourceRanges: []
     serviceAnnotations: {}
 
-    # Enable cross-cluster access using SNI matching
-    zvpn:
-      enabled: false
-      suffix: global
-
     # To generate an internal load balancer:
     # --set serviceAnnotations.cloud.google.com/load-balancer-type=internal
     #serviceAnnotations:
@@ -83,19 +69,18 @@ gateways:
       mountPath: /etc/istio/ingressgateway-ca-certs
 
     customService: false
-    externalTrafficPolicy: ""
+    externalTrafficPolicy: "Local"
 
     ingressPorts: []
     additionalContainers: []
     configVolumes: []
 
-    ### Advanced options ############
-    env:
-      # A gateway with this mode ensures that pilot generates an additional
-      # set of clusters for internal services but without Istio mTLS, to
-      # enable cross cluster routing.
-      ISTIO_META_ROUTER_MODE: "standard"
+    serviceAccount:
+      # Annotations to add to the service account
+      annotations: {}
 
+    ### Advanced options ############
+    env: {}
     nodeSelector: {}
     tolerations: []
 
@@ -177,7 +162,7 @@ global:
   hub: docker.io/istio
 
   # Default tag for Istio images.
-  tag: 1.9.3
+  tag: 1.13.2
 
   # Specify image pull policy if default behavior isn't desired.
   # Default behavior: latest images will be Always else IfNotPresent.
@@ -194,15 +179,12 @@ global:
   # To output all istio components logs in json format by adding --log_as_json argument to each container argument
   logAsJson: false
 
-  # Specify pod scheduling arch(amd64, ppc64le, s390x) and weight as follows:
+  # Specify pod scheduling arch(amd64, ppc64le, s390x, arm64) and weight as follows:
   #   0 - Never scheduled
   #   1 - Least preferred
   #   2 - No preference
   #   3 - Most preferred
-  arch:
-    amd64: 2
-    s390x: 2
-    ppc64le: 2
+  arch: {}
 
   # Comma-separated minimum per-scope logging level of messages to output, in the form of <scope>:<level>,<scope>:<level>
   # The control plane has different scopes depending on component, but can configure default log level across all components
@@ -237,9 +219,13 @@ global:
     gw_image: curiefense/curieproxy-istio
     curiesync_image: curiefense/curiesync
     curieconf_manifest_url: "s3://curiefense-test01/prod/manifest.json"
-    # allowed values: "s3", "gs", "local-bucket"
+    # allowed values: "s3", "gs", "local-bucket", "minio"
     curiefense_bucket_type: "s3"
-    # namespace where curiefense components are running (redis, curielogger)
+    # minio hostname and port, when curiefense_bucket_type is minio
+    curiefense_minio_host: "minio.curiefense:9000"
+    # set to true to disable TLS for minio, for testing environments
+    curiefense_minio_insecure: false
+    # namespace where curiefense components are running (redis)
     curiefense_namespace: "curiefense"
     # typically "redis.$curiefense_namespace", can be changed to use an external redis instance
     redis_host: "redis.curiefense"
@@ -325,12 +311,17 @@ global:
     # The service port used by Security Token Service (STS) server to handle token exchange requests.
     # Setting this port to a non-zero value enables STS server.
     servicePort: 0
-
-  # Deprecated, use meshConfig.trustDomain
-  trustDomain: ""
+  # whether to use autoscaling/v2 template for HPA settings
+  # for internal usage only, not to be configured by users.
+  autoscalingv2API: true
 
 meshConfig:
   enablePrometheusMerge: true
+
+  # The trust domain corresponds to the trust root of a system
+  # Refer to https://github.com/spiffe/spiffe/blob/master/standards/SPIFFE-ID.md#21-trust-domain
+  trustDomain: "cluster.local"
+
   defaultConfig:
     proxyMetadata: {}
     tracing:
