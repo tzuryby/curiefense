@@ -20,7 +20,7 @@ lazy_static! {
     static ref SAMPLE_DURATION: i64 = std::env::var("SAMPLE_DURATION")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(60);
     static ref TOP_AMOUNT: usize = std::env::var("AGGREGATED_TOP")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -100,9 +100,8 @@ struct AggregatedCounters {
     requests_triggered_ratelimit_active: usize,
     requests_triggered_ratelimit_report: usize,
 
+    authority: Arp<TopN<String>>,
     aclid: Arp<TopN<String>>,
-    secpolid: Arp<TopN<String>>,
-    secpolentryid: Arp<TopN<String>>,
     cfid: Arp<TopN<String>>,
 
     location: Arp<AggSection>,
@@ -297,27 +296,27 @@ impl<T: Eq + Clone + std::hash::Hash + Serialize> Metric<T> {
             Value::Number(serde_json::Number::from(self.unique.count())),
         );
         mp.insert(
-            format!("unique_active_{}", tp),
+            format!("unique_{}_active", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Active).count())),
         );
         mp.insert(
-            format!("unique_reported_{}", tp),
+            format!("unique_{}_reported", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Report).count())),
         );
         mp.insert(
-            format!("unique_passed_{}", tp),
+            format!("unique_{}_passed", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Pass).count())),
         );
         mp.insert(
-            format!("top_active_{}", tp),
+            format!("top_{}_active", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
         );
         mp.insert(
-            format!("top_reported_{}", tp),
+            format!("top_{}_reported", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
         );
         mp.insert(
-            format!("top_passed_{}", tp),
+            format!("top_{}_passed", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
         );
     }
@@ -578,12 +577,7 @@ impl AggregatedCounters {
             .get_mut(cf_cursor)
             .inc(rinfo.rinfo.secpolicy.content_filter_profile.id.to_string());
         *self.requests.get_mut(cursor) += 1;
-        self.secpolid
-            .get_mut(cursor)
-            .inc(rinfo.rinfo.secpolicy.policy.id.to_string());
-        self.secpolentryid
-            .get_mut(cursor)
-            .inc(rinfo.rinfo.secpolicy.entry.id.to_string());
+        self.authority.get_mut(cursor).inc(rinfo.rinfo.host.to_string());
         let top_tags = self.top_tags.get_mut(cursor);
 
         let mut human = false;
@@ -671,8 +665,7 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     e.location.serialize(&mut content, "section_");
     e.ruleid.serialize(&mut content, "top_ruleid_");
     e.aclid.serialize(&mut content, "top_aclid_");
-    e.secpolid.serialize(&mut content, "top_secpolid_");
-    e.secpolentryid.serialize(&mut content, "top_secpolentryid_");
+    e.authority.serialize(&mut content, "top_authority_");
     content.insert(
         "risk_level_active".into(),
         serde_json::to_value(e.risk_level.get(ArpCursor::Active)).unwrap_or(Value::Null),
