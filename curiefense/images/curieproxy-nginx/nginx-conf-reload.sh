@@ -13,9 +13,9 @@ temp_dir="/tmp/current-conf"
 
 if [ -f "$source_file" ]; then
   mkdir -p ${temp_dir}
-  rm -rf ${temp_dir}/*
+  rm -rf "${temp_dir:?}/"*
   cp -a ${target_dir}/. ${temp_dir}/
-  rm -rf ${target_dir}/*
+  rm -rf "${target_dir:?}/"*
   echo "Extract $source_file into $target_dir"
   tar xzf ${source_file} -C ${target_dir}
   echo "Test Nginx with new configuration"

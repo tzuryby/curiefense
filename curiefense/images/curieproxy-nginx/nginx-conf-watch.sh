@@ -10,16 +10,16 @@ fi
 echo "Blindly calling reload script at start"
 /usr/local/bin/nginx-conf-reload.sh &
 
-filename=/cf-config/current/config/customconf.tar.gz
+confarchive=/cf-config/current/config/customconf.tar.gz
 
 while true
 do
-  if [ -f "$filename" ]; then
-    file_age=$(($(date +%s) - $(date +%s -r "$filename")))
+  if [ -f "$confarchive" ]; then
+    file_age=$(($(date +%s) - $(date +%s -r "$confarchive")))
     echo "File age in sec: $file_age"
     if (( file_age < 20 ));
     then
-      echo "New copy of $source_file found. calling reload script."
+      echo "New copy of $confarchive found. calling reload script."
       /usr/local/bin/nginx-conf-reload.sh &
     fi
   else
