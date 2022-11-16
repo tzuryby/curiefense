@@ -26,7 +26,7 @@ from utils.prometheus_counters_dict import (
     name_changes,
 )
 
-ENABLE_EXPORT_T2 = os.getenv("ENABLE_EXPORT_T2", 'True').lower() in ('true', '1', 'on')
+ENABLE_EXPORT_T2 = os.getenv("ENABLE_EXPORT_T2", "True").lower() in ("true", "1", "on")
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
