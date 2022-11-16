@@ -26,6 +26,7 @@ from utils.prometheus_counters_dict import (
     name_changes,
 )
 
+ENABLE_EXPORT_T2 = os.getenv("ENABLE_EXPORT_T2", "True").lower() in ("true", "1", "on")
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
@@ -202,7 +203,8 @@ def export_t3():
         acc_avg = {}
         five_sec_string = q.get()
         five_sec_json = json.loads(five_sec_string)
-        export_t2(five_sec_json)
+        if ENABLE_EXPORT_T2:
+            export_t2(five_sec_json)
         for agg_sec in five_sec_json:
             start_time = time.time()
             update_t3_counters(agg_sec, acc_avg)
