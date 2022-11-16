@@ -1,36 +1,9 @@
-# should be in nginx.conf, but will do for now
-lua_package_path '/lua/?.lua;;';
-log_format curiefenselog escape=none '$request_map';
-log_format aggregationlog escape=none '$aggregated';
-
 upstream backend_a {
     server ${TARGET_ADDRESS_A}:${TARGET_PORT_A};
 }
 
 upstream backend_b {
     server ${TARGET_ADDRESS_B}:${TARGET_PORT_B};
-}
-
-server {
-    resolver local=on;
-    access_log ${AGGREGATED_STATS_LOG_FILE} aggregationlog;
-    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
-
-    listen 8999;
-
-    set $aggregated '{}';
-
-    server_name _;
-    location / {
-        access_by_lua_block {
-            local curiefense  = require "curiefense"
-            local agg = curiefense.aggregated_values()
-            ngx.var.aggregated = agg
-            ngx.header["content-type"] = "text/json"
-            ngx.say(agg)
-            ngx.exit(200)
-        }
-    }
 }
 
 server {
