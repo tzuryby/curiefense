@@ -546,4 +546,3 @@ def test_entries_delete(curieapi, doc):
             r = curieapi.entries.get("pytest", doc, e["id"])
         with pytest.raises(NotFoundError):
             r = curieapi.entries.delete("pytest", doc, e["id"])
-

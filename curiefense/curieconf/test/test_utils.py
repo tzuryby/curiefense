@@ -69,6 +69,7 @@ def test_bytes2jblob_json():
     res2 = utils.jblob2bytes(res)
     assert res2 == vec
 
+
 def test_model_invert_names():
     # Expected to get a new model replacing between the field name (test1_old_name) and
     # the field attribute (test1_new_name)
@@ -156,4 +157,3 @@ def test_dict_to_path_value():
         {"path": "b.b", "value": 2},
         {"path": "c.c.c", "value": 3},
     ]
-

@@ -34,7 +34,6 @@ BLOBS_BOOTSTRAP = {
 }
 
 
-
 def _get_existing_keys(target, keys):
     return list(filter(None, map(target.get, keys)))
 
@@ -72,6 +71,7 @@ def bytes2jblob(b, fmthint=None):
         fmt = "base64"
     bl = base64.b64encode(b).decode("utf-8")
     return {"format": fmt, "blob": bl}
+
 
 def model_invert_names(model):
     """
