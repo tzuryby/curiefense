@@ -21,12 +21,12 @@ fi
 
 # Enable TLS if required secrets are present -- docker environments
 if [ -f /run/secrets/uisslcrt ]; then
-	sed -i 's/# TLS-DOCKERCOMPOSE //' /init/nginx.conf
+	sed -i 's/# TLS-DOCKERCOMPOSE //' /usr/local/openresty/nginx/conf/nginx.conf
 fi
 
 # Enable TLS if required secrets are present -- k8s environments
 if [ -f /run/secrets/uisslcrt/uisslcrt ]; then
-	sed -i 's/# TLS-K8S //' /init/nginx.conf
+	sed -i 's/# TLS-K8S //' /usr/local/openresty/nginx/conf/nginx.conf
 fi
 
-/usr/sbin/nginx -g 'daemon off;'
+/usr/local/openresty/bin/openresty -g "daemon off;"
