@@ -6,7 +6,7 @@ COPY conf.d /etc/nginx/conf.d
 COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY curieproxy/lua /lua
 
-RUN ln -sf /etc/nginx/conf.d/customcode.lua /lua/customcode.lua
+RUN ln -sf /etc/nginx/conf.d/lua/customcode.lua /lua/customcode.lua
 
 COPY curieproxy/lua/shared-objects/*.so /usr/local/lib/lua/5.1/
 COPY --from=rustbin /root/curiefense.so /usr/local/lib/lua/5.1/
