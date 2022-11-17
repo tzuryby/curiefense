@@ -1,7 +1,7 @@
-name: Run e2e docker-compose main no rustbuild
+name: Manual e2e compose main no rustbuild
 
 on:
-  pull_request:
+  workflow_dispatch
     paths:
       - "deploy/**"
       - "curiefense/**"
