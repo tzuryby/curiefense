@@ -13,7 +13,7 @@ import jsonschema
 jsonschema.Draft4Validator = jsonschema.Draft3Validator
 
 # from curieconf import utils
-# from curieconf.utils import cloud
+from curieconf.utils import cloud
 # from curieconf.confserver import app
 
 
@@ -1623,81 +1623,150 @@ req_fetch_parser = reqparse.RequestParser()
 req_fetch_parser.add_argument("url", location="args", help="url to retrieve")
 
 
-@ns_tools.route("/fetch")
-class FetchResource(Resource):
-    @ns_tools.expect(req_fetch_parser, validate=True)
-    def get(self):
-        "Fetch an URL"
-        args = req_fetch_parser.parse_args()
+@app.get("/tools/fetch", tags=[Tags.tools])
+async def fetch_resource_get(url: str):
+    """Fetch an URL"""
+    try:
+        r = requests.get(url)
+    except Exception as e:
+        raise HTTPException(400, "cannot retrieve [%s]: %s" % (url, e))
+    return r.content
+
+
+# @ns_tools.route("/fetch")
+# class FetchResource(Resource):
+#     @ns_tools.expect(req_fetch_parser, validate=True)
+#     def get(self):
+#         "Fetch an URL"
+#         args = req_fetch_parser.parse_args()
+#         try:
+#             r = requests.get(args.url)
+#         except Exception as e:
+#             abort(400, "cannot retrieve [%s]: %s" % (args.url, e))
+#         return make_response(r.content)
+
+
+@app.put("/tools/publish/{config}/", tags=[Tags.tools])
+@app.put("/tools/publish/{config}/v/{version}/", tags=[Tags.tools])
+async def publish_resource_put(config: str, request: Request, buckets: List[Bucket], version: str = None):
+    """Push configuration to s3 buckets"""
+    conf = app.backend.configs_get(config, version)
+    ok = True
+    status = []
+    req_json = await request.json()
+    if type(req_json) is not list:
+        raise HTTPException(400, "body must be a list")
+    for bucket in buckets:
+        logs = []
         try:
-            r = requests.get(args.url)
-        except Exception as e:
-            abort(400, "cannot retrieve [%s]: %s" % (args.url, e))
-        return make_response(r.content)
-
-
-@ns_tools.route("/publish/<string:config>/")
-@ns_tools.route("/publish/<string:config>/v/<string:version>/")
-class PublishResource(Resource):
-    @ns_tools.expect([m_bucket], validate=True)
-    def put(self, config, version=None):
-        "Push configuration to s3 buckets"
-        conf = current_app.backend.configs_get(config, version)
-        ok = True
-        status = []
-        if type(request.json) is not list:
-            abort(400, "body must be a list")
-        for bucket in request.json:
-            logs = []
-            try:
-                cloud.export(conf, bucket["url"], prnt=lambda x: logs.append(x))
-            except Exception as e:
-                ok = False
-                s = False
-                msg = repr(e)
-            else:
-                s = True
-                msg = "ok"
-            status.append(
-                {"name": bucket["name"], "ok": s, "logs": logs, "message": msg}
-            )
-        return make_response({"ok": ok, "status": status})
-
-
-@ns_tools.route("/gitpush/")
-class GitPushResource(Resource):
-    @ns_tools.expect([m_giturl], validate=True)
-    def put(self):
-        "Push git configuration to remote git repositories"
-        ok = True
-        status = []
-        for giturl in request.json:
-            try:
-                current_app.backend.gitpush(giturl["giturl"])
-            except Exception as e:
-                msg = repr(e)
-                s = False
-            else:
-                msg = "ok"
-                s = True
-            status.append({"url": giturl["giturl"], "ok": s, "message": msg})
-        return make_response({"ok": ok, "status": status})
-
-
-@ns_tools.route("/gitfetch/")
-class GitFetchResource(Resource):
-    @ns_tools.expect(m_giturl, validate=True)
-    def put(self):
-        "Fetch git configuration from specified remote repository"
-        ok = True
-        try:
-            current_app.backend.gitfetch(request.json["giturl"])
+            cloud.export(conf, dict(bucket)["url"], prnt=lambda x: logs.append(x))
         except Exception as e:
             ok = False
+            s = False
             msg = repr(e)
         else:
+            s = True
             msg = "ok"
-        return make_response({"ok": ok, "status": msg})
+        status.append(
+            {"name": dict(bucket)["name"], "ok": s, "logs": logs, "message": msg}
+        )
+    return {"ok": ok, "status": status}
+
+
+# @ns_tools.route("/publish/<string:config>/")
+# @ns_tools.route("/publish/<string:config>/v/<string:version>/")
+# class PublishResource(Resource):
+#     @ns_tools.expect([m_bucket], validate=True)
+#     def put(self, config, version=None):
+#         "Push configuration to s3 buckets"
+#         conf = current_app.backend.configs_get(config, version)
+#         ok = True
+#         status = []
+#         if type(request.json) is not list:
+#             abort(400, "body must be a list")
+#         for bucket in request.json:
+#             logs = []
+#             try:
+#                 cloud.export(conf, bucket["url"], prnt=lambda x: logs.append(x))
+#             except Exception as e:
+#                 ok = False
+#                 s = False
+#                 msg = repr(e)
+#             else:
+#                 s = True
+#                 msg = "ok"
+#             status.append(
+#                 {"name": bucket["name"], "ok": s, "logs": logs, "message": msg}
+#             )
+#         return make_response({"ok": ok, "status": status})
+
+
+@app.put("/tools/gitpush/", tags=[Tags.tools])
+async def git_push_resource_put(git_urls: List[GitUrl]):
+    """Push git configuration to remote git repositories"""
+    ok = True
+    status = []
+    for giturl in git_urls:
+        try:
+            app.backend.gitpush(dict(giturl)["giturl"])
+        except Exception as e:
+            msg = repr(e)
+            s = False
+        else:
+            msg = "ok"
+            s = True
+        status.append({"url": dict(giturl)["giturl"], "ok": s, "message": msg})
+    return {"ok": ok, "status": status}
+
+
+# @ns_tools.route("/gitpush/")
+# class GitPushResource(Resource):
+#     @ns_tools.expect([m_giturl], validate=True)
+#     def put(self):
+#         "Push git configuration to remote git repositories"
+#         ok = True
+#         status = []
+#         for giturl in request.json:
+#             try:
+#                 current_app.backend.gitpush(giturl["giturl"])
+#             except Exception as e:
+#                 msg = repr(e)
+#                 s = False
+#             else:
+#                 msg = "ok"
+#                 s = True
+#             status.append({"url": giturl["giturl"], "ok": s, "message": msg})
+#         return make_response({"ok": ok, "status": status})
+
+
+@app.put("/tools/gitfetch/", tags=[Tags.tools])
+async def git_fetch_resource_put(giturl: GitUrl):
+    """Fetch git configuration from specified remote repository"""
+    ok = True
+    try:
+        app.backend.gitfetch(dict(giturl)["giturl"])
+    except Exception as e:
+        ok = False
+        msg = repr(e)
+    else:
+        msg = "ok"
+    return {"ok": ok, "status": msg}
+
+
+# @ns_tools.route("/gitfetch/")
+# class GitFetchResource(Resource):
+#     @ns_tools.expect(m_giturl, validate=True)
+#     def put(self):
+#         "Fetch git configuration from specified remote repository"
+#         ok = True
+#         try:
+#             current_app.backend.gitfetch(request.json["giturl"])
+#         except Exception as e:
+#             ok = False
+#             msg = repr(e)
+#         else:
+#             msg = "ok"
+#         return make_response({"ok": ok, "status": msg})
 
 
 if __name__ == '__main__':
