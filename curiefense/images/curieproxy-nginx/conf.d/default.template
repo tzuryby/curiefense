@@ -9,8 +9,8 @@ upstream backend_b {
 server {
     resolver local=on;
     set $request_map '{}';
-    access_log ${ACCESS_LOG} curiefenselog;
-    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
+    access_log ${NGINX_ACCESS_LOG} curiefenselog;
+    error_log  ${NGINX_ERROR_LOG}  ${NGINX_LOG_LEVEL};
 
     listen 31081 default_server;
     listen 31083 default_server ssl http2;
@@ -45,8 +45,8 @@ server {
 server {
     resolver local=on;
     set $request_map '{}';
-    access_log ${ACCESS_LOG} curiefenselog;
-    error_log  ${ERROR_LOG}  debug;
+    access_log ${NGINX_ACCESS_LOG} curiefenselog;
+    error_log  ${NGINX_ERROR_LOG}  debug;
 
     listen 31082 default_server;
     listen 31084 default_server ssl http2;
