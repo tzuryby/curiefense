@@ -1388,116 +1388,230 @@ async def entry_version_resource_get(config: str, document: str, entry: str, ver
 ### Database ###
 ################
 
-
-@ns_db.route("/")
-class DbResource(Resource):
-    def get(self):
-        "Get the list of existing namespaces"
-        return current_app.backend.ns_list()
+@app.get("/db/", tags=[Tags.db])
+async def db_resource_get():
+    """Get the list of existing namespaces"""
+    return app.backend.ns_list()
 
 
-@ns_db.route("/v/")
-class DbQueryResource(Resource):
-    def get(self):
-        "List all existing versions of namespaces"
-        return current_app.backend.ns_list_versions()
+# @ns_db.route("/")
+# class DbResource(Resource):
+#     def get(self):
+#         "Get the list of existing namespaces"
+#         return current_app.backend.ns_list()
 
 
-@ns_db.route("/<string:nsname>/")
-class NSResource(Resource):
-    def get(self, nsname):
-        "Get a complete namespace"
-        try:
-            return current_app.backend.ns_get(nsname, version=None)
-        except KeyError:
-            abort(404, "namespace [%s] does not exist" % nsname)
-
-    @ns_db.expect(m_db, validate=True)
-    def post(self, nsname):
-        "Create a non-existing namespace from data"
-        try:
-            return current_app.backend.ns_create(nsname, request.json, get_gitactor())
-        except Exception:
-            abort(409, "namespace [%s] already exists" % nsname)
-
-    @ns_db.expect(m_db, validate=True)
-    def put(self, nsname):
-        "Merge data into a namespace"
-        return current_app.backend.ns_update(nsname, request.json, get_gitactor())
-
-    def delete(self, nsname):
-        "Delete an existing namespace"
-        try:
-            return current_app.backend.ns_delete(nsname, get_gitactor())
-        except KeyError:
-            abort(409, "namespace [%s] does not exist" % nsname)
+@app.get("/db/v/", tags=[Tags.db])
+async def db_query_resource_get():
+    """List all existing versions of namespaces"""
+    return app.backend.ns_list_versions()
 
 
-@ns_db.route("/<string:nsname>/v/<string:version>/")
-class NSVersionResource(Resource):
-    def get(self, nsname, version):
-        "Get a given version of a namespace"
-        return current_app.backend.ns_get(nsname, version)
+#
+# @ns_db.route("/v/")
+# class DbQueryResource(Resource):
+#     def get(self):
+#         "List all existing versions of namespaces"
+#         return current_app.backend.ns_list_versions()
 
 
-@ns_db.route("/<string:nsname>/v/<string:version>/revert/")
-class NSVersionResource(Resource):
-    def put(self, nsname, version):
-        "Create a new version for a namespace from an old version"
-        try:
-            return current_app.backend.ns_revert(nsname, version, get_gitactor())
-        except KeyError:
-            abort(404, "namespace [%s] version [%s] not found" % (nsname, version))
+@app.get("/db/{nsname}/", tags=[Tags.db])
+async def ns_resource_get(nsname: str):
+    """Get a complete namespace"""
+    try:
+        return app.backend.ns_get(nsname, version=None)
+    except KeyError:
+        raise HTTPException(404, "namespace [%s] does not exist" % nsname)
 
 
-@ns_db.route("/<string:nsname>/q/")
-class NSQueryResource(Resource):
-    def post(self, nsname):
-        "Run a JSON query on the namespace and returns the results"
-        return current_app.backend.ns_query(nsname, request.json)
+@app.post("/db/{nsname}/", tags=[Tags.db])
+async def ns_resource_post(nsname: str, db: DB, request: Request):
+    """Create a non-existing namespace from data"""
+    try:
+        return app.backend.ns_create(nsname, dict(db), get_gitactor(request))
+    except Exception:
+        raise HTTPException(409, "namespace [%s] already exists" % nsname)
 
 
-@ns_db.route("/<string:nsname>/k/")
-class KeysResource(Resource):
-    def get(self, nsname):
-        "List all keys of a given namespace"
-        return current_app.backend.key_list(nsname)
+@app.put("/db/{nsname}/", tags=[Tags.db])
+async def ns_resource_put(nsname: str, db: DB, request: Request):
+    """Merge data into a namespace"""
+    return app.backend.ns_update(nsname, dict(db), get_gitactor(request))
 
 
-@ns_db.route("/<string:nsname>/k/<string:key>/v/")
-class KeysListVersionsResource(Resource):
-    def get(self, nsname, key):
-        "Get all versions of a given key in namespace"
-        return current_app.backend.key_list_versions(nsname, key)
+@app.delete("/db/{nsname}/", tags=[Tags.db])
+async def ns_resource_put(nsname: str, request: Request):
+    """Delete an existing namespace"""
+    try:
+        return app.backend.ns_delete(nsname, get_gitactor(request))
+    except KeyError:
+        raise HTTPException(409, "namespace [%s] does not exist" % nsname)
 
 
-@ns_db.route("/<string:nsname>/k/<string:key>/")
-class KeyResource(Resource):
-    def get(self, nsname, key):
-        "Retrieve a given key's value from a given namespace"
-        return current_app.backend.key_get(nsname, key)
+# @ns_db.route("/<string:nsname>/")
+# class NSResource(Resource):
+#     # def get(self, nsname):
+#     #     "Get a complete namespace"
+#     #     try:
+#     #         return current_app.backend.ns_get(nsname, version=None)
+#     #     except KeyError:
+#     #         abort(404, "namespace [%s] does not exist" % nsname)
+#
+#     # @ns_db.expect(m_db, validate=True)
+#     # def post(self, nsname):
+#     #     "Create a non-existing namespace from data"
+#     #     try:
+#     #         return current_app.backend.ns_create(nsname, request.json, get_gitactor())
+#     #     except Exception:
+#     #         abort(409, "namespace [%s] already exists" % nsname)
+#
+#     # @ns_db.expect(m_db, validate=True)
+#     # def put(self, nsname):
+#     #     "Merge data into a namespace"
+#     #     return current_app.backend.ns_update(nsname, request.json, get_gitactor())
+#
+#     # def delete(self, nsname):
+#     #     "Delete an existing namespace"
+#     #     try:
+#     #         return current_app.backend.ns_delete(nsname, get_gitactor())
+#     #     except KeyError:
+#     #         abort(409, "namespace [%s] does not exist" % nsname)
 
-    def put(self, nsname, key):
-        "Create or update the value of a key"
-        # check if "reblaze/k/<key>" exists in system/schema-validation
-        if nsname != "system":
-            keyName = nsname + "/k/" + key
-            schemas = current_app.backend.key_get("system", "schema-validation")
-            schema = None
-            # find schema if exists and validate the json input
-            for item in schemas.items():
-                if item[0] == keyName:
-                    schema = item[1]
-                    break
-            if schema:
-                isValid = validateDbJson(request.json, schema)
-                if isValid is False:
-                    abort(500, "schema mismatched")
-        return current_app.backend.key_set(nsname, key, request.json, get_gitactor())
 
-    def delete(self, nsname, key):
-        "Delete a key"
-        return current_app.backend.key_delete(nsname, key, get_gitactor())
+@app.get("/db/{nsname}/v/{version}", tags=[Tags.db])
+async def ns_version_resource_get(nsname: str, version: str):
+    """Get a given version of a namespace"""
+    return app.backend.ns_get(nsname, version)
+
+
+# @ns_db.route("/<string:nsname>/v/<string:version>/")
+# class NSVersionResource(Resource):
+#     def get(self, nsname, version):
+#         "Get a given version of a namespace"
+#         return current_app.backend.ns_get(nsname, version)
+
+
+@app.put("/db/{nsname}/v/{version}/revert/", tags=[Tags.db])
+async def ns_version_revert_resource_put(nsname: str, version: str, request: Request):
+    """Create a new version for a namespace from an old version"""
+    try:
+        return app.backend.ns_revert(nsname, version, get_gitactor(request))
+    except KeyError:
+        raise HTTPException(404, "namespace [%s] version [%s] not found" % (nsname, version))
+
+
+#
+# @ns_db.route("/<string:nsname>/v/<string:version>/revert/")
+# class NSVersionResource(Resource):
+#     def put(self, nsname, version):
+#         "Create a new version for a namespace from an old version"
+#         try:
+#             return current_app.backend.ns_revert(nsname, version, get_gitactor())
+#         except KeyError:
+#             abort(404, "namespace [%s] version [%s] not found" % (nsname, version))
+
+
+@app.post("/db/{nsname}/q/", tags=[Tags.db])
+async def ns_query_resource_post(nsname: str, request: Request):
+    """Run a JSON query on the namespace and returns the results"""
+    req_json = await request.json()
+    return app.backend.ns_query(nsname, req_json)
+
+
+# @ns_db.route("/<string:nsname>/q/")
+# class NSQueryResource(Resource):
+#     def post(self, nsname):
+#         "Run a JSON query on the namespace and returns the results"
+#         return current_app.backend.ns_query(nsname, request.json)
+#
+
+
+@app.get("/db/{nsname}/k/", tags=[Tags.db])
+async def keys_resource_get(nsname: str):
+    """List all keys of a given namespace"""
+    return app.backend.key_list(nsname)
+
+
+# @ns_db.route("/<string:nsname>/k/")
+# class KeysResource(Resource):
+#     def get(self, nsname):
+#         "List all keys of a given namespace"
+#         return current_app.backend.key_list(nsname)
+
+@app.get("/db/{nsname}/k/{key}/v/", tags=[Tags.db])
+async def keys_list_versions_resource_get(nsname: str, key: str):
+    """Get all versions of a given key in namespace"""
+    return app.backend.key_list_versions(nsname, key)
+
+
+# @ns_db.route("/<string:nsname>/k/<string:key>/v/")
+# class KeysListVersionsResource(Resource):
+#     def get(self, nsname, key):
+#         "Get all versions of a given key in namespace"
+#         return current_app.backend.key_list_versions(nsname, key)
+#
+
+@app.get("/db/{nsname}/k/{key}/", tags=[Tags.db])
+async def key_resource_get(nsname: str, key: str):
+    """Retrieve a given key's value from a given namespace"""
+    return app.backend.key_get(nsname, key)
+
+
+@app.put("/db/{nsname}/k/{key}/", tags=[Tags.db])
+async def key_resource_put(nsname: str, key: str, request: Request):
+    """Create or update the value of a key"""
+    # check if "reblaze/k/<key>" exists in system/schema-validation
+    req_json = await request.json()
+
+    if nsname != "system":
+        keyName = nsname + "/k/" + key
+        schemas = app.backend.key_get("system", "schema-validation")
+        schema = None
+        # find schema if exists and validate the json input
+        for item in schemas.items():
+            if item[0] == keyName:
+                schema = item[1]
+                break
+        if schema:
+            isValid = validateDbJson(req_json, schema)
+            if isValid is False:
+                raise HTTPException(500, "schema mismatched")
+    return app.backend.key_set(nsname, key, req_json, get_gitactor(request))
+
+
+@app.delete("/db/{nsname}/k/{key}/", tags=[Tags.db])
+async def key_resource_delete(nsname: str, key: str, request: Request):
+    """Delete a key"""
+    return app.backend.key_delete(nsname, key, get_gitactor(request))
+
+
+# @ns_db.route("/<string:nsname>/k/<string:key>/")
+# class KeyResource(Resource):
+#     # def get(self, nsname, key):
+#     #     "Retrieve a given key's value from a given namespace"
+#     #     return current_app.backend.key_get(nsname, key)
+#
+#     # def put(self, nsname, key):
+#     #     "Create or update the value of a key"
+#     #     # check if "reblaze/k/<key>" exists in system/schema-validation
+#     #     if nsname != "system":
+#     #         keyName = nsname + "/k/" + key
+#     #         schemas = current_app.backend.key_get("system", "schema-validation")
+#     #         schema = None
+#     #         # find schema if exists and validate the json input
+#     #         for item in schemas.items():
+#     #             if item[0] == keyName:
+#     #                 schema = item[1]
+#     #                 break
+#     #         if schema:
+#     #             isValid = validateDbJson(request.json, schema)
+#     #             if isValid is False:
+#     #                 abort(500, "schema mismatched")
+#     #     return current_app.backend.key_set(nsname, key, request.json, get_gitactor())
+#
+#     # def delete(self, nsname, key):
+#     #     "Delete a key"
+#     #     return current_app.backend.key_delete(nsname, key, get_gitactor())
 
 
 #############
