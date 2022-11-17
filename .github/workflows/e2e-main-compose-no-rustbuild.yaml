@@ -1,4 +1,4 @@
-name: Run e2e tests on docker-compose
+name: Run e2e docker-compose main no rustbuild
 
 on:
   pull_request:
