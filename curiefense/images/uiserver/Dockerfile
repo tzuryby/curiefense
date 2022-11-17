@@ -1,6 +1,6 @@
 FROM node:16.17.0 as builder
 
-# grab latest commit 
+# grab latest commit
 WORKDIR /
 RUN git clone --depth=1 https://github.com/reblaze/ui.git
 
@@ -9,10 +9,10 @@ RUN npm install
 RUN npm run build
 
 
-FROM nginx:1.23.1
+FROM docker.io/curiefense/openresty:1.21.4.1-bionic
 
 USER root
-RUN ln -sf /init/nginx.conf /etc/nginx/nginx.conf
+RUN ln -sf /init/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 RUN ln -sf /dev/stdout /var/log/nginx/access.log && \
     ln -sf /dev/stderr /var/log/nginx/error.log && \
         ln -sf /init/http.conf /etc/nginx/conf.d/ && \
