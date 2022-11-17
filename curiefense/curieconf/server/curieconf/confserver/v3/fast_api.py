@@ -1027,6 +1027,7 @@ async def blob_revert_resource_put(config: str, blob: str, version: str, request
     """Create a new version for a blob from an old version"""
     return app.backend.blobs_revert(config, blob, version, get_gitactor(request))
 
+
 #
 # @ns_configs.route("/<string:config>/b/<string:blob>/v/<string:version>/revert/")
 # class BlobRevertResource(Resource):
@@ -1039,11 +1040,12 @@ async def blob_revert_resource_put(config: str, blob: str, version: str, request
 ### DOCUMENTS ###
 #################
 
-@app.get("/configs/{config}/d/", tags=[Tags.congifs], response_model= DocumentListEntry)
-async def document_resource(config:str):
+@app.get("/configs/{config}/d/", tags=[Tags.congifs], response_model=DocumentListEntry)
+async def document_resource(config: str):
     """Retrieve the list of existing documents in this configuration"""
     res = app.backend.documents_list(config)
     return res
+
 
 #
 # @ns_configs.route("/<string:config>/d/")
@@ -1055,104 +1057,164 @@ async def document_resource(config:str):
 #         return res
 
 
-@app.get("/configs/{config}/d/{document}/", tags=[Tags.congifs], response_model= DocumentMask )
-async def get(config: str, document: str):
-    pass
+@app.get("/configs/{config}/d/{document}/", tags=[Tags.congifs], response_model=DocumentMask)
+async def document_resource_get(config: str, document: str):
+    """Get a complete document"""
+    if document not in models:
+        raise HTTPException(status_code=404, detail="document does not exist")
+    res = app.backend.documents_get(config, document)
+    res = {key: res[key] for key in list(models[document].__fields__.keys())}
+    return res
+
+
+async def _filter(data, keys):
+    return {key: data[key] for key in keys}
+
 
 @app.post("/configs/{config}/d/{document}/", tags=[Tags.congifs])
-async def post(config: str, document: str, basic_entry: List[BasicEntry]):
-    "Create a new complete document"
+async def document_resource_post(config: str, document: str, basic_entries: List[BasicEntry], request: Request):
+    """Create a new complete document"""
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
 
-    data = dict[basic_entry]
-    for entry in request.json:
-        isValid, err = validateJson(entry, document)
+    data = [_filter(dict(entry), list(models[document].__fields__.keys())) for entry in basic_entries]
+    for entry in basic_entries:
+        isValid, err = validateJson(dict(entry), document)
         if isValid is False:
-            abort(500, "schema mismatched: \n" + err)
-    res = current_app.backend.documents_create(
-        config, document, data, get_gitactor()
+            raise HTTPException(500, "schema mismatched: \n" + err)
+    res = app.backend.documents_create(
+        config, document, data, get_gitactor(request)
     )
     return res
 
 
+@app.put("/configs/{config}/d/{document}/", tags=[Tags.congifs])
+async def document_resource_put(config: str, document: str, basic_entries: List[BasicEntry], request: Request):
+    """Update an existing document"""
+    if document not in models:
+        raise HTTPException(status_code=404, detail="document does not exist")
 
-@ns_configs.route("/<string:config>/d/<string:document>/")
-class DocumentResource(Resource):
-    @ns_configs.marshal_with(m_document_mask, mask="*", skip_none=True)
-    def get(self, config, document):
-        "Get a complete document"
-        if document not in models:
-
-            abort(404, "document does not exist")
-        res = current_app.backend.documents_get(config, document)
-        return marshal(res, models[document], skip_none=True)
-
-    @ns_configs.expect([m_basic_entry], validate=True)
-    def post(self, config, document):
-        "Create a new complete document"
-        if document not in models:
-            abort(404, "document does not exist")
-        data = marshal(request.json, models[document], skip_none=True)
-        for entry in request.json:
-            isValid, err = validateJson(entry, document)
-            if isValid is False:
-                abort(500, "schema mismatched: \n" + err)
-        res = current_app.backend.documents_create(
-            config, document, data, get_gitactor()
-        )
-        return res
-
-    @ns_configs.expect([m_basic_entry], validate=True)
-    def put(self, config, document):
-        "Update an existing document"
-        if document not in models:
-            abort(404, "document does not exist")
-        data = marshal(request.json, models[document], skip_none=True)
-        for entry in request.json:
-            isValid, err = validateJson(entry, document)
-            if isValid is False:
-                abort(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
-        res = current_app.backend.documents_update(
-            config, document, data, get_gitactor()
-        )
-        return res
-
-    def delete(self, config, document):
-        "Delete/empty a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.documents_delete(config, document, get_gitactor())
-        return res
+    data = [_filter(dict(entry), list(models[document].__fields__.keys())) for entry in basic_entries]
+    for entry in basic_entries:
+        isValid, err = validateJson(dict(entry), document)
+        if isValid is False:
+            raise HTTPException(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
+    res = app.backend.documents_update(
+        config, document, data, get_gitactor(request)
+    )
+    return res
 
 
-@ns_configs.route("/<string:config>/d/<string:document>/v/")
-class DocumentListVersionResource(Resource):
-    def get(self, config, document):
-        "Retrieve the existing versions of a given document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.documents_list_versions(config, document)
-        return marshal(res, m_version_log, skip_none=True)
+@app.delete("/configs/{config}/d/{document}/", tags=[Tags.congifs])
+async def document_resource_delete(config: str, document: str, request: Request):
+    """Delete/empty a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.documents_delete(config, document, get_gitactor(request))
+    return res
 
 
-@ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/")
-class DocumentVersionResource(Resource):
-    def get(self, config, document, version):
-        "Get a given version of a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.documents_get(config, document, version)
-        return marshal(res, models[document], skip_none=True)
+# @ns_configs.route("/<string:config>/d/<string:document>/")
+# class DocumentResource(Resource):
+#     # @ns_configs.marshal_with(m_document_mask, mask="*", skip_none=True)
+#     # def get(self, config, document):
+#     #     "Get a complete document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     res = current_app.backend.documents_get(config, document)
+#     #     return marshal(res, models[document], skip_none=True)
+#     #
+#     # @ns_configs.expect([m_basic_entry], validate=True)
+#     # def post(self, config, document):
+#     #     "Create a new complete document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     data = marshal(request.json, models[document], skip_none=True)
+#     #     for entry in request.json:
+#     #         isValid, err = validateJson(entry, document)
+#     #         if isValid is False:
+#     #             abort(500, "schema mismatched: \n" + err)
+#     #     res = current_app.backend.documents_create(
+#     #         config, document, data, get_gitactor()
+#     #     )
+#     #     return res
+#
+#     # @ns_configs.expect([m_basic_entry], validate=True)
+#     # def put(self, config, document):
+#     #     "Update an existing document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     data = marshal(request.json, models[document], skip_none=True)
+#     #     for entry in request.json:
+#     #         isValid, err = validateJson(entry, document)
+#     #         if isValid is False:
+#     #             abort(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
+#     #     res = current_app.backend.documents_update(
+#     #         config, document, data, get_gitactor()
+#     #     )
+#     #     return res
+#
+#     # def delete(self, config, document):
+#     #     "Delete/empty a document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     res = current_app.backend.documents_delete(config, document, get_gitactor())
+#     #     return res
 
 
-@ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/revert/")
-class DocumentRevertResource(Resource):
-    def put(self, config, document, version):
-        "Create a new version for a document from an old version"
-        return current_app.backend.documents_revert(
-            config, document, version, get_gitactor()
-        )
+@app.get("/configs/{config}/d/{document}/v/", tags=[Tags.congifs])
+async def document_list_version_resource_get(config: str, document: str):
+    """Retrieve the existing versions of a given document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.documents_list_versions(config, document)
+    res = {key: res[key] for key in list(VersionLog.__fields__.keys())}
+    return res
+
+
+#
+# @ns_configs.route("/<string:config>/d/<string:document>/v/")
+# class DocumentListVersionResource(Resource):
+#     def get(self, config, document):
+#         "Retrieve the existing versions of a given document"
+#         if document not in models:
+#             abort(404, "document does not exist")
+#         res = current_app.backend.documents_list_versions(config, document)
+#         return marshal(res, m_version_log, skip_none=True)
+
+
+@app.get("/configs/{config}/d/{document}/v/{version}/", tags=[Tags.congifs])
+async def document_version_resource_get(config: str, document: str, version: str):
+    """Get a given version of a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.documents_get(config, document, version)
+    return {key: res[key] for key in list(models[document].__fields__.keys())}
+
+
+# @ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/")
+# class DocumentVersionResource(Resource):
+#     def get(self, config, document, version):
+#         "Get a given version of a document"
+#         if document not in models:
+#             abort(404, "document does not exist")
+#         res = current_app.backend.documents_get(config, document, version)
+#         return marshal(res, models[document], skip_none=True)
+
+@app.put("/configs/{config}/d/{document}/v/{version}/revert/", tags=[Tags.congifs])
+async def document_revert_resource_put(config: str, document: str, version: str, request: Request):
+    """Create a new version for a document from an old version"""
+    return app.backend.documents_revert(
+        config, document, version, get_gitactor(request)
+    )
+
+# @ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/revert/")
+# class DocumentRevertResource(Resource):
+#     def put(self, config, document, version):
+#         "Create a new version for a document from an old version"
+#         return current_app.backend.documents_revert(
+#             config, document, version, get_gitactor()
+#         )
 
 
 ###############
