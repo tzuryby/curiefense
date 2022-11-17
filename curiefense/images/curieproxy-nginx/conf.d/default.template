@@ -1,8 +1,3 @@
-# should be in nginx.conf, but will do for now
-lua_package_path '/lua/?.lua;;';
-log_format curiefenselog escape=none '$request_map';
-log_format aggregationlog escape=none '$aggregated';
-
 upstream backend_a {
     server ${TARGET_ADDRESS_A}:${TARGET_PORT_A};
 }
@@ -13,31 +8,9 @@ upstream backend_b {
 
 server {
     resolver local=on;
-    access_log ${AGGREGATED_STATS_LOG_FILE} aggregationlog;
-    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
-
-    listen 8999;
-
-    set $aggregated '{}';
-
-    server_name _;
-    location / {
-        access_by_lua_block {
-            local curiefense  = require "curiefense"
-            local agg = curiefense.aggregated_values()
-            ngx.var.aggregated = agg
-            ngx.header["content-type"] = "text/json"
-            ngx.say(agg)
-            ngx.exit(200)
-        }
-    }
-}
-
-server {
-    resolver local=on;
     set $request_map '{}';
-    access_log ${ACCESS_LOG} curiefenselog;
-    error_log  ${ERROR_LOG}  ${NGINX_LOG_LEVEL};
+    access_log ${NGINX_ACCESS_LOG} curiefenselog;
+    error_log  ${NGINX_ERROR_LOG}  ${NGINX_LOG_LEVEL};
 
     listen 31081 default_server;
     listen 31083 default_server ssl http2;
@@ -72,8 +45,8 @@ server {
 server {
     resolver local=on;
     set $request_map '{}';
-    access_log ${ACCESS_LOG} curiefenselog;
-    error_log  ${ERROR_LOG}  debug;
+    access_log ${NGINX_ACCESS_LOG} curiefenselog;
+    error_log  ${NGINX_ERROR_LOG}  debug;
 
     listen 31082 default_server;
     listen 31084 default_server ssl http2;

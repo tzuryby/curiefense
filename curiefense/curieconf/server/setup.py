@@ -4,22 +4,17 @@ from setuptools import setup
 
 setup(
     name="curieconf_server",
-    version="1.2",
+    version="3.0",
     description="Curiefense configuration server",
     author="Reblaze",
     author_email="phil@reblaze.com",
     packages=[
         "curieconf.confserver",
         "curieconf.confserver.backend",
-        "curieconf.confserver.v1",
-        "curieconf.confserver.v2",
         "curieconf.confserver.v3",
     ],
     package_data={
         "curieconf.confserver": [
-            "json/*.schema",
-            "v1/json/*.schema",
-            "v2/json/*.schema",
             "v3/json/*.schema",
         ]
     },
