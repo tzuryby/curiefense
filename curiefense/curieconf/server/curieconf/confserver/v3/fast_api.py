@@ -1208,6 +1208,7 @@ async def document_revert_resource_put(config: str, document: str, version: str,
         config, document, version, get_gitactor(request)
     )
 
+
 # @ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/revert/")
 # class DocumentRevertResource(Resource):
 #     def put(self, config, document, version):
@@ -1221,86 +1222,166 @@ async def document_revert_resource_put(config: str, document: str, version: str,
 ### ENTRIES ###
 ###############
 
-
-@ns_configs.route("/<string:config>/d/<string:document>/e/")
-class EntriesResource(Resource):
-    def get(self, config, document):
-        "Retrieve the list of entries in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.entries_list(config, document)
-        return res  # XXX: marshal
-
-    @ns_configs.expect(m_basic_entry, validate=True)
-    def post(self, config, document):
-        "Create an entry in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        isValid, err = validateJson(request.json, document)
-        if isValid:
-            data = marshal(request.json, models[document], skip_none=True)
-            res = current_app.backend.entries_create(
-                config, document, data, get_gitactor()
-            )
-            return res
-        else:
-            abort(500, "schema mismatched: \n" + err)
+@app.get("/configs/{config}/d/{document}/e/", tags=[Tags.congifs])
+async def entries_resource_get(config: str, document: str):
+    """Retrieve the list of entries in a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.entries_list(config, document)
+    return res  # XXX: marshal
 
 
-@ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
-class EntryResource(Resource):
-    def get(self, config, document, entry):
-        "Retrieve an entry from a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.entries_get(config, document, entry)
-        return marshal(res, models[document], skip_none=True)
-
-    @ns_configs.expect(m_basic_entry, validate=True)
-    def put(self, config, document, entry):
-        "Update an entry in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        isValid, err = validateJson(request.json, document)
-        if isValid:
-            data = marshal(request.json, models[document], skip_none=True)
-            res = current_app.backend.entries_update(
-                config, document, entry, data, get_gitactor()
-            )
-            return res
-        else:
-            abort(500, "schema mismatched: \n" + err)
-
-    def delete(self, config, document, entry):
-        "Delete an entry from a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.entries_delete(
-            config, document, entry, get_gitactor()
+@app.post("/configs/{config}/d/{document}/e/", tags=[Tags.congifs])
+async def entries_resource_post(config: str, document: str, basic_entry: BasicEntry, request: Request):
+    "Create an entry in a document"
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    isValid, err = validateJson(dict(basic_entry), document)
+    if isValid:
+        data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
+        res = app.backend.entries_create(
+            config, document, data, get_gitactor(request)
         )
         return res
+    else:
+        raise HTTPException(500, "schema mismatched: \n" + err)
 
 
-@ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/v/")
-class EntryListVersionResource(Resource):
-    def get(self, config, document, entry):
-        "Get the list of existing versions of a given entry in a document"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.entries_list_versions(config, document, entry)
-        return marshal(res, m_version_log, skip_none=True)
+# @ns_configs.route("/<string:config>/d/<string:document>/e/")
+# class EntriesResource(Resource):
+#     # def get(self, config, document):
+#     #     "Retrieve the list of entries in a document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     res = current_app.backend.entries_list(config, document)
+#     #     return res  # XXX: marshal
+#
+#     @ns_configs.expect(m_basic_entry, validate=True)
+#     def post(self, config, document):
+#         "Create an entry in a document"
+#         if document not in models:
+#             abort(404, "document does not exist")
+#         isValid, err = validateJson(request.json, document)
+#         if isValid:
+#             data = marshal(request.json, models[document], skip_none=True)
+#             res = current_app.backend.entries_create(
+#                 config, document, data, get_gitactor()
+#             )
+#             return res
+#         else:
+#             abort(500, "schema mismatched: \n" + err)
 
 
-@ns_configs.route(
-    "/<string:config>/d/<string:document>/e/<string:entry>/v/<string:version>/"
-)
-class EntryVersionResource(Resource):
-    def get(self, config, document, entry, version):
-        "Get a given version of a document entry"
-        if document not in models:
-            abort(404, "document does not exist")
-        res = current_app.backend.entries_get(config, document, entry, version)
-        return marshal(res, models[document], skip_none=True)
+@app.get("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
+async def entry_resource_get(config: str, document: str, entry: str):
+    """Retrieve an entry from a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.entries_get(config, document, entry)
+    return {key: res for key in list(models[document].__fields__.keys())}
+
+
+@app.put("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
+async def entry_resource_put(config: str, document: str, entry: str, basic_entry: BasicEntry, request: Request):
+    """Update an entry in a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    isValid, err = validateJson(dict(basic_entry), document)
+    if isValid:
+        data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
+
+        res = app.backend.entries_update(
+            config, document, entry, data, get_gitactor(request)
+        )
+        return res
+    else:
+        raise HTTPException(500, "schema mismatched: \n" + err)
+
+
+@app.delete("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
+async def entry_resource_deleye(config: str, document: str, entry: str, request: Request):
+    """Delete an entry from a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.entries_delete(
+        config, document, entry, get_gitactor(request)
+    )
+    return res
+
+
+# @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/")
+# class EntryResource(Resource):
+#     # def get(self, config, document, entry):
+#     #     "Retrieve an entry from a document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     res = current_app.backend.entries_get(config, document, entry)
+#     #     return marshal(res, models[document], skip_none=True)
+#
+#     # @ns_configs.expect(m_basic_entry, validate=True)
+#     # def put(self, config, document, entry):
+#     #     "Update an entry in a document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     isValid, err = validateJson(request.json, document)
+#     #     if isValid:
+#     #         data = marshal(request.json, models[document], skip_none=True)
+#     #         res = current_app.backend.entries_update(
+#     #             config, document, entry, data, get_gitactor()
+#     #         )
+#     #         return res
+#     #     else:
+#     #         abort(500, "schema mismatched: \n" + err)
+#
+#     # def delete(self, config, document, entry):
+#     #     "Delete an entry from a document"
+#     #     if document not in models:
+#     #         abort(404, "document does not exist")
+#     #     res = current_app.backend.entries_delete(
+#     #         config, document, entry, get_gitactor()
+#     #     )
+#     #     return res
+
+
+@app.get("/configs/{config}/d/{document}/e/{entry}/v/", tags=[Tags.congifs])
+async def entry_list_version_resource_get(config: str, document: str, entry: str):
+    """Get the list of existing versions of a given entry in a document"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.entries_list_versions(config, document, entry)
+    return {key: res[key] for key in list(VersionLog.__fields__.keys())}
+
+
+#
+# @ns_configs.route("/<string:config>/d/<string:document>/e/<string:entry>/v/")
+# class EntryListVersionResource(Resource):
+#     def get(self, config, document, entry):
+#         "Get the list of existing versions of a given entry in a document"
+#         if document not in models:
+#             abort(404, "document does not exist")
+#         res = current_app.backend.entries_list_versions(config, document, entry)
+#         return marshal(res, m_version_log, skip_none=True)
+
+
+@app.get("/configs/{config}/d/{document}/e/{entry}/v/{version}/", tags=[Tags.congifs])
+async def entry_version_resource_get(config: str, document: str, entry: str, version: str):
+    """Get a given version of a document entry"""
+    if document not in models:
+        raise HTTPException(404, "document does not exist")
+    res = app.backend.entries_get(config, document, entry, version)
+    return {key: res[key] for key in list(models[document].__fields__.keys())}
+
+
+# @ns_configs.route(
+#     "/<string:config>/d/<string:document>/e/<string:entry>/v/<string:version>/"
+# )
+# class EntryVersionResource(Resource):
+#     def get(self, config, document, entry, version):
+#         "Get a given version of a document entry"
+#         if document not in models:
+#             abort(404, "document does not exist")
+#         res = current_app.backend.entries_get(config, document, entry, version)
+#         return marshal(res, models[document], skip_none=True)
 
 
 ################
