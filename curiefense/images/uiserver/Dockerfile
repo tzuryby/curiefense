@@ -14,6 +14,7 @@ FROM docker.io/curiefense/openresty:1.21.4.1-bionic
 # USER root
 COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY start_nginx.sh /init/start_nginx.sh
+RUN chmod +x /init/start_nginx.sh
 COPY --from=builder /ui/dist /app
 
 CMD /init/start_nginx.sh
