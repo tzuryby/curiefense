@@ -174,7 +174,7 @@ services:
   uiserver:
     container_name: uiserver
     hostname: uiserver
-    image: "curiefense/uiserver:${DOCKER_TAG}"
+    image: "gcr.io/open-reblaze/uiserver:main"
     restart: always
     networks:
       - confnet
