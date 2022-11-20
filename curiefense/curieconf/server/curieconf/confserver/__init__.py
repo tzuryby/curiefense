@@ -1,22 +1,15 @@
 #! /usr/bin/env python3
 
 import os
-import flask
-from flask import Flask, current_app
 from .backend import Backends
-
-from flask_cors import CORS
+import uvicorn
+from curieconf.confserver.v3 import api
 from prometheus_flask_exporter import PrometheusMetrics
 
+from fastapi import FastAPI
 
-## Import all versions
-from .v3 import api as api_v3
-
-app = Flask(__name__)
-
-CORS(app, resources={r"/*": {"origins": "*"}})
-
-app.register_blueprint(api_v3.api_bp, url_prefix="/api/v3")
+app = FastAPI()
+app.include_router(api.router)
 
 
 def drop_into_pdb(app, exception):
@@ -56,19 +49,16 @@ def main(args=None):
 
     options = parser.parse_args(args)
 
-    if options.pdb:
-        flask.got_request_exception.connect(drop_into_pdb)
-
-    metrics = PrometheusMetrics(app)
+    #TODO - find replacements for got_request_exception and prometheus_flask_exporter
+    # if options.pdb:
+    #     flask.got_request_exception.connect(drop_into_pdb)
+    # metrics = PrometheusMetrics(app)
 
     try:
-        with app.app_context():
-            current_app.backend = Backends.get_backend(app, options.dbpath)
-            current_app.options = options.__dict__
-            app.run(debug=options.debug, host=options.host, port=options.port)
+        app.backend = Backends.get_backend(app, options.dbpath)
+        app.options = options.__dict__
+        uvicorn.run(app, host=options.host, port=options.port)
+
+    #        app.run(debug=options.debug, host=options.host, port=options.port)
     finally:
         pass
-
-
-if __name__ == "__main__":
-    main()
