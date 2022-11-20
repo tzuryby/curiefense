@@ -31,7 +31,7 @@ LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
 
-METRICS_PULL_INTERVAL = os.getenv("METRICS_PULL_INTERVAL", 60)
+METRICS_PULL_INTERVAL = int(os.getenv("METRICS_PULL_INTERVAL", 60))
 
 http_methods = [
     "GET",
@@ -102,6 +102,7 @@ def switch_hyphens(name):
 
 
 def _get_sleep_interval(start_time):
+    logger.info("start_time %s" % start_time)
     sleep = METRICS_PULL_INTERVAL - (time.time() - start_time)
     return 0 if sleep < 0 else sleep
 
