@@ -212,18 +212,29 @@ def export_t3():
 
 def get_t2():
     config = get_config("t2_source")
+    logger.info("entering the while True")
     while True:
         start_time = time.time()
-        time.time() - start_time
+        logger.info ("start time %s" % start_time)
+        # time.time() - start_time
         try:
-            five_sec_t2 = requests.get(
+            logger.info ("url: %s" % config["url"])
+            logger.info ("headers: %s" %config["headers"])
+            
+            t2_data = requests.get(
                 config["url"], headers=config["headers"]
-            ).content.decode()
-            q.put(five_sec_t2)
+            )
+            t2_data = t2_data.content.decode()
+
+            q.put(t2_data)
+            logger.info ("done iteration: %s" %start_time)
+
         except Exception as e:
             logger.exception(e)
 
-        time.sleep(_get_sleep_interval(start_time))
+        _sleep_interval = get_sleep_interval(start_time)
+        logger.info ("sleeping for %s" % _sleep_interval)
+        time.sleep(_sleep_interval)
 
 
 if __name__ == "__main__":
