@@ -228,14 +228,14 @@ def get_t2():
             t2_data = t2_data.content.decode()
 
             q.put(t2_data)
-            logger.info ("done iteration: %s" %start_time)
+            logger.info ("done iteration: %s" % start_time)
 
         except Exception as e:
             logger.exception(e)
 
         sleep_interval = _get_sleep_interval(start_time)
-        logger.info ("sleeping for %s" % _sleep_interval)
-        time.sleep(_sleep_interval)
+        logger.info ("sleeping for %s" % sleep_interval)
+        time.sleep(sleep_interval)
 
 
 
