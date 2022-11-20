@@ -16,23 +16,23 @@ if [ -f "$source_file" ]; then
   rm -rf "${temp_dir:?}/"*
   cp -a ${target_dir}/. ${temp_dir}/
   rm -rf "${target_dir:?}/"*
-  echo "RELOAD-CUSTOMCODE: Extract $source_file into $target_dir"
+  echo "RELOAD-CUSTOMCONF: Extract $source_file into $target_dir"
   tar xzf ${source_file} -C ${target_dir}
-  echo "RELOAD-CUSTOMCODE: Test Nginx with new configuration"
+  echo "RELOAD-CUSTOMCONF: Test Nginx with new configuration"
   nginx -t
   ## check exit code of previous command
   retVal=$?
   if [ $retVal -ne 0 ];
   then
-    echo "RELOAD-CUSTOMCODE: Nginx failed, restore config files" >&2
+    echo "RELOAD-CUSTOMCONF: Nginx failed, restore config files" >&2
     cp -a  ${temp_dir}/. ${target_dir}/
     cp ${target_dir}/lua/customcode.lua /lua/customcode.lua
   else
       echo reloading nginx
       nginx -s reload
-      echo "RELOAD-CUSTOMCODE: Nginx reloaded with the new config"
+      echo "RELOAD-CUSTOMCONF: Nginx reloaded with the new config"
   fi
 else
-  echo "RELOAD-CUSTOMCODE: ${source_file} does not exist. Exiting $0" >&2
+  echo "RELOAD-CUSTOMCONF: ${source_file} does not exist. Exiting $0" >&2
   exit
 fi
