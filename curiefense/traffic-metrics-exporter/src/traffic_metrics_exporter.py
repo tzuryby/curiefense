@@ -232,9 +232,10 @@ def get_t2():
         except Exception as e:
             logger.exception(e)
 
-        _sleep_interval = get_sleep_interval(start_time)
+        sleep_interval = _get_sleep_interval(start_time)
         logger.info ("sleeping for %s" % _sleep_interval)
         time.sleep(_sleep_interval)
+
 
 
 if __name__ == "__main__":
