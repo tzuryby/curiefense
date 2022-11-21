@@ -877,7 +877,7 @@ async def config_clone_name_post(config: str, new_name: str, meta: Meta, request
 #         return current_app.backend.configs_clone(config, data, new_name)
 
 
-@router.get("configs/{config}/v/", tags=[Tags.congifs], response_model=VersionLog)
+@router.get("/configs/{config}/v/", tags=[Tags.congifs], response_model=List[VersionLog])
 async def config_list_version_get(config: str, request: Request):
     """Get all versions of a given configuration"""
     return request.app.backend.configs_list_versions(config)
@@ -891,7 +891,7 @@ async def config_list_version_get(config: str, request: Request):
 #         return current_app.backend.configs_list_versions(config)
 
 
-@router.get("configs/{config}/v/{version}/", tags=[Tags.congifs])
+@router.get("/configs/{config}/v/{version}/", tags=[Tags.congifs])
 async def config_version_get(config: str, version: str, request: Request):
     """Retrieve a specific version of a configuration"""
     return request.app.backend.configs_get(config, version)
@@ -903,7 +903,7 @@ async def config_version_get(config: str, version: str, request: Request):
 #         "Retrieve a specific version of a configuration"
 #         return current_app.backend.configs_get(config, version)
 
-@router.get("/{config}/v/{version}/revert/", tags=[Tags.congifs])
+@router.get("/configs/{config}/v/{version}/revert/", tags=[Tags.congifs])
 async def config_revert_put(config: str, version: str, request: Request):
     """Create a new version for a configuration from an old version"""
     return request.app.backend.configs_revert(config, version, get_gitactor(request))
