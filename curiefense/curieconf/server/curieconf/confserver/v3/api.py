@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, List, Union
 
 from fastapi import FastAPI, Request, HTTPException, APIRouter
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, StrictStr, StrictBool, StrictInt
 import random  # needed for generating a random number for an API
 import uvicorn  # optional if you run it directly from terminal
 import jsonschema
@@ -59,8 +59,8 @@ anyType = ["number", "string", "boolean", "object", "array", "null"]
 # limit
 
 class Threshold(BaseModel):
-    limit: int
-    action: str
+    limit: StrictInt
+    action: StrictStr
 
 
 # m_threshold = api.model(
@@ -72,18 +72,18 @@ class Threshold(BaseModel):
 # )
 
 class Limit(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    _global: bool = Field(alias="global")
-    active: bool
-    timeframe: int
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
+    _global: StrictBool = Field(alias="global")
+    active: StrictBool
+    timeframe: StrictInt
     thresholds: List[Threshold]
     include: typing.Any
     exclude: typing.Any
     key: anyTypeUnion
     pairwith: typing.Any
-    tags: List[str]
+    tags: List[StrictStr]
 
 
 # m_limit = api.model(
@@ -106,14 +106,14 @@ class Limit(BaseModel):
 
 # securitypolicy
 class SecProfileMap(BaseModel):
-    id: str = None
-    name: str = None
-    description: Optional[str]
-    match: str = None
-    acl_profile: str = None
-    acl_active: bool = None
-    content_filter_profile: str = None
-    content_filter_active: bool = None
+    id: StrictStr = None
+    name: StrictStr = None
+    description: Optional[StrictStr]
+    match: StrictStr = None
+    acl_profile: StrictStr = None
+    acl_active: StrictBool = None
+    content_filter_profile: StrictStr = None
+    content_filter_active: StrictBool = None
     limit_ids: Optional[list]
 
 
@@ -138,11 +138,11 @@ class SecProfileMap(BaseModel):
 # )
 
 class SecurityPolicy(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    tags: Optional[List[str]]
-    match: str
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
+    tags: Optional[List[StrictStr]]
+    match: StrictStr
     session: anyTypeUnion
     session_ids: anyTypeUnion
     map: Optional[List[SecProfileMap]]
@@ -165,17 +165,17 @@ class SecurityPolicy(BaseModel):
 # content filter rule
 
 class ContentFilterRule(BaseModel):
-    id: str
-    name: str
-    msg: str
-    operand: str
-    severity: int
-    certainity: int
-    category: str
-    subcategory: str
-    risk: int
-    tags: Optional[List[str]]
-    description: Optional[str]
+    id: StrictStr
+    name: StrictStr
+    msg: StrictStr
+    operand: StrictStr
+    severity: StrictInt
+    certainity: StrictInt
+    category: StrictStr
+    subcategory: StrictStr
+    risk: StrictInt
+    tags: Optional[List[StrictStr]]
+    description: Optional[StrictStr]
 
 
 # m_contentfilterrule = api.model(
@@ -197,24 +197,24 @@ class ContentFilterRule(BaseModel):
 
 # content filter profile
 class ContentFilterProfile(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    ignore_alphanum: bool
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
+    ignore_alphanum: StrictBool
     args: typing.Any
     headers: typing.Any
     cookies: typing.Any
     path: typing.Any
     allsections: typing.Any
     decoding: typing.Any
-    masking_seed: str
-    content_type: Optional[List[str]]
-    active: Optional[List[str]]
-    report: Optional[List[str]]
-    ignore: Optional[List[str]]
-    tags: Optional[List[str]]
-    action: Optional[str]
-    ignore_body: bool
+    masking_seed: StrictStr
+    content_type: Optional[List[StrictStr]]
+    active: Optional[List[StrictStr]]
+    report: Optional[List[StrictStr]]
+    ignore: Optional[List[StrictStr]]
+    tags: Optional[List[StrictStr]]
+    action: Optional[StrictStr]
+    ignore_body: StrictBool
 
 
 # m_contentfilterprofile = api.model(
@@ -243,17 +243,17 @@ class ContentFilterProfile(BaseModel):
 
 # aclprofile
 class ACLProfile(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    allow: Optional[List[str]]
-    allow_bot: Optional[List[str]]
-    deny_bot: Optional[List[str]]
-    passthrough: Optional[List[str]]
-    deny: Optional[List[str]]
-    force_deny: Optional[List[str]]
-    tags: Optional[List[str]]
-    action: Optional[str]
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
+    allow: Optional[List[StrictStr]]
+    allow_bot: Optional[List[StrictStr]]
+    deny_bot: Optional[List[StrictStr]]
+    passthrough: Optional[List[StrictStr]]
+    deny: Optional[List[StrictStr]]
+    force_deny: Optional[List[StrictStr]]
+    tags: Optional[List[StrictStr]]
+    action: Optional[StrictStr]
 
 
 # m_aclprofile = api.model(
@@ -275,14 +275,14 @@ class ACLProfile(BaseModel):
 
 # Global Filter
 class GlobalFilter(BaseModel):
-    id: str
-    name: str
-    source: str
-    mdate: str
-    description: str
-    active: bool
+    id: StrictStr
+    name: StrictStr
+    source: StrictStr
+    mdate: StrictStr
+    description: StrictStr
+    active: StrictBool
     action: typing.Any
-    tags: Optional[List[str]]
+    tags: Optional[List[StrictStr]]
     rule: anyTypeUnion
 
 
@@ -304,16 +304,16 @@ class GlobalFilter(BaseModel):
 # Flow Control
 
 class FlowControl(BaseModel):
-    id: str
-    name: str
-    timeframe: int
+    id: StrictStr
+    name: StrictStr
+    timeframe: StrictInt
     key: List[typing.Any]
     sequence: List[typing.Any]
-    tags: Optional[List[str]]
-    include: Optional[List[str]]
-    exclude: Optional[List[str]]
-    description: Optional[str]
-    active: bool
+    tags: Optional[List[StrictStr]]
+    include: Optional[List[StrictStr]]
+    exclude: Optional[List[StrictStr]]
+    description: Optional[StrictStr]
+    active: StrictBool
 
 
 #
@@ -336,12 +336,12 @@ class FlowControl(BaseModel):
 # Action
 
 class Action(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
-    tags: List[str]
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
+    tags: List[StrictStr]
     params: typing.Any
-    type: str
+    type: StrictStr
 
 
 # m_action = api.model(
@@ -358,9 +358,9 @@ class Action(BaseModel):
 
 # Virtual Tag
 class VirtualTag(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
     match: List[typing.Any]
 
 
@@ -377,8 +377,8 @@ class VirtualTag(BaseModel):
 
 # custom
 class Custom(BaseModel):
-    id: str
-    name: str
+    id: StrictStr
+    name: StrictStr
 
 
 # m_custom = api.model(
@@ -408,33 +408,33 @@ models = {
 
 ### Other models
 class DocumentMask(BaseModel):
-    id: str
-    name: str
-    description: str
+    id: StrictStr
+    name: StrictStr
+    description: StrictStr
     map: Optional[List[SecProfileMap]]
     include: Optional[List[typing.Any]]
     exclude: Optional[List[typing.Any]]
-    tags: Optional[List[str]]
+    tags: Optional[List[StrictStr]]
     active: Optional[List[typing.Any]]
     action: typing.Any
     sequence: Optional[List[typing.Any]]
-    timeframe: Optional[int]
+    timeframe: Optional[StrictInt]
     thresholds: Optional[List[Threshold]]
     pairwith: typing.Any
-    content_type: Optional[List[str]]
+    content_type: Optional[List[StrictStr]]
     params: typing.Any
     decoding: typing.Any
-    category: Optional[str]
-    subcategory: Optional[str]
-    risk: Optional[int]
-    allow: Optional[List[str]]
-    allow_bot: Optional[List[str]]
-    deny_bot: Optional[List[str]]
-    passthrough: Optional[List[str]]
-    deny: Optional[List[str]]
-    force_deny: Optional[List[str]]
-    match: Optional[str] = "j"
-    _type: Optional[str] = Field(alias="type")
+    category: Optional[StrictStr]
+    subcategory: Optional[StrictStr]
+    risk: Optional[StrictInt]
+    allow: Optional[List[StrictStr]]
+    allow_bot: Optional[List[StrictStr]]
+    deny_bot: Optional[List[StrictStr]]
+    passthrough: Optional[List[StrictStr]]
+    deny: Optional[List[StrictStr]]
+    force_deny: Optional[List[StrictStr]]
+    match: Optional[StrictStr] = "j"
+    _type: Optional[StrictStr] = Field(alias="type")
     _star: Optional[List[typing.Any]] = Field(alias="*")
 
 
@@ -473,7 +473,7 @@ class DocumentMask(BaseModel):
 # )
 
 class VersionLog(BaseModel):
-    version: Optional[str]
+    version: Optional[StrictStr]
     # TODO - dt_format="iso8601"
     date: Optional[datetime.datetime]
     _star: Optional[List[typing.Any]] = Field(alias="*")
@@ -490,11 +490,11 @@ class VersionLog(BaseModel):
 # )
 
 class Meta(BaseModel):
-    id: str
-    description: str
+    id: StrictStr
+    description: StrictStr
     date: Optional[datetime.datetime]
     logs: Optional[List[VersionLog]] = []
-    version: Optional[str]
+    version: Optional[StrictStr]
 
 
 # m_meta = api.model(
@@ -509,7 +509,7 @@ class Meta(BaseModel):
 # )
 
 class BlobEntry(BaseModel):
-    format: str
+    format: StrictStr
     blob: anyTypeUnion
 
 
@@ -522,7 +522,7 @@ class BlobEntry(BaseModel):
 # )
 
 class BlobListEntry(BaseModel):
-    name: Optional[str]
+    name: Optional[StrictStr]
 
 
 # m_blob_list_entry = api.model(
@@ -533,8 +533,8 @@ class BlobListEntry(BaseModel):
 # )
 
 class DocumentListEntry(BaseModel):
-    name: Optional[str]
-    entries: Optional[int]
+    name: Optional[StrictStr]
+    entries: Optional[StrictInt]
 
 
 # m_document_list_entry = api.model(
@@ -577,10 +577,10 @@ class ConfigBlobs(BaseModel):
 # )
 
 class ConfigDeleteBlobs(BaseModel):
-    geolite2asn: Optional[bool]
-    geolite2country: Optional[bool]
-    geolite2city: Optional[bool]
-    customconf: Optional[bool]
+    geolite2asn: Optional[StrictBool]
+    geolite2country: Optional[StrictBool]
+    geolite2city: Optional[StrictBool]
+    customconf: Optional[StrictBool]
 
 
 # m_config_delete_blobs = api.model(
@@ -607,8 +607,8 @@ class Config(BaseModel):
 # )
 
 class Edit(BaseModel):
-    path: str
-    value: str
+    path: StrictStr
+    value: StrictStr
 
 
 # m_edit = api.model(
@@ -620,9 +620,9 @@ class Edit(BaseModel):
 # )
 
 class BasicEntry(BaseModel):
-    id: str
-    name: str
-    description: Optional[str]
+    id: StrictStr
+    name: StrictStr
+    description: Optional[StrictStr]
 
 
 # m_basic_entry = api.model(
@@ -637,8 +637,8 @@ class BasicEntry(BaseModel):
 ### Publish
 
 class Bucket(BaseModel):
-    name: str
-    url: str
+    name: StrictStr
+    url: StrictStr
 
 
 # m_bucket = api.model(
@@ -652,7 +652,7 @@ class Bucket(BaseModel):
 ### Git push & pull
 
 class GitUrl(BaseModel):
-    giturl: str
+    giturl: StrictStr
 
 
 # m_giturl = api.model(
