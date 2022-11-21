@@ -4,7 +4,7 @@ local curiefense  = require "curiefense"
 local sfmt = string.format
 local redis = require "resty.redis"
 
-local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 1
+--local HOPS = os.getenv("XFF_TRUSTED_HOPS") or 0
 local redishost = os.getenv("REDIS_HOST") or "redis"
 local redisport = os.getenv("REDIS_PORT") or 6379
 
@@ -92,7 +92,7 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid)
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
-    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str, hops=HOPS}
+    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=ip_str} --, hops=nil}
 
     if secpolid then
         params['secpolid'] = secpolid
