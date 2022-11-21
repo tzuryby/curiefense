@@ -15,7 +15,6 @@ jsonschema.Draft4Validator = jsonschema.Draft3Validator
 # from curieconf import utils
 from curieconf.utils import cloud
 
-
 # TODO: TEMP DEFINITIONS
 import os
 
@@ -779,7 +778,7 @@ async def configs_get(request: Request):
 async def configs_post(config: Config, request: Request):
     """Create a new configuration"""
     data = await request.json()
-    return request.app.backend.configs_create(data=data, actor = get_gitactor(request))
+    return request.app.backend.configs_create(data=data, actor=get_gitactor(request))
 
 
 #
@@ -805,14 +804,14 @@ async def config_get(config: str, request: Request):
 @router.post("/configs/{config}/", tags=[Tags.congifs])
 async def config_post(config: str, m_config: Config, request: Request):
     "Create a new configuration. Configuration name in URL overrides configuration in POST data"
-    data = dict(m_config)
+    data = await request.json()
     return request.app.backend.configs_create(data, config, get_gitactor(request))
 
 
 @router.put("/configs/{config}/", tags=[Tags.congifs])
 async def config_put(config: str, meta: Meta, request: Request):
     """Update an existing configuration"""
-    data = dict(meta)
+    data = await request.json()
     return request.app.backend.configs_update(config, data, get_gitactor(request))
 
 
@@ -849,7 +848,7 @@ async def config_delete(config: str, request: Request):
 @router.post("/configs/{config}/clone/", tags=[Tags.congifs])
 async def config_clone_post(config: str, meta: Meta, request: Request):
     """Clone a configuration. New name is provided in POST data"""
-    data = dict(meta)
+    data = await request.json()
     return request.app.backend.configs_clone(config, data)
 
 
@@ -865,7 +864,7 @@ async def config_clone_post(config: str, meta: Meta, request: Request):
 @router.post("/configs/{config}/clone/{new_name}/", tags=[Tags.congifs])
 async def config_clone_name_post(config: str, new_name: str, meta: Meta, request: Request):
     """Clone a configuration. New name is provided URL"""
-    data = dict(meta)
+    data = await request.json()
     return request.app.backend.configs_clone(config, data, new_name)
 
 
@@ -946,16 +945,19 @@ async def blob_resource_get(config: str, blob: str, request: Request):
 @router.post("configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_post(config: str, blob: str, blob_entry: BlobEntry, request: Request):
     """Create a new blob"""
+    b_entry = await request.json()
     return request.app.backend.blobs_create(
-        config, blob, dict(blob_entry), get_gitactor(request)
+        config, blob, b_entry, get_gitactor(request)
     )
 
 
 @router.put("configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_put(config: str, blob: str, blob_entry: BlobEntry, request: Request):
-    """Create a new blob"""
+    """upaate an existing blob"""
+    b_entry = await request.json()
+
     return request.app.backend.blobs_update(
-        config, blob, dict(blob_entry), get_gitactor(request)
+        config, blob, b_entry, get_gitactor(request)
     )
 
 
@@ -1426,8 +1428,9 @@ async def ns_resource_get(nsname: str, request: Request):
 @router.post("/db/{nsname}/", tags=[Tags.db])
 async def ns_resource_post(nsname: str, db: DB, request: Request):
     """Create a non-existing namespace from data"""
+    _db = await request.json()
     try:
-        return request.app.backend.ns_create(nsname, dict(db), get_gitactor(request))
+        return request.app.backend.ns_create(nsname, _db, get_gitactor(request))
     except Exception:
         raise HTTPException(409, "namespace [%s] already exists" % nsname)
 
@@ -1435,7 +1438,9 @@ async def ns_resource_post(nsname: str, db: DB, request: Request):
 @router.put("/db/{nsname}/", tags=[Tags.db])
 async def ns_resource_put(nsname: str, db: DB, request: Request):
     """Merge data into a namespace"""
-    return request.app.backend.ns_update(nsname, dict(db), get_gitactor(request))
+    _db = await request.json()
+
+    return request.app.backend.ns_update(nsname, _db, get_gitactor(request))
 
 
 @router.delete("/db/{nsname}/", tags=[Tags.db])
@@ -1651,10 +1656,12 @@ async def publish_resource_put(config: str, request: Request, buckets: List[Buck
     req_json = await request.json()
     if type(req_json) is not list:
         raise HTTPException(400, "body must be a list")
+    buck = await request.json()
+
     for bucket in buckets:
         logs = []
         try:
-            cloud.export(conf, dict(bucket)["url"], prnt=lambda x: logs.append(x))
+            cloud.export(conf, buck["url"], prnt=lambda x: logs.append(x))
         except Exception as e:
             ok = False
             s = False
@@ -1663,7 +1670,7 @@ async def publish_resource_put(config: str, request: Request, buckets: List[Buck
             s = True
             msg = "ok"
         status.append(
-            {"name": dict(bucket)["name"], "ok": s, "logs": logs, "message": msg}
+            {"name": buck["name"], "ok": s, "logs": logs, "message": msg}
         )
     return {"ok": ok, "status": status}
 
@@ -1738,8 +1745,9 @@ async def git_push_resource_put(git_urls: List[GitUrl], request: Request):
 async def git_fetch_resource_put(giturl: GitUrl, request: Request):
     """Fetch git configuration from specified remote repository"""
     ok = True
+    _giturl = await request.json()
     try:
-        request.app.backend.gitfetch(dict(giturl)["giturl"])
+        request.app.backend.gitfetch(_giturl["giturl"])
     except Exception as e:
         ok = False
         msg = repr(e)
