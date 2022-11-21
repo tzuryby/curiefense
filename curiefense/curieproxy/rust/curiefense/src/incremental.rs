@@ -44,7 +44,7 @@ pub struct IData {
     ipinfo: IPInfo,
     stats: StatsCollect<BStageSecpol>,
     container_name: Option<String>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 }
 
 impl IData {
@@ -77,7 +77,7 @@ pub fn inspect_init(
     ipinfo: IPInfo,
     start: Option<DateTime<Utc>>,
     selected_secpol: Option<&str>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> Result<IData, String> {
     let mut logs = Logs::new(loglevel);
     let mr = match_securitypolicy(

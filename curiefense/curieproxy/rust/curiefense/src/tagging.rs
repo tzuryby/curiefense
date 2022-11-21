@@ -128,6 +128,9 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Header(hdr) => check_pair(hdr, &rinfo.headers, |h| {
             Location::HeaderValue(hdr.key.clone(), h.to_string())
         }),
+        GlobalFilterEntryE::Plugins(arg) => check_pair(arg, &rinfo.plugins, |a| {
+            Location::PluginValue(arg.key.clone(), a.to_string())
+        }),
         GlobalFilterEntryE::Args(arg) => check_pair(arg, &rinfo.rinfo.qinfo.args, |a| {
             Location::UriArgumentValue(arg.key.clone(), a.to_string())
         }),

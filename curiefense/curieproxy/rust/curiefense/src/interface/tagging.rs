@@ -29,6 +29,9 @@ pub enum Location {
     Cookies,
     Cookie(String),
     CookieValue(String, String),
+    Plugins,
+    Plugin(String),
+    PluginValue(String, String),
 }
 
 impl std::fmt::Display for Location {
@@ -58,6 +61,9 @@ impl std::fmt::Display for Location {
             RefererPath => write!(f, "referer path"),
             RefererPathpart(p) => write!(f, "referer path part {}", p),
             RefererPathpartValue(p, v) => write!(f, "referer path part {}={}", p, v),
+            Plugins => write!(f, "plugins"),
+            Plugin(c) => write!(f, "plugin {}", c),
+            PluginValue(c, v) => write!(f, "plugin {}={}", c, v),
         }
     }
 }
@@ -100,6 +106,9 @@ impl Location {
             RefererPath => Some(Header("referer".to_string())),
             RefererPathpart(_) => Some(RefererPath),
             RefererPathpartValue(k, _) => Some(RefererPathpart(*k)),
+            Plugins => Some(Request),
+            Plugin(_) => Some(Plugins),
+            PluginValue(n, _) => Some(Plugin(n.clone())),
         }
     }
 
@@ -133,6 +142,7 @@ impl Location {
             SectionIdx::Path => Location::Path,
             // TODO: track body / uri args
             SectionIdx::Args => Location::UriArgumentValue(name.to_string(), value.to_string()),
+            SectionIdx::Plugins => Location::PluginValue(name.to_string(), value.to_string()),
         }
     }
     pub fn from_name(idx: SectionIdx, name: &str) -> Self {
@@ -142,6 +152,7 @@ impl Location {
             SectionIdx::Path => Location::Path,
             // TODO: track body / uri args
             SectionIdx::Args => Location::UriArgument(name.to_string()),
+            SectionIdx::Plugins => Location::Plugin(name.to_string()),
         }
     }
     pub fn from_section(idx: SectionIdx) -> Self {
@@ -151,6 +162,7 @@ impl Location {
             SectionIdx::Path => Location::Path,
             // TODO: track body / uri args
             SectionIdx::Args => Location::Uri,
+            SectionIdx::Plugins => Location::Plugins,
         }
     }
     pub fn serialize_with_parent<S: serde::Serializer>(
@@ -223,6 +235,15 @@ impl Location {
                 map.serialize_entry("name", name)?;
             }
             Location::CookieValue(_, value) => {
+                map.serialize_entry("value", value)?;
+            }
+            Location::Plugins => {
+                map.serialize_entry("section", "plugins")?;
+            }
+            Location::Plugin(name) => {
+                map.serialize_entry("name", name)?;
+            }
+            Location::PluginValue(_, value) => {
                 map.serialize_entry("value", value)?;
             }
         }

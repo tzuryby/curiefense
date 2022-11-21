@@ -409,6 +409,7 @@ pub struct AggSection {
     args: usize,
     body: usize,
     attrs: usize,
+    plugins: usize,
 }
 
 impl AggregatedCounters {
@@ -538,6 +539,7 @@ impl AggregatedCounters {
                     | Location::RefererPathpart(_)
                     | Location::RefererPathpartValue(_, _) => aggloc.headers += 1,
                     Location::Cookies | Location::Cookie(_) | Location::CookieValue(_, _) => aggloc.headers += 1,
+                    Location::Plugins | Location::Plugin(_) | Location::PluginValue(_, _) => aggloc.plugins += 1,
                 }
             }
         }

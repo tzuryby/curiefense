@@ -318,7 +318,7 @@ pub struct RequestInfo {
     pub rinfo: RInfo,
     pub session: String,
     pub session_ids: HashMap<String, String>,
-    pub plugins: HashMap<String, HashMap<String, String>>,
+    pub plugins: RequestField,
 }
 
 impl RequestInfo {
@@ -522,7 +522,7 @@ pub fn map_request(
     container_name: Option<String>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
@@ -565,6 +565,12 @@ pub fn map_request(
         container_name,
     };
 
+    let mut plugins_field = RequestField::new(&[]);
+    for (k, v) in plugins {
+        let l = Location::PluginValue(k.clone(), v.clone());
+        plugins_field.add(k, l, v);
+    }
+
     let dummy_reqinfo = RequestInfo {
         timestamp: ts.unwrap_or_else(Utc::now),
         cookies,
@@ -572,7 +578,7 @@ pub fn map_request(
         rinfo,
         session: String::new(),
         session_ids: HashMap::new(),
-        plugins,
+        plugins: plugins_field,
     };
 
     let raw_session = (if secpolicy.session.is_empty() {
@@ -627,6 +633,7 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Args(k) => reqinfo.rinfo.qinfo.args.get(k).map(Selected::Str),
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
         RequestSelector::Cookie(k) => reqinfo.cookies.get(k).map(Selected::Str),
+        RequestSelector::Plugins(k) => reqinfo.plugins.get(k).map(Selected::Str),
         RequestSelector::Ip => Some(&reqinfo.rinfo.geoip.ipstr).map(Selected::Str),
         RequestSelector::Network => reqinfo.rinfo.geoip.network.as_ref().map(Selected::Str),
         RequestSelector::Uri => Some(&reqinfo.rinfo.qinfo.uri).map(Selected::Str),

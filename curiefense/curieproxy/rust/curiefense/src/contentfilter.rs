@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config::contentfilter::{
     rule_tags, ContentFilterEntryMatch, ContentFilterProfile, ContentFilterRules, ContentFilterSection, Section,
-    SectionIdx,
+    SectionIdx, ALL_SECTION_IDX, ALL_SECTION_IDX_NO_PLUGINS,
 };
 use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
 use crate::interface::{BDecision, BlockReason, Initiator, Location, Tags};
@@ -47,6 +47,7 @@ fn get_section(idx: SectionIdx, rinfo: &RequestInfo) -> &RequestField {
         Cookies => &rinfo.cookies,
         Args => &rinfo.rinfo.qinfo.args,
         Path => &rinfo.rinfo.qinfo.path_as_map,
+        Plugins => &rinfo.plugins,
     }
 }
 
@@ -69,7 +70,6 @@ pub fn content_filter_check(
     profile: &ContentFilterProfile,
     mhsdb: Option<&ContentFilterRules>,
 ) -> (Result<(), CfBlock>, StatsCollect<BStageContentFilter>) {
-    use SectionIdx::*;
     let mut omit = Default::default();
 
     // directly exit if omitted profile
@@ -79,7 +79,7 @@ pub fn content_filter_check(
     }
 
     // check section profiles
-    for idx in &[Path, Headers, Cookies, Args] {
+    for idx in &ALL_SECTION_IDX {
         if let Err(reason) = section_check(
             logs,
             tags,
@@ -108,7 +108,7 @@ pub fn content_filter_check(
     let mut hca_keys: HashMap<String, (SectionIdx, String)> = HashMap::new();
 
     // list of non whitelisted entries
-    for idx in &[Path, Headers, Cookies, Args] {
+    for idx in &ALL_SECTION_IDX_NO_PLUGINS {
         let section_content = get_section(*idx, rinfo)
             .iter()
             .filter(|(name, _)| !omit.entries.get(*idx).contains(*name))

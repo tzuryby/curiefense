@@ -182,6 +182,9 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("authority", &rinfo.rinfo.host)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
+    if !rinfo.plugins.is_empty() {
+        map_ser.serialize_entry("plugins", &rinfo.plugins)?;
+    }
     map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;

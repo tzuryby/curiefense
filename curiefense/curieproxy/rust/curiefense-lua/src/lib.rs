@@ -36,7 +36,7 @@ struct LuaArgs<'l> {
     secpolid: Option<String>,
     humanity: Option<bool>,
     configpath: String,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 }
 
 /// Lua function arguments:
@@ -125,7 +125,15 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         secpolid,
         humanity,
         configpath: configpath.unwrap_or_else(|| "/cf-config/current/config".to_string()),
-        plugins: mplugins.unwrap_or_default(),
+        plugins: mplugins
+            .unwrap_or_default()
+            .into_iter()
+            .flat_map(|(plugin_name, values)| {
+                values
+                    .into_iter()
+                    .map(move |(k, v)| (format!("{}.{}", &plugin_name, k), v))
+            })
+            .collect(),
     })
 }
 
@@ -270,7 +278,7 @@ fn inspect_request<GH: Grasshopper>(
     ip: String,
     grasshopper: Option<&GH>,
     selected_secpol: Option<String>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> Result<InspectionResult, String> {
     let mut logs = Logs::default();
     logs.debug("Inspection init");
@@ -304,7 +312,7 @@ fn inspect_init<GH: Grasshopper>(
     ip: String,
     grasshopper: Option<&GH>,
     selected_secpol: Option<String>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> Result<(InitResult, Logs), String> {
     let mut logs = Logs::new(loglevel);
     logs.debug("Inspection init");

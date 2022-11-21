@@ -59,6 +59,7 @@ pub enum GlobalFilterEntryE {
     Args(PairEntry),
     Cookies(PairEntry),
     Header(PairEntry),
+    Plugins(PairEntry),
 
     // ip/iprange
     Ip(IpAddr),
@@ -306,6 +307,7 @@ impl GlobalFilterSection {
                 GlobalFilterEntryType::Args => pair(logs, GlobalFilterEntryE::Args, val),
                 GlobalFilterEntryType::Cookies => pair(logs, GlobalFilterEntryE::Cookies, val),
                 GlobalFilterEntryType::Headers => pair(logs, GlobalFilterEntryE::Header, val),
+                GlobalFilterEntryType::Plugins => pair(logs, GlobalFilterEntryE::Plugins, val),
                 GlobalFilterEntryType::Path => single_re(logs, GlobalFilterEntryE::Path, val),
                 GlobalFilterEntryType::Query => single_re(logs, GlobalFilterEntryE::Query, val),
                 GlobalFilterEntryType::Uri => single_re(logs, GlobalFilterEntryE::Uri, val),

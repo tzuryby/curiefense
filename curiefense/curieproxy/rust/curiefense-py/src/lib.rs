@@ -17,7 +17,7 @@ fn py_inspect_request(
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
-    plugins: Option<HashMap<String, HashMap<String, String>>>,
+    plugins: Option<HashMap<String, String>>,
 ) -> PyResult<(String, Vec<u8>)> {
     let real_loglevel = match loglevel.as_str() {
         "debug" => LogLevel::Debug,

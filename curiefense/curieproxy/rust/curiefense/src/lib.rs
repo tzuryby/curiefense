@@ -79,7 +79,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     raw: RawRequest,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
     async_std::task::block_on(inspect_generic_request_map_async(
         configpath,
@@ -98,7 +98,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     raw: RawRequest,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
 
@@ -226,7 +226,7 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     raw: RawRequest<'_>,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
-    plugins: HashMap<String, HashMap<String, String>>,
+    plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
     match inspect_generic_request_map_init(configpath, mgh, raw, logs, selected_secpol, plugins) {
         Err(res) => res,
