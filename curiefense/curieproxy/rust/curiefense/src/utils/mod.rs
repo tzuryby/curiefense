@@ -403,7 +403,7 @@ impl InspectionResult {
 }
 
 pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
-    let pip = ipstr.parse();
+    let pip = ipstr.trim().parse();
     let mut geoip = GeoIp {
         ipstr,
         ip: None,
