@@ -14,7 +14,6 @@ jsonschema.Draft4Validator = jsonschema.Draft3Validator
 
 # from curieconf import utils
 from curieconf.utils import cloud
-# from curieconf.confserver import app
 
 
 # TODO: TEMP DEFINITIONS
@@ -107,14 +106,14 @@ class Limit(BaseModel):
 
 # securitypolicy
 class SecProfileMap(BaseModel):
-    id: str
-    name: str
-    description: str
-    match: str
-    acl_profile: str
-    acl_active: bool
-    content_filter_profile: str
-    content_filter_active: bool
+    id: str = None
+    name: str = None
+    description: Optional[str]
+    match: str = None
+    acl_profile: str = None
+    acl_active: bool = None
+    content_filter_profile: str = None
+    content_filter_active: bool = None
     limit_ids: Optional[list]
 
 
@@ -141,12 +140,12 @@ class SecProfileMap(BaseModel):
 class SecurityPolicy(BaseModel):
     id: str
     name: str
-    description: str
-    tags: List[str]
+    description: Optional[str]
+    tags: Optional[List[str]]
     match: str
     session: anyTypeUnion
     session_ids: anyTypeUnion
-    map: List[SecProfileMap]
+    map: Optional[List[SecProfileMap]]
 
 
 # m_securitypolicy = api.model(
@@ -566,10 +565,10 @@ class ConfigDocuments(BaseModel):
 
 
 class ConfigBlobs(BaseModel):
-    geolite2asn: Optional[List[Optional[BlobEntry]]]
-    geolite2country: Optional[List[Optional[BlobEntry]]]
-    geolite2city: Optional[List[Optional[BlobEntry]]]
-    customconf: Optional[List[Optional[BlobEntry]]]
+    geolite2asn: Optional[BlobEntry]
+    geolite2country: Optional[BlobEntry]
+    geolite2city: Optional[BlobEntry]
+    customconf: Optional[BlobEntry]
 
 
 # m_config_blobs = api.model(
@@ -700,13 +699,13 @@ def validateDbJson(json_data, schema):
 
 def get_gitactor(request):
     email, username = "", ""
-    email_header = app.options.get("trusted_email_header", None)
+    email_header = request.app.options.get("trusted_email_header", None)
     if email_header:
         email = request.headers.get(email_header, "")
-    username_header = app.options.get("trusted_username_header", None)
+    username_header = request.app.options.get("trusted_username_header", None)
     if username_header:
         username = request.headers.get(username_header, "")
-    return app.backend.prepare_actor(username, email)
+    return request.app.backend.prepare_actor(username, email)
 
 
 base_path = Path(__file__).parent
@@ -779,8 +778,8 @@ async def configs_get(request: Request):
 @router.post("/configs/", tags=[Tags.congifs])
 async def configs_post(config: Config, request: Request):
     """Create a new configuration"""
-    data = dict(config)
-    return request.app.backend.configs_create(data, get_gitactor(request))
+    data = await request.json()
+    return request.app.backend.configs_create(data=data, actor = get_gitactor(request))
 
 
 #
@@ -798,29 +797,29 @@ async def configs_post(config: Config, request: Request):
 #         return current_app.backend.configs_create(data, get_gitactor())
 
 @router.get("/configs/{config}/", tags=[Tags.congifs], response_model=Config)
-async def config_get(config: str):
+async def config_get(config: str, request: Request):
     """Retrieve a complete configuration"""
-    return app.backend.configs_get(config)
+    return request.app.backend.configs_get(config)
 
 
 @router.post("/configs/{config}/", tags=[Tags.congifs])
 async def config_post(config: str, m_config: Config, request: Request):
     "Create a new configuration. Configuration name in URL overrides configuration in POST data"
     data = dict(m_config)
-    return app.backend.configs_create(data, config, get_gitactor(request))
+    return request.app.backend.configs_create(data, config, get_gitactor(request))
 
 
 @router.put("/configs/{config}/", tags=[Tags.congifs])
 async def config_put(config: str, meta: Meta, request: Request):
     """Update an existing configuration"""
     data = dict(meta)
-    return app.backend.configs_update(config, data, get_gitactor(request))
+    return request.app.backend.configs_update(config, data, get_gitactor(request))
 
 
 @router.delete("/configs/{config}/", tags=[Tags.congifs])
-async def config_delete(config: str):
+async def config_delete(config: str, request: Request):
     """Delete a configuration"""
-    return app.backend.configs_delete(config)
+    return request.app.backend.configs_delete(config)
 
 
 # @ns_configs.route("/<string:config>/")
@@ -848,10 +847,10 @@ async def config_delete(config: str):
 
 
 @router.post("/configs/{config}/clone/", tags=[Tags.congifs])
-async def config_clone_post(config: str, meta: Meta):
+async def config_clone_post(config: str, meta: Meta, request: Request):
     """Clone a configuration. New name is provided in POST data"""
     data = dict(meta)
-    return app.backend.configs_clone(config, data)
+    return request.app.backend.configs_clone(config, data)
 
 
 # @ns_configs.route("/<string:config>/clone/")
@@ -864,10 +863,10 @@ async def config_clone_post(config: str, meta: Meta):
 #
 
 @router.post("/configs/{config}/clone/{new_name}/", tags=[Tags.congifs])
-async def config_clone_name_post(config: str, new_name: str, meta: Meta):
+async def config_clone_name_post(config: str, new_name: str, meta: Meta, request: Request):
     """Clone a configuration. New name is provided URL"""
     data = dict(meta)
-    return app.backend.configs_clone(config, data, new_name)
+    return request.app.backend.configs_clone(config, data, new_name)
 
 
 # @ns_configs.route("/<string:config>/clone/<string:new_name>/")
@@ -880,9 +879,9 @@ async def config_clone_name_post(config: str, new_name: str, meta: Meta):
 
 
 @router.get("configs/{config}/v/", tags=[Tags.congifs], response_model=VersionLog)
-async def config_list_version_get(config: str):
+async def config_list_version_get(config: str, request: Request):
     """Get all versions of a given configuration"""
-    return app.backend.configs_list_versions(config)
+    return request.app.backend.configs_list_versions(config)
 
 
 # @ns_configs.route("/<string:config>/v/")
@@ -894,9 +893,9 @@ async def config_list_version_get(config: str):
 
 
 @router.get("configs/{config}/v/{version}/", tags=[Tags.congifs])
-async def config_version_get(config: str, version: str):
+async def config_version_get(config: str, version: str, request: Request):
     """Retrieve a specific version of a configuration"""
-    return app.backend.configs_get(config, version)
+    return request.app.backend.configs_get(config, version)
 
 
 # @ns_configs.route("/<string:config>/v/<string:version>/")
@@ -908,7 +907,7 @@ async def config_version_get(config: str, version: str):
 @router.get("/{config}/v/{version}/revert/", tags=[Tags.congifs])
 async def config_revert_put(config: str, version: str, request: Request):
     """Create a new version for a configuration from an old version"""
-    return app.backend.configs_revert(config, version, get_gitactor(request))
+    return request.app.backend.configs_revert(config, version, get_gitactor(request))
 
 
 # @ns_configs.route("/<string:config>/v/<string:version>/revert/")
@@ -924,9 +923,9 @@ async def config_revert_put(config: str, version: str, request: Request):
 
 
 @router.get("/configs/{config}/b/", tags=[Tags.congifs], response_model=BlobListEntry)
-async def blobs_resource_get(config: str):
+async def blobs_resource_get(config: str, request: Request):
     """Retrieve the list of available blobs"""
-    res = app.backend.blobs_list(config)
+    res = request.app.backend.blobs_list(config)
     return res
 
 
@@ -939,15 +938,15 @@ async def blobs_resource_get(config: str):
 #         return res
 
 @router.get("configs/{config}/b/{blob}/", tags=[Tags.congifs], response_model=BlobEntry)
-async def blob_resource_get(config: str, blob: str):
+async def blob_resource_get(config: str, blob: str, request: Request):
     """Retrieve a blob"""
-    return app.backend.blobs_get(config, blob)
+    return request.app.backend.blobs_get(config, blob)
 
 
 @router.post("configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_post(config: str, blob: str, blob_entry: BlobEntry, request: Request):
     """Create a new blob"""
-    return app.backend.blobs_create(
+    return request.app.backend.blobs_create(
         config, blob, dict(blob_entry), get_gitactor(request)
     )
 
@@ -955,7 +954,7 @@ async def blob_resource_post(config: str, blob: str, blob_entry: BlobEntry, requ
 @router.put("configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_put(config: str, blob: str, blob_entry: BlobEntry, request: Request):
     """Create a new blob"""
-    return app.backend.blobs_update(
+    return request.app.backend.blobs_update(
         config, blob, dict(blob_entry), get_gitactor(request)
     )
 
@@ -963,7 +962,7 @@ async def blob_resource_put(config: str, blob: str, blob_entry: BlobEntry, reque
 @router.delete("configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_get(config: str, blob: str, request: Request):
     """Delete a blob"""
-    return app.backend.blobs_delete(config, blob, get_gitactor(request))
+    return request.app.backend.blobs_delete(config, blob, get_gitactor(request))
 
 
 #
@@ -994,9 +993,9 @@ async def blob_resource_get(config: str, blob: str, request: Request):
 
 
 @router.get("configs/{config}/b/{blob}/v/", tags=[Tags.congifs], response_model=VersionLog)
-async def blob_list_version_resource_get(config: str, blob: str):
+async def blob_list_version_resource_get(config: str, blob: str, request: Request):
     "Retrieve the list of versions of a given blob"
-    res = app.backend.blobs_list_versions(config, blob)
+    res = request.app.backend.blobs_list_versions(config, blob)
     return res
 
 
@@ -1010,9 +1009,9 @@ async def blob_list_version_resource_get(config: str, blob: str):
 
 
 @router.get("configs/{config}/b/{blob}/v/{version}", tags=[Tags.congifs], response_model=VersionLog)
-async def blob_version_resource_get(config: str, blob: str, version: str):
+async def blob_version_resource_get(config: str, blob: str, version: str, request: Request):
     """Retrieve the given version of a blob"""
-    return app.backend.blobs_get(config, blob, version)
+    return request.app.backend.blobs_get(config, blob, version)
 
 
 # @ns_configs.route("/<string:config>/b/<string:blob>/v/<string:version>/")
@@ -1025,7 +1024,7 @@ async def blob_version_resource_get(config: str, blob: str, version: str):
 @router.put("configs/{config}/b/{blob}/v/{version}/revert/", tags=[Tags.congifs])
 async def blob_revert_resource_put(config: str, blob: str, version: str, request: Request):
     """Create a new version for a blob from an old version"""
-    return app.backend.blobs_revert(config, blob, version, get_gitactor(request))
+    return request.app.backend.blobs_revert(config, blob, version, get_gitactor(request))
 
 
 #
@@ -1041,9 +1040,9 @@ async def blob_revert_resource_put(config: str, blob: str, version: str, request
 #################
 
 @router.get("/configs/{config}/d/", tags=[Tags.congifs], response_model=DocumentListEntry)
-async def document_resource(config: str):
+async def document_resource(config: str, request: Request):
     """Retrieve the list of existing documents in this configuration"""
-    res = app.backend.documents_list(config)
+    res = request.app.backend.documents_list(config)
     return res
 
 
@@ -1058,11 +1057,11 @@ async def document_resource(config: str):
 
 
 @router.get("/configs/{config}/d/{document}/", tags=[Tags.congifs], response_model=DocumentMask)
-async def document_resource_get(config: str, document: str):
+async def document_resource_get(config: str, document: str, request: Request):
     """Get a complete document"""
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
-    res = app.backend.documents_get(config, document)
+    res = request.app.backend.documents_get(config, document)
     res = {key: res[key] for key in list(models[document].__fields__.keys())}
     return res
 
@@ -1082,7 +1081,7 @@ async def document_resource_post(config: str, document: str, basic_entries: List
         isValid, err = validateJson(dict(entry), document)
         if isValid is False:
             raise HTTPException(500, "schema mismatched: \n" + err)
-    res = app.backend.documents_create(
+    res = request.app.backend.documents_create(
         config, document, data, get_gitactor(request)
     )
     return res
@@ -1099,7 +1098,7 @@ async def document_resource_put(config: str, document: str, basic_entries: List[
         isValid, err = validateJson(dict(entry), document)
         if isValid is False:
             raise HTTPException(500, "schema mismatched for entry: " + str(entry) + "\n" + err)
-    res = app.backend.documents_update(
+    res = request.app.backend.documents_update(
         config, document, data, get_gitactor(request)
     )
     return res
@@ -1110,7 +1109,7 @@ async def document_resource_delete(config: str, document: str, request: Request)
     """Delete/empty a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.documents_delete(config, document, get_gitactor(request))
+    res = request.app.backend.documents_delete(config, document, get_gitactor(request))
     return res
 
 
@@ -1163,11 +1162,11 @@ async def document_resource_delete(config: str, document: str, request: Request)
 
 
 @router.get("/configs/{config}/d/{document}/v/", tags=[Tags.congifs])
-async def document_list_version_resource_get(config: str, document: str):
+async def document_list_version_resource_get(config: str, document: str, request: Request):
     """Retrieve the existing versions of a given document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.documents_list_versions(config, document)
+    res = request.app.backend.documents_list_versions(config, document)
     res = {key: res[key] for key in list(VersionLog.__fields__.keys())}
     return res
 
@@ -1184,11 +1183,11 @@ async def document_list_version_resource_get(config: str, document: str):
 
 
 @router.get("/configs/{config}/d/{document}/v/{version}/", tags=[Tags.congifs])
-async def document_version_resource_get(config: str, document: str, version: str):
+async def document_version_resource_get(config: str, document: str, version: str, request: Request):
     """Get a given version of a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.documents_get(config, document, version)
+    res = request.app.backend.documents_get(config, document, version)
     return {key: res[key] for key in list(models[document].__fields__.keys())}
 
 
@@ -1204,7 +1203,7 @@ async def document_version_resource_get(config: str, document: str, version: str
 @router.put("/configs/{config}/d/{document}/v/{version}/revert/", tags=[Tags.congifs])
 async def document_revert_resource_put(config: str, document: str, version: str, request: Request):
     """Create a new version for a document from an old version"""
-    return app.backend.documents_revert(
+    return request.app.backend.documents_revert(
         config, document, version, get_gitactor(request)
     )
 
@@ -1223,11 +1222,11 @@ async def document_revert_resource_put(config: str, document: str, version: str,
 ###############
 
 @router.get("/configs/{config}/d/{document}/e/", tags=[Tags.congifs])
-async def entries_resource_get(config: str, document: str):
+async def entries_resource_get(config: str, document: str, request: Request):
     """Retrieve the list of entries in a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.entries_list(config, document)
+    res = request.app.backend.entries_list(config, document)
     return res  # XXX: marshal
 
 
@@ -1239,7 +1238,7 @@ async def entries_resource_post(config: str, document: str, basic_entry: BasicEn
     isValid, err = validateJson(dict(basic_entry), document)
     if isValid:
         data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
-        res = app.backend.entries_create(
+        res = request.app.backend.entries_create(
             config, document, data, get_gitactor(request)
         )
         return res
@@ -1273,11 +1272,11 @@ async def entries_resource_post(config: str, document: str, basic_entry: BasicEn
 
 
 @router.get("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
-async def entry_resource_get(config: str, document: str, entry: str):
+async def entry_resource_get(config: str, document: str, entry: str, request: Request):
     """Retrieve an entry from a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.entries_get(config, document, entry)
+    res = request.app.backend.entries_get(config, document, entry)
     return {key: res for key in list(models[document].__fields__.keys())}
 
 
@@ -1290,7 +1289,7 @@ async def entry_resource_put(config: str, document: str, entry: str, basic_entry
     if isValid:
         data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
 
-        res = app.backend.entries_update(
+        res = request.app.backend.entries_update(
             config, document, entry, data, get_gitactor(request)
         )
         return res
@@ -1303,7 +1302,7 @@ async def entry_resource_deleye(config: str, document: str, entry: str, request:
     """Delete an entry from a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.entries_delete(
+    res = request.app.backend.entries_delete(
         config, document, entry, get_gitactor(request)
     )
     return res
@@ -1344,11 +1343,11 @@ async def entry_resource_deleye(config: str, document: str, entry: str, request:
 
 
 @router.get("/configs/{config}/d/{document}/e/{entry}/v/", tags=[Tags.congifs])
-async def entry_list_version_resource_get(config: str, document: str, entry: str):
+async def entry_list_version_resource_get(config: str, document: str, entry: str, request: Request):
     """Get the list of existing versions of a given entry in a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.entries_list_versions(config, document, entry)
+    res = request.app.backend.entries_list_versions(config, document, entry)
     return {key: res[key] for key in list(VersionLog.__fields__.keys())}
 
 
@@ -1364,11 +1363,11 @@ async def entry_list_version_resource_get(config: str, document: str, entry: str
 
 
 @router.get("/configs/{config}/d/{document}/e/{entry}/v/{version}/", tags=[Tags.congifs])
-async def entry_version_resource_get(config: str, document: str, entry: str, version: str):
+async def entry_version_resource_get(config: str, document: str, entry: str, version: str, request: Request):
     """Get a given version of a document entry"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    res = app.backend.entries_get(config, document, entry, version)
+    res = request.app.backend.entries_get(config, document, entry, version)
     return {key: res[key] for key in list(models[document].__fields__.keys())}
 
 
@@ -1389,9 +1388,9 @@ async def entry_version_resource_get(config: str, document: str, entry: str, ver
 ################
 
 @router.get("/db/", tags=[Tags.db])
-async def db_resource_get():
+async def db_resource_get(request: Request):
     """Get the list of existing namespaces"""
-    return app.backend.ns_list()
+    return request.app.backend.ns_list()
 
 
 # @ns_db.route("/")
@@ -1402,9 +1401,9 @@ async def db_resource_get():
 
 
 @router.get("/db/v/", tags=[Tags.db])
-async def db_query_resource_get():
+async def db_query_resource_get(request: Request):
     """List all existing versions of namespaces"""
-    return app.backend.ns_list_versions()
+    return request.app.backend.ns_list_versions()
 
 
 #
@@ -1416,10 +1415,10 @@ async def db_query_resource_get():
 
 
 @router.get("/db/{nsname}/", tags=[Tags.db])
-async def ns_resource_get(nsname: str):
+async def ns_resource_get(nsname: str, request: Request):
     """Get a complete namespace"""
     try:
-        return app.backend.ns_get(nsname, version=None)
+        return request.app.backend.ns_get(nsname, version=None)
     except KeyError:
         raise HTTPException(404, "namespace [%s] does not exist" % nsname)
 
@@ -1428,7 +1427,7 @@ async def ns_resource_get(nsname: str):
 async def ns_resource_post(nsname: str, db: DB, request: Request):
     """Create a non-existing namespace from data"""
     try:
-        return app.backend.ns_create(nsname, dict(db), get_gitactor(request))
+        return request.app.backend.ns_create(nsname, dict(db), get_gitactor(request))
     except Exception:
         raise HTTPException(409, "namespace [%s] already exists" % nsname)
 
@@ -1436,14 +1435,14 @@ async def ns_resource_post(nsname: str, db: DB, request: Request):
 @router.put("/db/{nsname}/", tags=[Tags.db])
 async def ns_resource_put(nsname: str, db: DB, request: Request):
     """Merge data into a namespace"""
-    return app.backend.ns_update(nsname, dict(db), get_gitactor(request))
+    return request.app.backend.ns_update(nsname, dict(db), get_gitactor(request))
 
 
 @router.delete("/db/{nsname}/", tags=[Tags.db])
 async def ns_resource_put(nsname: str, request: Request):
     """Delete an existing namespace"""
     try:
-        return app.backend.ns_delete(nsname, get_gitactor(request))
+        return request.app.backend.ns_delete(nsname, get_gitactor(request))
     except KeyError:
         raise HTTPException(409, "namespace [%s] does not exist" % nsname)
 
@@ -1479,9 +1478,9 @@ async def ns_resource_put(nsname: str, request: Request):
 
 
 @router.get("/db/{nsname}/v/{version}", tags=[Tags.db])
-async def ns_version_resource_get(nsname: str, version: str):
+async def ns_version_resource_get(nsname: str, version: str, request: Request):
     """Get a given version of a namespace"""
-    return app.backend.ns_get(nsname, version)
+    return request.app.backend.ns_get(nsname, version)
 
 
 # @ns_db.route("/<string:nsname>/v/<string:version>/")
@@ -1495,7 +1494,7 @@ async def ns_version_resource_get(nsname: str, version: str):
 async def ns_version_revert_resource_put(nsname: str, version: str, request: Request):
     """Create a new version for a namespace from an old version"""
     try:
-        return app.backend.ns_revert(nsname, version, get_gitactor(request))
+        return request.app.backend.ns_revert(nsname, version, get_gitactor(request))
     except KeyError:
         raise HTTPException(404, "namespace [%s] version [%s] not found" % (nsname, version))
 
@@ -1515,7 +1514,7 @@ async def ns_version_revert_resource_put(nsname: str, version: str, request: Req
 async def ns_query_resource_post(nsname: str, request: Request):
     """Run a JSON query on the namespace and returns the results"""
     req_json = await request.json()
-    return app.backend.ns_query(nsname, req_json)
+    return request.app.backend.ns_query(nsname, req_json)
 
 
 # @ns_db.route("/<string:nsname>/q/")
@@ -1527,9 +1526,9 @@ async def ns_query_resource_post(nsname: str, request: Request):
 
 
 @router.get("/db/{nsname}/k/", tags=[Tags.db])
-async def keys_resource_get(nsname: str):
+async def keys_resource_get(nsname: str, request: Request):
     """List all keys of a given namespace"""
-    return app.backend.key_list(nsname)
+    return request.app.backend.key_list(nsname)
 
 
 # @ns_db.route("/<string:nsname>/k/")
@@ -1539,9 +1538,9 @@ async def keys_resource_get(nsname: str):
 #         return current_app.backend.key_list(nsname)
 
 @router.get("/db/{nsname}/k/{key}/v/", tags=[Tags.db])
-async def keys_list_versions_resource_get(nsname: str, key: str):
+async def keys_list_versions_resource_get(nsname: str, key: str, request: Request):
     """Get all versions of a given key in namespace"""
-    return app.backend.key_list_versions(nsname, key)
+    return request.app.backend.key_list_versions(nsname, key)
 
 
 # @ns_db.route("/<string:nsname>/k/<string:key>/v/")
@@ -1552,9 +1551,9 @@ async def keys_list_versions_resource_get(nsname: str, key: str):
 #
 
 @router.get("/db/{nsname}/k/{key}/", tags=[Tags.db])
-async def key_resource_get(nsname: str, key: str):
+async def key_resource_get(nsname: str, key: str, request: Request):
     """Retrieve a given key's value from a given namespace"""
-    return app.backend.key_get(nsname, key)
+    return request.app.backend.key_get(nsname, key)
 
 
 @router.put("/db/{nsname}/k/{key}/", tags=[Tags.db])
@@ -1565,7 +1564,7 @@ async def key_resource_put(nsname: str, key: str, request: Request):
 
     if nsname != "system":
         keyName = nsname + "/k/" + key
-        schemas = app.backend.key_get("system", "schema-validation")
+        schemas = request.app.backend.key_get("system", "schema-validation")
         schema = None
         # find schema if exists and validate the json input
         for item in schemas.items():
@@ -1576,13 +1575,13 @@ async def key_resource_put(nsname: str, key: str, request: Request):
             isValid = validateDbJson(req_json, schema)
             if isValid is False:
                 raise HTTPException(500, "schema mismatched")
-    return app.backend.key_set(nsname, key, req_json, get_gitactor(request))
+    return request.app.backend.key_set(nsname, key, req_json, get_gitactor(request))
 
 
 @router.delete("/db/{nsname}/k/{key}/", tags=[Tags.db])
 async def key_resource_delete(nsname: str, key: str, request: Request):
     """Delete a key"""
-    return app.backend.key_delete(nsname, key, get_gitactor(request))
+    return request.app.backend.key_delete(nsname, key, get_gitactor(request))
 
 
 # @ns_db.route("/<string:nsname>/k/<string:key>/")
@@ -1646,7 +1645,7 @@ async def fetch_resource_get(url: str):
 @router.put("/tools/publish/{config}/v/{version}/", tags=[Tags.tools])
 async def publish_resource_put(config: str, request: Request, buckets: List[Bucket], version: str = None):
     """Push configuration to s3 buckets"""
-    conf = app.backend.configs_get(config, version)
+    conf = request.app.backend.configs_get(config, version)
     ok = True
     status = []
     req_json = await request.json()
@@ -1698,13 +1697,13 @@ async def publish_resource_put(config: str, request: Request, buckets: List[Buck
 
 
 @router.put("/tools/gitpush/", tags=[Tags.tools])
-async def git_push_resource_put(git_urls: List[GitUrl]):
+async def git_push_resource_put(git_urls: List[GitUrl], request: Request):
     """Push git configuration to remote git repositories"""
     ok = True
     status = []
     for giturl in git_urls:
         try:
-            app.backend.gitpush(dict(giturl)["giturl"])
+            request.app.backend.gitpush(dict(giturl)["giturl"])
         except Exception as e:
             msg = repr(e)
             s = False
@@ -1736,11 +1735,11 @@ async def git_push_resource_put(git_urls: List[GitUrl]):
 
 
 @router.put("/tools/gitfetch/", tags=[Tags.tools])
-async def git_fetch_resource_put(giturl: GitUrl):
+async def git_fetch_resource_put(giturl: GitUrl, request: Request):
     """Fetch git configuration from specified remote repository"""
     ok = True
     try:
-        app.backend.gitfetch(dict(giturl)["giturl"])
+        request.app.backend.gitfetch(dict(giturl)["giturl"])
     except Exception as e:
         ok = False
         msg = repr(e)
