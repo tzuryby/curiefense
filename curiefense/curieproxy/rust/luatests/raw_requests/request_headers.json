@@ -16,5 +16,21 @@
         "h1": "82.13.8.87 - nil - 12"
       }
     }
+  },
+  {
+    "headers": {
+      ":authority": "localhost:30081",
+      ":method": "GET",
+      ":path": "/",
+      "user-agent": "yay",
+      "x-forwarded-for": "82.13.8.89"
+    },
+    "name": "monitor and forward with header",
+    "response": {
+      "action": "pass",
+      "headers": {
+        "header_1": "value_1"
+      }
+    }
   }
 ]

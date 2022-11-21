@@ -253,7 +253,7 @@ local function equals(o1, o2)
 
 local function test_status(expected_response, actual_response)
   local expected_status = expected_response.response.status
-  
+
   if expected_status == nil then
     -- nothing to check
     return true
@@ -270,13 +270,13 @@ local function test_status(expected_response, actual_response)
     print("Expected status " .. cjson.encode(expected_status) .. ", but got " .. cjson.encode(actual_status))
     return false
   end
-  
+
   return true
 end
 
 local function test_block_mode(expected_response, actual_response)
   local expected_block_mode = expected_response.response.block
-  
+
   if expected_block_mode == nil then
     -- nothing to check
     return true
@@ -290,23 +290,25 @@ local function test_block_mode(expected_response, actual_response)
   local actual_block_mode = actual_response.response.block_mode
 
   if actual_block_mode ~= expected_block_mode then
-    print("Expected block_mode " .. cjson.encode(expected_block_mode) .. ", but got " .. cjson.encode(actual_block_mode))
+    print("Expected block_mode " ..
+      cjson.encode(expected_block_mode) .. ", but got " .. cjson.encode(actual_block_mode))
     return false
   end
-  
+
   return true
 end
 
 local function test_headers(expected_response, actual_response)
   local expected_headers = expected_response.response.headers
-  
+
   if expected_headers == nil then
     -- nothing to check
     return true
   end
 
   if actual_response.response == cjson.null then
-    print("Expected headers " .. cjson.encode(expected_headers) .. ", but got no response" )
+    print("Expected headers " ..
+      cjson.encode(expected_headers) .. ", but got no response" )
     return false
   end
 
@@ -319,26 +321,19 @@ local function test_headers(expected_response, actual_response)
         cjson.encode(actual_headers[h]))
       good = false
     end
+  end
 
   if not good then
     print("Returned headers are " .. cjson.encode(actual_headers))
   end
 
   return good
-  end
-
-
-  if actual_block_mode ~= expected_block_mode then
-    print("Expected block_mode " .. cjson.encode(expected_block_mode) .. ", but got " .. cjson.encode(actual_block_mode))
-    return false
-  end
-  
-  return true
 end
 
 local function test_trigger(expected_response, actual_response, parsed_responses, trigger_name)
+  local expected_headers = expected_response.response.headers
   local expected_trigger = expected_response.response[trigger_name]
-  
+
   if expected_trigger == nil then
     -- nothing to check
     return true
@@ -378,18 +373,18 @@ local function test_raw_request(request_path, mode)
         ", but got " .. cjson.encode(actual.action))
       good = false
     end
-    good = test_status(expected, actual)
-    good = test_block_mode(expected, actual)
-    good = test_headers(expected, actual)
+    good = test_status(expected, actual) or good
+    good = test_block_mode(expected, actual) or good
+    good = test_headers(expected, actual) or good
 
     local triggers = {
       "acl_triggers",
       "rate_limit_triggers",
       "global_filter_triggers",
-      "content_filter_triggers" 
+      "content_filter_triggers"
     }
     for _, trigger_name in pairs(triggers) do
-      good = test_trigger(expected, actual, request_map, trigger_name)
+      good = test_trigger(expected, actual, request_map, trigger_name) or good
     end
 
     if not good then

@@ -55,6 +55,7 @@ fn is_blocking(reasons: &[BlockReason]) -> bool {
     reasons.iter().any(|r| r.decision >= BDecision::Blocking)
 }
 
+#[derive(Debug)]
 pub struct CfBlock {
     pub blocking: bool,
     pub reasons: Vec<BlockReason>,

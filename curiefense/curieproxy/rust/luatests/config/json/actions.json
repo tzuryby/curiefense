@@ -85,6 +85,17 @@
     "name": "Add IP header to response"
   },
   {
+    "params": {
+      "headers": {
+        "header_1": "value_1"
+      }
+    },
+    "type": "monitor",
+    "id": "monitorheader",
+    "tags": [],
+    "name": "Add header to forwarded request"
+  },
+  {
     "type": "monitor",
     "id": "monitor",
     "tags": [],
@@ -108,9 +119,7 @@
     "name": "ye8qyg0h"
   },
   {
-    "tags": [
-      "myextratag"
-    ],
+    "tags": ["myextratag"],
     "type": "custom",
     "params": {
       "status": 403,
