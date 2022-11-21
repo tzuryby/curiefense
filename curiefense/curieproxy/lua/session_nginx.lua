@@ -70,8 +70,7 @@ local function redis_connect(handle)
     return red
 end
 
-function session_rust_nginx.inspect(handle, loglevel, secpolid)
-
+function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
     local rheaders, err = handle.req.get_headers()
     if err == "truncated" then
         handle.log(handle.ERR, "truncated headers: " .. err)
@@ -91,7 +90,7 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid)
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
     local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
-    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=handle.var.remote_addr}
+    local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content, ip=handle.var.remote_addr, hops=HOPS, plugins=plugins}
 
     if secpolid then
         params['secpolid'] = secpolid

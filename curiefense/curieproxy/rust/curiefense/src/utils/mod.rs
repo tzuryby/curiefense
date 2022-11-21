@@ -318,6 +318,7 @@ pub struct RequestInfo {
     pub rinfo: RInfo,
     pub session: String,
     pub session_ids: HashMap<String, String>,
+    pub plugins: HashMap<String, HashMap<String, String>>,
 }
 
 impl RequestInfo {
@@ -521,6 +522,7 @@ pub fn map_request(
     container_name: Option<String>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
+    plugins: HashMap<String, HashMap<String, String>>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
@@ -570,6 +572,7 @@ pub fn map_request(
         rinfo,
         session: String::new(),
         session_ids: HashMap::new(),
+        plugins,
     };
 
     let raw_session = (if secpolicy.session.is_empty() {
@@ -605,6 +608,7 @@ pub fn map_request(
         rinfo: dummy_reqinfo.rinfo,
         session,
         session_ids,
+        plugins: dummy_reqinfo.plugins,
     }
 }
 
@@ -779,7 +783,7 @@ mod tests {
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
         let mut secpol = SecurityPolicy::empty();
         secpol.content_filter_profile.referer_as_uri = true;
-        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None);
+        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None, HashMap::new());
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);
