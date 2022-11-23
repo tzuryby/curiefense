@@ -249,8 +249,13 @@ impl BlockReason {
             .map(|r| r.to_string())
     }
 
-    pub fn global_filter(id: String, name: String, decision: BDecision) -> Self {
-        BlockReason::nodetails(Initiator::GlobalFilter { id, name }, decision)
+    pub fn global_filter(id: String, name: String, decision: BDecision, locs: &HashSet<Location>) -> Self {
+        let initiator = Initiator::GlobalFilter { id, name };
+        BlockReason {
+            decision,
+            initiator,
+            location: locs.clone(),
+        }
     }
 
     pub fn limit(id: String, name: String, threshold: u64, decision: BDecision) -> Self {

@@ -273,6 +273,7 @@ pub fn tag_request(
                         psection.id.clone(),
                         psection.name.clone(),
                         a.atype.to_bdecision(),
+                        &mtch.matched,
                     )],
                 );
                 decision = stronger_decision(decision, curdec);

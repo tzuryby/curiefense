@@ -850,5 +850,19 @@
     "tags": [
       "jwtemail"
     ]
+  },
+  {
+    "id": "filter-header",
+    "name": "Filter header",
+    "description": "Filter a particual header value",
+    "tags": [],
+    "active": true,
+    "action": "ye8qyg0h",
+    "rule": {
+      "relation": "OR",
+      "entries": [["headers", ["test-global-filter-trigger", "true"], ""]]
+    },
+    "mdate": "",
+    "source": "self-managed"
   }
 ]
