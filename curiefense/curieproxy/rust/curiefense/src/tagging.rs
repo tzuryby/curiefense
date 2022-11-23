@@ -292,7 +292,7 @@ mod tests {
     use crate::utils::map_request;
     use crate::utils::RawRequest;
     use crate::utils::RequestMeta;
-    use regex::Regex;
+    use regex::RegexBuilder;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -351,7 +351,7 @@ mod tests {
     fn single_re(input: &str) -> SingleEntry {
         SingleEntry {
             exact: input.to_string(),
-            re: Regex::new(input).ok(),
+            re: RegexBuilder::new(input).case_insensitive(true).build().ok(),
         }
     }
 
@@ -359,7 +359,7 @@ mod tests {
         PairEntry {
             key: key.to_string(),
             exact: input.to_string(),
-            re: Regex::new(input).ok(),
+            re: RegexBuilder::new(input).case_insensitive(true).build().ok(),
         }
     }
 

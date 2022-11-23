@@ -1,4 +1,4 @@
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use std::{collections::HashMap, str::FromStr};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -137,7 +137,7 @@ pub fn decode_request_selector_condition(
         Ok(RequestSelectorCondition::Tag(cond.to_string()))
     } else {
         let sel = RequestSelector::resolve_selector(tp, v)?;
-        let re = Regex::new(cond)?;
+        let re = RegexBuilder::new(cond).case_insensitive(true).build()?;
         Ok(RequestSelectorCondition::N(sel, re))
     }
 }

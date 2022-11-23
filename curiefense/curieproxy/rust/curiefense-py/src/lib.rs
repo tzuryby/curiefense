@@ -74,7 +74,10 @@ struct MatchResult {
 
 #[pyfunction]
 fn rust_match(pattern: String, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
-    let re = regex::Regex::new(&pattern).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
+    let re = regex::RegexBuilder::new(&pattern)
+        .case_insensitive(true)
+        .build()
+        .map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
     if let Some(to_match) = mmatch {
         Ok(re
             .find_iter(to_match)
