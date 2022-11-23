@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 59,
+  "id": 62,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -2748,8 +2748,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "MODIFIED Reblaze threats overview (demo)",
+  "title": "Reblaze Threats Overview [v5]",
   "uid": "8KP9HSH4r",
-  "version": 11,
+  "version": 1,
   "weekStart": ""
 }
