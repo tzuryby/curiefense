@@ -16,6 +16,7 @@ pub enum RequestSelector {
     Args(String),
     Cookie(String),
     Header(String),
+    Plugins(String),
     Company,
     Authority,
     Tags,
@@ -30,18 +31,20 @@ pub enum RequestSelectorCondition {
     Tag(String),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SelectorType {
     Headers,
     Cookies,
     Args,
     Attrs,
+    Plugins,
 }
 
 fn resolve_selector_type(k: &str) -> anyhow::Result<SelectorType> {
     match k {
         "headers" => Ok(SelectorType::Headers),
         "cookies" => Ok(SelectorType::Cookies),
+        "plugins" => Ok(SelectorType::Plugins),
         "args" => Ok(SelectorType::Args),
         "arguments" => Ok(SelectorType::Args),
         "attrs" => Ok(SelectorType::Attrs),
@@ -84,6 +87,7 @@ impl RequestSelector {
             SelectorType::Headers => Ok(RequestSelector::Header(v.to_string())),
             SelectorType::Cookies => Ok(RequestSelector::Cookie(v.to_string())),
             SelectorType::Args => Ok(RequestSelector::Args(v.to_string())),
+            SelectorType::Plugins => Ok(RequestSelector::Plugins(v.to_string())),
             SelectorType::Attrs => Self::decode_attribute(v).ok_or_else(|| anyhow::anyhow!("Unknown attribute {}", v)),
         }
     }
@@ -119,6 +123,7 @@ impl std::fmt::Display for RequestSelector {
             RequestSelector::Region => write!(f, "region"),
             RequestSelector::SubRegion => write!(f, "subregion"),
             RequestSelector::Session => write!(f, "session"),
+            RequestSelector::Plugins(n) => write!(f, "plugins_{}", n),
         }
     }
 }

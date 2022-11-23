@@ -17,6 +17,7 @@ fn py_inspect_request(
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
+    plugins: Option<HashMap<String, String>>,
 ) -> PyResult<(String, Vec<u8>)> {
     let real_loglevel = match loglevel.as_str() {
         "debug" => LogLevel::Debug,
@@ -37,7 +38,14 @@ fn py_inspect_request(
     };
 
     let grasshopper = DynGrasshopper {};
-    let dec = inspect_generic_request_map(&configpath, Some(&grasshopper), raw, &mut logs, None);
+    let dec = inspect_generic_request_map(
+        &configpath,
+        Some(&grasshopper),
+        raw,
+        &mut logs,
+        None,
+        plugins.unwrap_or_default(),
+    );
     let res = InspectionResult {
         decision: dec.decision,
         tags: Some(dec.tags),

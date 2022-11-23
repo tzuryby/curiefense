@@ -18,6 +18,7 @@ pub struct Section<A> {
     pub cookies: A,
     pub args: A,
     pub path: A,
+    pub plugins: A,
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +80,12 @@ impl ContentFilterProfile {
                     names: HashMap::new(),
                     regex: Vec::new(),
                 },
+                plugins: ContentFilterSection {
+                    max_count: usize::MAX,
+                    max_length: usize::MAX,
+                    names: HashMap::new(),
+                    regex: Vec::new(),
+                },
             },
             decoding: vec![Transformation::Base64Decode, Transformation::UrlDecode],
             masking_seed: seed.as_bytes().to_vec(),
@@ -119,7 +126,23 @@ pub enum SectionIdx {
     Cookies,
     Args,
     Path,
+    Plugins,
 }
+
+pub const ALL_SECTION_IDX: [SectionIdx; 5] = [
+    SectionIdx::Headers,
+    SectionIdx::Cookies,
+    SectionIdx::Args,
+    SectionIdx::Path,
+    SectionIdx::Plugins,
+];
+
+pub const ALL_SECTION_IDX_NO_PLUGINS: [SectionIdx; 4] = [
+    SectionIdx::Headers,
+    SectionIdx::Cookies,
+    SectionIdx::Args,
+    SectionIdx::Path,
+];
 
 impl<A> Section<A> {
     pub fn get(&self, idx: SectionIdx) -> &A {
@@ -128,6 +151,7 @@ impl<A> Section<A> {
             SectionIdx::Cookies => &self.cookies,
             SectionIdx::Args => &self.args,
             SectionIdx::Path => &self.path,
+            SectionIdx::Plugins => &self.plugins,
         }
     }
 
@@ -137,6 +161,7 @@ impl<A> Section<A> {
             SectionIdx::Cookies => &mut self.cookies,
             SectionIdx::Args => &mut self.args,
             SectionIdx::Path => &mut self.path,
+            SectionIdx::Plugins => &mut self.plugins,
         }
     }
 }
@@ -151,6 +176,7 @@ where
             cookies: Default::default(),
             args: Default::default(),
             path: Default::default(),
+            plugins: Default::default(),
         }
     }
 }
@@ -278,6 +304,7 @@ fn convert_entry(
                 cookies: mk_section(&entry.allsections, entry.cookies)?,
                 args: mk_section(&entry.allsections, entry.args)?,
                 path: mk_section(&entry.allsections, entry.path)?,
+                plugins: mk_section(&entry.allsections, entry.plugins)?,
             },
             decoding,
             masking_seed: entry.masking_seed.as_bytes().to_vec(),
