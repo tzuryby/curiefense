@@ -531,14 +531,14 @@ impl SimpleAction {
         tags: &mut Tags,
         reason: Vec<BlockReason>,
     ) -> Decision {
+        for t in self.extra_tags.iter().flat_map(|s| s.iter()) {
+            tags.insert(t, Location::Request);
+        }
         if self.atype == SimpleActionT::Skip {
             return Decision {
                 maction: None,
                 reasons: reason,
             };
-        }
-        for t in self.extra_tags.iter().flat_map(|s| s.iter()) {
-            tags.insert(t, Location::Request);
         }
         let action = match self.to_action(rinfo, tags, is_human) {
             None => match (mgh, rinfo.headers.get("user-agent")) {
