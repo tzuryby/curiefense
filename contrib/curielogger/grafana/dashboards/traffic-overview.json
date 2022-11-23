@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 61,
+  "id": 64,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -93,7 +93,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
+        "w": 12,
         "x": 0,
         "y": 3
       },
@@ -143,86 +143,42 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "rgb(31, 111, 227)",
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "{class=\"2\"}"
-            },
-            "properties": [
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "light-blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "{class=\"4\"}"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "super-light-red",
-                  "mode": "fixed"
-                }
+                "color": "green",
+                "value": null
               }
             ]
           }
-        ]
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 6,
-        "w": 6,
-        "x": 18,
+        "w": 3,
+        "x": 12,
         "y": 3
       },
       "id": 8,
       "interval": "5m",
       "options": {
-        "displayLabels": [
-          "name"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "values": [
-            "percent",
-            "value"
-          ]
-        },
-        "pieType": "pie",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "sum"
+            "lastNotNull"
           ],
           "fields": "",
           "values": false
         },
-        "text": {},
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
-      "pluginVersion": "7.5.17",
+      "pluginVersion": "9.0.5",
       "targets": [
         {
           "datasource": {
@@ -230,7 +186,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "sum by (code_class) (increase(status_classes_total[5m]))",
+          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^2' }[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -238,14 +194,221 @@
           "refId": "class x"
         }
       ],
-      "title": "HTTP status class (2xx, 3xx, 4xx, 5xx)",
+      "title": "2xx",
       "transformations": [
         {
           "id": "groupBy",
           "options": {}
         }
       ],
-      "type": "piechart"
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "number of requests grouped by http status class",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 15,
+        "y": 3
+      },
+      "id": 48,
+      "interval": "5m",
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "exemplar": true,
+          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^3' }[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{code_class}}xx",
+          "refId": "class x"
+        }
+      ],
+      "title": "3xx",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {}
+        }
+      ],
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "number of requests grouped by http status class",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 18,
+        "y": 3
+      },
+      "id": 46,
+      "interval": "5m",
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "exemplar": true,
+          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^4' }[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{code_class}}xx",
+          "refId": "class x"
+        }
+      ],
+      "title": "4xx",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {}
+        }
+      ],
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "number of requests grouped by http status class",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 21,
+        "y": 3
+      },
+      "id": 47,
+      "interval": "5m",
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "exemplar": true,
+          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^5' }[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "{{code_class}}xx",
+          "refId": "class x"
+        }
+      ],
+      "title": "5xx",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {}
+        }
+      ],
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -1924,8 +2087,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
@@ -2158,8 +2320,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
@@ -2438,8 +2599,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
@@ -2566,8 +2726,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
@@ -2694,8 +2853,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
@@ -2932,7 +3090,7 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "dataplaneprometheus",
           "value": "dataplaneprometheus"
         },
@@ -2951,13 +3109,13 @@
     ]
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Reblaze 5.0 Traffic Overview",
+  "title": "Reblaze Traffic Overview [v5]",
   "uid": "tUZcMWHVr",
-  "version": 13,
+  "version": 3,
   "weekStart": ""
 }
