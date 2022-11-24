@@ -301,7 +301,7 @@ pub fn jsonlog_rinfo(
             };
             let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
             let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
-            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
+            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::RateLimit);
             let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
 
             let mut mp = serializer.serialize_map(None)?;
