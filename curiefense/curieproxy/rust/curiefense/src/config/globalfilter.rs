@@ -251,14 +251,15 @@ impl GlobalFilterSection {
         }
 
         /// build a global filter entry for "pair" conditions
-        fn pair<F>(logs: &mut Logs, conv: F, val: Value) -> anyhow::Result<GlobalFilterEntry>
+        fn pair<F>(logs: &mut Logs, conv: F, val: Value, lowercase_key: bool) -> anyhow::Result<GlobalFilterEntry>
         where
             F: FnOnce(PairEntry) -> GlobalFilterEntryE,
         {
-            let (k, v): (String, String) = match from_value::<(String, String, Value)>(val.clone()) {
+            let (uk, v): (String, String) = match from_value::<(String, String, Value)>(val.clone()) {
                 Err(_) => from_value(val)?,
                 Ok((k, v, _)) => (k, v),
             };
+            let k = if lowercase_key { uk.to_ascii_lowercase() } else { uk };
             Ok(match &v.strip_prefix('!') {
                 None => GlobalFilterEntry {
                     negated: false,
@@ -304,10 +305,10 @@ impl GlobalFilterSection {
                     },
                     val,
                 ),
-                GlobalFilterEntryType::Args => pair(logs, GlobalFilterEntryE::Args, val),
-                GlobalFilterEntryType::Cookies => pair(logs, GlobalFilterEntryE::Cookies, val),
-                GlobalFilterEntryType::Headers => pair(logs, GlobalFilterEntryE::Header, val),
-                GlobalFilterEntryType::Plugins => pair(logs, GlobalFilterEntryE::Plugins, val),
+                GlobalFilterEntryType::Args => pair(logs, GlobalFilterEntryE::Args, val, false),
+                GlobalFilterEntryType::Cookies => pair(logs, GlobalFilterEntryE::Cookies, val, false),
+                GlobalFilterEntryType::Headers => pair(logs, GlobalFilterEntryE::Header, val, true),
+                GlobalFilterEntryType::Plugins => pair(logs, GlobalFilterEntryE::Plugins, val, false),
                 GlobalFilterEntryType::Path => single_re(logs, GlobalFilterEntryE::Path, val),
                 GlobalFilterEntryType::Query => single_re(logs, GlobalFilterEntryE::Query, val),
                 GlobalFilterEntryType::Uri => single_re(logs, GlobalFilterEntryE::Uri, val),
