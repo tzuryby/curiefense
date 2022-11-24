@@ -330,8 +330,7 @@ local function test_headers(expected_response, actual_response)
   return good
 end
 
-local function test_trigger(expected_response, actual_response, parsed_responses, trigger_name)
-  local expected_headers = expected_response.response.headers
+local function test_trigger(expected_response, parsed_responses, trigger_name)
   local expected_trigger = expected_response.response[trigger_name]
 
   if expected_trigger == nil then
@@ -339,12 +338,12 @@ local function test_trigger(expected_response, actual_response, parsed_responses
     return true
   end
 
-  if actual_response.response == cjson.null then
-    print("Expected " .. trigger_name .. ":" .. cjson.encode(expected_headers) .. ", but got no response" )
+  local actual_trigger = parsed_responses[trigger_name]
+  if actual_trigger == cjson.null then
+    print("Expected " .. trigger_name .. ":" .. cjson.encode(expected_response) .. ", but got no trigger" )
     return false
   end
 
-  local actual_trigger = parsed_responses[trigger_name]
 
   if equals(actual_trigger, expected_trigger) == false then
     print("Expected " .. trigger_name .. ":")
@@ -384,7 +383,7 @@ local function test_raw_request(request_path, mode)
       "content_filter_triggers"
     }
     for _, trigger_name in pairs(triggers) do
-      good = test_trigger(expected, actual, request_map, trigger_name) or good
+      good = test_trigger(expected, request_map, trigger_name) or good
     end
 
     if not good then
