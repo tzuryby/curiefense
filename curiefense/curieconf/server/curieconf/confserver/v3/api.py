@@ -1678,15 +1678,14 @@ async def publish_resource_put(config: str, request: Request, buckets: List[Buck
     conf = request.app.backend.configs_get(config, version)
     ok = True
     status = []
-    req_json = await request.json()
-    if type(req_json) is not list:
+    buckets = await request.json()
+    if type(buckets) is not list:
         raise HTTPException(400, "body must be a list")
-    buck = await request.json()
 
     for bucket in buckets:
         logs = []
         try:
-            cloud.export(conf, buck["url"], prnt=lambda x: logs.append(x))
+            cloud.export(conf, bucket["url"], prnt=lambda x: logs.append(x))
         except Exception as e:
             ok = False
             s = False
@@ -1733,16 +1732,17 @@ async def git_push_resource_put(git_urls: List[GitUrl], request: Request):
     """Push git configuration to remote git repositories"""
     ok = True
     status = []
-    for giturl in git_urls:
+    git_jsons = await request.json()
+    for giturl in git_jsons:
         try:
-            request.app.backend.gitpush(dict(giturl)["giturl"])
+            request.app.backend.gitpush(giturl["giturl"])
         except Exception as e:
             msg = repr(e)
             s = False
         else:
             msg = "ok"
             s = True
-        status.append({"url": dict(giturl)["giturl"], "ok": s, "message": msg})
+        status.append({"url": giturl["giturl"], "ok": s, "message": msg})
     return {"ok": ok, "status": status}
 
 
@@ -1770,9 +1770,9 @@ async def git_push_resource_put(git_urls: List[GitUrl], request: Request):
 async def git_fetch_resource_put(giturl: GitUrl, request: Request):
     """Fetch git configuration from specified remote repository"""
     ok = True
-    _giturl = await request.json()
+    giturl_json = await request.json()
     try:
-        request.app.backend.gitfetch(_giturl["giturl"])
+        request.app.backend.gitfetch(giturl_json["giturl"])
     except Exception as e:
         ok = False
         msg = repr(e)
