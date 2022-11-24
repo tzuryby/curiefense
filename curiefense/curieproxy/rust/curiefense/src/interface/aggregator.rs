@@ -110,6 +110,7 @@ struct AggregatedCounters {
     top_tags: Arp<TopN<String>>,
     top_country_human: TopN<String>,
     top_country_bot: TopN<String>,
+    top_rtc: Arp<TopN<String>>,
 
     bot: usize,
     human: usize,
@@ -412,6 +413,40 @@ pub struct AggSection {
     plugins: usize,
 }
 
+fn is_autotag_prefix(s: &str) -> bool {
+    matches!(
+        s,
+        "securitypolicy"
+            | "securitypolicy-entry"
+            | "aclid"
+            | "aclname"
+            | "contentfilterid"
+            | "contentfiltername"
+            | "cf-rule-id"
+            | "cf-rule-category"
+            | "cf-rule-subcategory"
+            | "cf-rule-risk"
+            | "fc-id"
+            | "fc-name"
+            | "limit-id"
+            | "limit-name"
+            | "headers"
+            | "cookies"
+            | "args"
+            | "host"
+            | "ip"
+            | "geo-continent-name"
+            | "geo-continent-code"
+            | "geo-city"
+            | "geo-org"
+            | "geo-country"
+            | "geo-region"
+            | "network"
+            | "geo-subregion"
+            | "geo-asn"
+    )
+}
+
 impl AggregatedCounters {
     fn increment(
         &mut self,
@@ -591,11 +626,15 @@ impl AggregatedCounters {
                     human = true;
                     self.human += 1
                 }
-                tg => {
-                    if !tg.contains(':') {
-                        top_tags.inc(tg.to_string())
+                tg => match tg.split_once(':') {
+                    None => top_tags.inc(tg.to_string()),
+                    Some(("rtc", rtc)) => self.top_rtc.get_mut(cursor).inc(rtc.to_string()),
+                    Some((prefix, _)) => {
+                        if !is_autotag_prefix(prefix) {
+                            top_tags.inc(tg.to_string())
+                        }
                     }
-                }
+                },
             }
         }
 
@@ -666,6 +705,7 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
 
     e.location.serialize(&mut content, "section_");
     e.ruleid.serialize(&mut content, "top_ruleid_");
+    e.top_rtc.serialize(&mut content, "top_rtc_");
     e.aclid.serialize(&mut content, "top_aclid_");
     e.authority.serialize(&mut content, "top_authority_");
     content.insert(
