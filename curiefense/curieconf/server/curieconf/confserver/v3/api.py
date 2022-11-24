@@ -1507,7 +1507,7 @@ async def ns_resource_put(nsname: str, request: Request):
 #     #         abort(409, "namespace [%s] does not exist" % nsname)
 
 
-@router.get("/db/{nsname}/v/{version}", tags=[Tags.db])
+@router.get("/db/{nsname}/v/{version}/", tags=[Tags.db])
 async def ns_version_resource_get(nsname: str, version: str, request: Request):
     """Get a given version of a namespace"""
     return request.app.backend.ns_get(nsname, version)
