@@ -84,7 +84,7 @@ impl RequestSelector {
 
     pub fn resolve_selector(tp: SelectorType, v: &str) -> anyhow::Result<Self> {
         match tp {
-            SelectorType::Headers => Ok(RequestSelector::Header(v.to_string())),
+            SelectorType::Headers => Ok(RequestSelector::Header(v.to_ascii_lowercase())),
             SelectorType::Cookies => Ok(RequestSelector::Cookie(v.to_string())),
             SelectorType::Args => Ok(RequestSelector::Args(v.to_string())),
             SelectorType::Plugins => Ok(RequestSelector::Plugins(v.to_string())),
