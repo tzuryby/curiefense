@@ -74,7 +74,7 @@ class Limit(BaseModel):
     id: StrictStr
     name: StrictStr
     description: Optional[StrictStr]
-    _global: StrictBool = Field(alias="global")
+    global_: StrictBool = Field(alias="global")
     active: StrictBool
     timeframe: StrictInt
     thresholds: List[Threshold]
@@ -340,7 +340,7 @@ class Action(BaseModel):
     description: Optional[StrictStr]
     tags: List[StrictStr]
     params: typing.Any
-    _type: StrictStr = Field(alias="type")
+    type_: StrictStr = Field(alias="type")
 
     class Config:
         fields = {
@@ -418,7 +418,7 @@ class DocumentMask(BaseModel):
     include: Optional[List[typing.Any]]
     exclude: Optional[List[typing.Any]]
     tags: Optional[List[StrictStr]]
-    active: Optional[List[typing.Any]]
+    active: Optional[typing.Any]
     action: typing.Any
     sequence: Optional[List[typing.Any]]
     timeframe: Optional[StrictInt]
@@ -437,8 +437,8 @@ class DocumentMask(BaseModel):
     deny: Optional[List[StrictStr]]
     force_deny: Optional[List[StrictStr]]
     match: Optional[StrictStr]
-    _type: Optional[StrictStr] = Field(alias="type")
-    _star: Optional[List[typing.Any]] = Field(alias="*")
+    type_: Optional[StrictStr] = Field(alias="type")
+    star_: Optional[List[typing.Any]] = Field(alias="*")
 
     class Config:
         fields = {
@@ -483,7 +483,7 @@ class VersionLog(BaseModel):
     version: Optional[StrictStr]
     # TODO - dt_format="iso8601"
     date: Optional[datetime.datetime]
-    _star: Optional[List[typing.Any]] = Field(alias="*")
+    star_: Optional[List[typing.Any]] = Field(alias="*")
 
 
 #
@@ -1066,12 +1066,13 @@ async def document_resource(config: str, request: Request):
 #         return res
 
 
-@router.get("/configs/{config}/d/{document}/", tags=[Tags.congifs], response_model=List[DocumentMask], response_model_exclude_unset=True)
+@router.get("/configs/{config}/d/{document}/", tags=[Tags.congifs], response_model=List[DocumentMask], response_model_exclude_unset=True, response_model_by_alias=True)
 async def document_resource_get(config: str, document: str, request: Request):
     """Get a complete document"""
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
     res = request.app.backend.documents_get(config, document)
+    print(res[0]["global"])
     #res = {key: res[key] for key in list(models[document].__fields__.keys())}
     return res
 
@@ -1252,11 +1253,13 @@ async def entries_resource_get(config: str, document: str, request: Request):
 @router.post("/configs/{config}/d/{document}/e/", tags=[Tags.congifs])
 async def entries_resource_post(config: str, document: str, basic_entry: BasicEntry, request: Request):
     "Create an entry in a document"
+
+    data_json = await request.json()
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    isValid, err = validateJson(dict(basic_entry), document)
+    isValid, err = validateJson(data_json, document)
     if isValid:
-        data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
+        data = {key: data_json[key] for key in list(models[document].__fields__.keys())}
         res = request.app.backend.entries_create(
             config, document, data, get_gitactor(request)
         )
@@ -1290,23 +1293,28 @@ async def entries_resource_post(config: str, document: str, basic_entry: BasicEn
 #             abort(500, "schema mismatched: \n" + err)
 
 
+def switch_alias(keys):
+    return [key[:-1] if key.endswith("_") else key for key in keys]
+
 @router.get("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
 async def entry_resource_get(config: str, document: str, entry: str, request: Request):
     """Retrieve an entry from a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.entries_get(config, document, entry)
-    return {key: res for key in list(models[document].__fields__.keys())}
+    keys = switch_alias(list(models[document].__fields__.keys()))
+    return {key: res[key] for key in keys}
 
 
 @router.put("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
 async def entry_resource_put(config: str, document: str, entry: str, basic_entry: BasicEntry, request: Request):
     """Update an entry in a document"""
+    data_json = await request.json()
     if document not in models:
         raise HTTPException(404, "document does not exist")
-    isValid, err = validateJson(dict(basic_entry), document)
+    isValid, err = validateJson(data_json, document)
     if isValid:
-        data = {key: dict(basic_entry)[key] for key in list(models[document].__fields__.keys())}
+        data = {key: data_json[key] for key in switch_alias(list(models[document].__fields__.keys()))}
 
         res = request.app.backend.entries_update(
             config, document, entry, data, get_gitactor(request)
@@ -1790,4 +1798,5 @@ async def git_fetch_resource_put(giturl: GitUrl, request: Request):
 
 
 if __name__ == '__main__':
-    print("hi")
+    l = ["k_", "jjjj", "lama_"]
+    print(switch_alias(l))
