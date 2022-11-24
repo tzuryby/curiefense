@@ -7,7 +7,7 @@ use crate::logs::Logs;
 
 use hyperscan::prelude::{pattern, Builder, CompileFlags, Pattern, Patterns, VectoredDatabase};
 use hyperscan::Vectored;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
@@ -247,7 +247,7 @@ fn mk_section(
         .chain(props.regex.into_iter())
         .map(|e| {
             let (s, v) = mk_entry_match(e)?;
-            let re = Regex::new(&s)?;
+            let re = RegexBuilder::new(&s).case_insensitive(true).build()?;
             Ok((re, v))
         })
         .collect();

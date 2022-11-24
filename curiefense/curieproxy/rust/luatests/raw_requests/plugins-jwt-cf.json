@@ -47,7 +47,7 @@
         "typ": "Bearer",
         "exp": 1668287880,
         "iat": 1668201480,
-        "email": "user@secure.domaine"
+        "email": "user@secure.DOMAINE"
       }
     },
     "response": {

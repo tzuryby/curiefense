@@ -1594,7 +1594,7 @@
           "exclusions": [],
           "key": "special",
           "mask": false,
-          "reg": "^[A-Z]+",
+          "reg": "^[a-z]+",
           "restrict": true
         }
       ],

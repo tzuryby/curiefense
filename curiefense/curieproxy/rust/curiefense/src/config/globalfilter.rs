@@ -1,7 +1,7 @@
 use anyhow::Context;
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use iprange::IpRange;
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use serde_json::{from_value, Value};
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -237,7 +237,7 @@ impl GlobalFilterSection {
                 |s| {
                     Ok(conv(SingleEntry {
                         exact: s.to_string(),
-                        re: match Regex::new(s) {
+                        re: match RegexBuilder::new(s).case_insensitive(true).build() {
                             Ok(r) => Some(r),
                             Err(rr) => {
                                 logs.error(|| format!("Bad regex {}: {}", s, rr));
@@ -264,7 +264,7 @@ impl GlobalFilterSection {
                     negated: false,
                     entry: conv(PairEntry {
                         key: k,
-                        re: match Regex::new(&v) {
+                        re: match RegexBuilder::new(&v).case_insensitive(true).build() {
                             Ok(r) => Some(r),
                             Err(rr) => {
                                 logs.error(|| format!("Bad regex {}: {}", v, rr));
@@ -278,7 +278,7 @@ impl GlobalFilterSection {
                     negated: true,
                     entry: conv(PairEntry {
                         key: k,
-                        re: match Regex::new(nval) {
+                        re: match RegexBuilder::new(nval).case_insensitive(true).build() {
                             Ok(r) => Some(r),
                             Err(rr) => {
                                 logs.error(|| format!("Bad regex {}: {}", nval, rr));
