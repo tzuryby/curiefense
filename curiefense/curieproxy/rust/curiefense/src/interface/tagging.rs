@@ -172,28 +172,28 @@ impl Location {
         match self {
             Location::Request => (),
             Location::Attributes => {
-                map.serialize_entry("section", "attributes")?;
+                // map.serialize_entry("section", "attributes")?; // BQ TODO
             }
             Location::Ip => {
-                map.serialize_entry("request_element", "ip")?;
+                map.serialize_entry("section", "ip")?; // BQ TODO: should be request-element
             }
             Location::Uri => {
-                map.serialize_entry("request_element", "uri")?;
+                map.serialize_entry("section", "uri")?; // BQ TODO: should be request-element
             }
             Location::RefererPath => {
-                map.serialize_entry("request_element", "referer_path")?;
+                // map.serialize_entry("section", "referer_path")?;
             }
             Location::RefererPathpart(part) => {
-                map.serialize_entry("part", part)?;
+                // map.serialize_entry("part", part)?; // BQ TODO
             }
             Location::RefererPathpartValue(_, value) => {
                 map.serialize_entry("value", value)?;
             }
             Location::Path => {
-                map.serialize_entry("section", "path")?;
+                // map.serialize_entry("section", "path")?; // BQ TODO
             }
             Location::Pathpart(part) => {
-                map.serialize_entry("part", part)?;
+                // map.serialize_entry("part", part)?; // BQ TODO
             }
             Location::PathpartValue(_, value) => {
                 map.serialize_entry("value", value)?;
@@ -583,6 +583,9 @@ mod test {
             Cookies,
             Cookie("foo".to_string()),
             CookieValue("foo".to_string(), "foo".to_string()),
+            Plugins,
+            Plugin("foo".to_string()),
+            PluginValue("foo".to_string(), "foo".to_string()),
         ];
         for location in locations {
             let res = serde_json::to_string(location).unwrap();
