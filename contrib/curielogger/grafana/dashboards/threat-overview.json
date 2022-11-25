@@ -666,7 +666,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -979,7 +979,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1017,7 +1017,7 @@
             "sum"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "sortBy": "Total",
           "sortDesc": true
         },
@@ -1094,7 +1094,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1132,7 +1132,7 @@
             "sum"
           ],
           "displayMode": "table",
-          "placement": "bottom",
+          "placement": "right",
           "sortBy": "Total",
           "sortDesc": true
         },
@@ -1157,7 +1157,7 @@
           "refId": "bots total"
         }
       ],
-      "title": "Statuses",
+      "title": "Status Codes",
       "type": "timeseries"
     },
     {
@@ -1197,7 +1197,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -1222,172 +1222,20 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 24,
+        "h": 6,
+        "w": 12,
         "x": 0,
         "y": 31
-      },
-      "id": 51,
-      "options": {
-        "graph": {},
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "7.5.17",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "exemplar": true,
-          "expr": "round(sum by (tag) (increase(top_tags_reported_total{tag=~\"rtc.*\"}[5m]))) ",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "report: {{tag}}",
-          "refId": "tags_report"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "exemplar": true,
-          "expr": "round(sum by (tag) (increase(top_tags_active_total{tag=~\"rtc.*\"}[5m]))) ",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "active:{{tag}}",
-          "refId": "tags_active"
-        }
-      ],
-      "title": "Reblaze Threat Categories",
-      "transformations": [
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:ato",
-            "renamePattern": "DDoS"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:scraper",
-            "renamePattern": "SCRAPER"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:injection",
-            "renamePattern": "INJECTION"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:api-bola",
-            "renamePattern": "API BOLA"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:maleware",
-            "renamePattern": "MALEWARE"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "rtc:trojan-backdoor",
-            "renamePattern": "TROJAN BACKDOOR"
-          }
-        }
-      ],
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 15,
-            "gradientMode": "hue",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "yellow",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 24,
-        "x": 0,
-        "y": 38
       },
       "id": 35,
       "options": {
         "graph": {},
         "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
         },
         "tooltip": {
           "mode": "single",
@@ -1401,27 +1249,328 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "exemplar": true,
-          "expr": "round(sum by (tag) (increase(top_tags_reported_total{tag!=\"rtc.*\"}[5m]))) ",
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "round(sum by (tag) (increase(top_rtc_active_total[5m])))",
           "hide": false,
+          "instant": false,
           "interval": "",
-          "legendFormat": "report: {{tag}}",
-          "refId": "tags_report"
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "tags_active"
+        }
+      ],
+      "title": "Top Active Threats",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "id": 54,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "7.5.17",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "round(sum by (tag) (increase(top_rtc_reported_total[5m]))) ",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{tag}}",
+          "range": true,
+          "refId": "tags_active"
+        }
+      ],
+      "title": "Top Reported Threats",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "id": 53,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "7.5.17",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "round(sum by (tag) (increase(top_tags_active_total{tag!=\"rtc.*\"}[5m]))) ",
           "hide": false,
           "interval": "",
-          "legendFormat": "active:{{tag}}",
-          "refId": "tags_active"
+          "legendFormat": "{{tag}}",
+          "range": true,
+          "refId": "tags_report"
         }
       ],
-      "title": "Tags",
+      "title": "Top Active Tags",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "id": 55,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "7.5.17",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "round(sum by (tag) (increase(top_tags_reported_total{tag!=\"rtc.*\"}[5m]))) ",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "tags_report"
+        }
+      ],
+      "title": "Top Reported Tags",
       "transformations": [],
       "type": "timeseries"
     },
@@ -1444,7 +1593,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 45
+        "y": 44
       },
       "hiddenSeries": false,
       "id": 37,
@@ -1544,7 +1693,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 45
+        "y": 44
       },
       "hiddenSeries": false,
       "id": 17,
@@ -1642,7 +1791,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 45
+        "y": 44
       },
       "hiddenSeries": false,
       "id": 38,
@@ -1755,7 +1904,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 53
+        "y": 52
       },
       "id": 32,
       "options": {
@@ -1836,7 +1985,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 53
+        "y": 52
       },
       "id": 31,
       "options": {
@@ -1917,7 +2066,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 53
+        "y": 52
       },
       "id": 30,
       "options": {
@@ -1998,7 +2147,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 53
+        "y": 52
       },
       "id": 9,
       "options": {
@@ -2080,7 +2229,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 56
       },
       "id": 45,
       "options": {
@@ -2160,7 +2309,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 56
       },
       "id": 52,
       "options": {
@@ -2245,7 +2394,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -2274,7 +2423,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 64
       },
       "id": 14,
       "options": {
@@ -2350,7 +2499,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -2418,7 +2567,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 76
       },
       "id": 26,
       "options": {
@@ -2489,7 +2638,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -2517,7 +2666,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 83
       },
       "id": 39,
       "options": {
@@ -2625,7 +2774,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -2653,7 +2802,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 90
       },
       "id": 40,
       "options": {
@@ -2743,13 +2892,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Reblaze Threats Overview [v5]",
   "uid": "8KP9HSH4r",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
