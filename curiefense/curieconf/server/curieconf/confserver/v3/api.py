@@ -1022,7 +1022,7 @@ async def blob_resource_delete(config: str, blob: str, request: Request):
 @router.get("/configs/{config}/b/{blob}/v/", tags=[Tags.congifs], response_model=List[VersionLog],
             response_model_exclude_unset=True)
 async def blob_list_version_resource_get(config: str, blob: str, request: Request):
-    "Retrieve the list of versions of a given blob"
+    """Retrieve the list of versions of a given blob"""
     res = request.app.backend.blobs_list_versions(config, blob)
     if request.headers.get("X-fields", False):
         res = filter_x_fields(res, request.headers["X-fields"])
@@ -1410,13 +1410,16 @@ async def entry_resource_deleye(config: str, document: str, entry: str, request:
 #     #     return res
 
 
-@router.get("/configs/{config}/d/{document}/e/{entry}/v/", tags=[Tags.congifs])
-async def entry_list_version_resource_get(config: str, document: str, entry: str, request: Request):
+@router.get("/configs/{config}/d/{document}/e/{entry}/v/", tags=[Tags.congifs], response_model=List[VersionLog],
+            response_model_exclude_unset=True)
+async def entry_list_version_resource_get(config: str, document: str, entry: str, request: Request,
+                                          ):
     """Get the list of existing versions of a given entry in a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.entries_list_versions(config, document, entry)
-    return {key: res[key] for key in list(VersionLog.__fields__.keys())}
+    return res
+    # return {key: res[key] for key in list(VersionLog.__fields__.keys())}
 
 
 #
@@ -1836,8 +1839,3 @@ async def git_fetch_resource_put(giturl: GitUrl, request: Request):
 #         else:
 #             msg = "ok"
 #         return make_response({"ok": ok, "status": msg})
-
-
-if __name__ == '__main__':
-    l = ["k_", "jjjj", "lama_"]
-    print(switch_alias(l))
