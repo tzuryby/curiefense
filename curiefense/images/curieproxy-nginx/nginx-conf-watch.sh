@@ -17,7 +17,7 @@ do
   if [ -f "$confarchive" ]; then
     file_age=$(($(date +%s) - $(date +%s -r "$confarchive")))
     echo "watch-customconf: File age in sec: $file_age"
-    if (( file_age < 20 ));
+    if (( file_age < 8 ));
     then
       echo "watch-customconf: New copy of $confarchive found. calling reload script."
       /usr/local/bin/nginx-conf-reload.sh &
@@ -25,5 +25,5 @@ do
   else
       echo "watch-customconf: ${confarchive} missing" >&2
   fi
-  sleep 20;
+  sleep 5;
 done
