@@ -104,6 +104,7 @@
         "y": 3
       },
       "id": 6,
+      "interval": "5m",
       "options": {
         "footer": {
           "fields": "",
@@ -136,7 +137,7 @@
           "refId": "peak"
         }
       ],
-      "title": "Traffic Peak ",
+      "title": "Traffic Peak (5m)",
       "transformations": [
         {
           "id": "reduce",
@@ -168,11 +169,11 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
+                "color": "semi-dark-blue",
                 "value": null
               },
               {
-                "color": "semi-dark-blue",
+                "color": "dark-blue",
                 "value": 80
               }
             ]
@@ -187,6 +188,7 @@
         "y": 3
       },
       "id": 15,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -256,6 +258,7 @@
         "y": 3
       },
       "id": 12,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -321,6 +324,7 @@
         "y": 3
       },
       "id": 11,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -343,11 +347,12 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "round(sum(increase(hits_total[5m])) -  sum(increase(passed_total[5m])))",
+          "expr": "round(     sum(increase(hits_total[5m])) -  sum(increase(passed_total[5m]))   -  sum(increase(reported_total[5m]))   )",
           "format": "time_series",
           "instant": false,
-          "interval": "",
+          "interval": "5m",
           "legendFormat": "",
           "refId": "blocked"
         }
@@ -390,6 +395,7 @@
         "y": 3
       },
       "id": 13,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -412,11 +418,12 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "round(sum(increase(reported_total[5m])))",
           "format": "time_series",
           "instant": false,
-          "interval": "",
+          "interval": "5m",
           "legendFormat": "",
           "refId": "report"
         }
@@ -459,6 +466,7 @@
         "y": 7
       },
       "id": 29,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -528,6 +536,7 @@
         "y": 7
       },
       "id": 43,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -597,6 +606,7 @@
         "y": 7
       },
       "id": 10,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -666,7 +676,7 @@
             "spanNulls": true,
             "stacking": {
               "group": "A",
-              "mode": "normal"
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -752,6 +762,7 @@
         "y": 11
       },
       "id": 2,
+      "interval": "5m",
       "options": {
         "graph": {},
         "legend": {
@@ -784,7 +795,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "sum(increase(hits_total[5m])) - sum(increase(passed_total[5m]))",
+          "expr": "sum(increase(hits_total[5m])) - sum(increase(passed_total[5m]))  -  sum(increase(reported_total[5m]))",
           "hide": false,
           "interval": "",
           "legendFormat": "blocked",
@@ -880,7 +891,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(sum(increase(hits_total[5m])) - sum(increase(passed_total[5m])))",
+          "expr": "round(sum(increase(hits_total[5m])) - sum(increase(passed_total[5m])) -  sum(increase(reported_total[5m])))",
           "hide": false,
           "interval": "",
           "legendFormat": "blocked",
@@ -928,11 +939,13 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:30",
           "format": "short",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:31",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -1062,7 +1075,7 @@
         "type": "prometheus",
         "uid": "$datasource"
       },
-      "description": "total number of requests  grouped by http statuses",
+      "description": "total number of requests  grouped by http status",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1125,6 +1138,7 @@
         "y": 25
       },
       "id": 22,
+      "interval": "5m",
       "options": {
         "graph": {},
         "legend": {
@@ -1208,8 +1222,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -1312,8 +1325,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -1415,8 +1427,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -1518,8 +1529,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -1597,6 +1607,7 @@
       },
       "hiddenSeries": false,
       "id": 37,
+      "interval": "30s",
       "legend": {
         "alignAsTable": true,
         "avg": false,
@@ -1660,11 +1671,13 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:90",
           "format": "short",
           "logBase": 1,
           "show": true
         },
         {
+          "$$hashKey": "object:91",
           "format": "short",
           "logBase": 1,
           "show": true
@@ -1888,12 +1901,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": null
-              },
-              {
-                "color": "semi-dark-red",
-                "value": 80
+                "color": "red"
               }
             ]
           }
@@ -1902,11 +1910,12 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 3,
         "x": 0,
         "y": 52
       },
       "id": 32,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -1929,28 +1938,17 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "sum(increase(requests_triggered_globalfilter_active_total[5m]))",
           "format": "time_series",
           "instant": false,
-          "interval": "1m",
+          "interval": "5m",
           "legendFormat": "active",
           "refId": "active"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "exemplar": true,
-          "expr": "sum(increase(requests_triggered_globalfilter_report_total[5m]))",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "report",
-          "refId": "report"
         }
       ],
-      "title": "Global Filter",
+      "title": "Global Filter Blocked",
       "type": "stat"
     },
     {
@@ -1969,12 +1967,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": null
-              },
-              {
-                "color": "semi-dark-red",
-                "value": 80
+                "color": "orange"
               }
             ]
           }
@@ -1983,11 +1976,12 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
+        "w": 3,
+        "x": 3,
         "y": 52
       },
-      "id": 31,
+      "id": 56,
+      "interval": "5m",
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -2010,28 +2004,17 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(increase(requests_triggered_ratelimit_active_total[5m]))",
+          "expr": "sum(increase(requests_triggered_globalfilter_report_total[5m]))",
           "format": "time_series",
           "instant": false,
-          "interval": "1m",
-          "legendFormat": "active",
-          "refId": "active"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "exemplar": true,
-          "expr": "sum(increase(requests_triggered_ratelimit_report_total[5m]))",
-          "hide": false,
-          "interval": "",
+          "interval": "5m",
           "legendFormat": "report",
-          "refId": "report"
+          "refId": "active"
         }
       ],
-      "title": "Rate Limit",
+      "title": "Global Filter Reported",
       "type": "stat"
     },
     {
@@ -2050,8 +2033,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": null
+                "color": "orange"
               },
               {
                 "color": "semi-dark-red",
@@ -2064,7 +2046,139 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 3,
+        "x": 6,
+        "y": 52
+      },
+      "id": 61,
+      "interval": "5m",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(increase(requests_triggered_ratelimit_active_total[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "5m",
+          "legendFormat": "blocked",
+          "refId": "active"
+        }
+      ],
+      "title": "Rate Limit Blocked",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "total number of requests  labeled  with ruleid ",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 52
+      },
+      "id": 57,
+      "interval": "5m",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(increase(requests_triggered_ratelimit_report_total[5m]))",
+          "hide": false,
+          "interval": "5m",
+          "legendFormat": "report",
+          "range": true,
+          "refId": "report"
+        }
+      ],
+      "title": "Rate Limit Reported",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "total number of requests  labeled  with ruleid ",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
         "x": 12,
         "y": 52
       },
@@ -2091,6 +2205,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
+          "editorMode": "code",
           "exemplar": true,
           "expr": "sum(increase(requests_triggered_acl_active_total[5m]))",
           "format": "time_series",
@@ -2098,7 +2213,58 @@
           "interval": "1m",
           "legendFormat": "active",
           "refId": "active"
+        }
+      ],
+      "title": "ACL active",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "total number of requests  labeled  with ruleid ",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange"
+              }
+            ]
+          }
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 52
+      },
+      "id": 58,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
@@ -2112,7 +2278,7 @@
           "refId": "report"
         }
       ],
-      "title": "ACL",
+      "title": "ACL Reported",
       "type": "stat"
     },
     {
@@ -2131,8 +2297,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "orange",
-                "value": null
+                "color": "orange"
               },
               {
                 "color": "semi-dark-red",
@@ -2145,8 +2310,73 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 3,
         "x": 18,
+        "y": 52
+      },
+      "id": 59,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "value"
+      },
+      "pluginVersion": "9.0.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(increase(requests_triggered_cf_active_total[5m]))",
+          "format": "time_series",
+          "instant": false,
+          "interval": "5m",
+          "legendFormat": "blocked",
+          "refId": "active"
+        }
+      ],
+      "title": "Content Filter Blocked",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "description": "total number of requests  labeled  by  ruleid  (CF rule)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
         "y": 52
       },
       "id": 9,
@@ -2173,19 +2403,6 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "sum(increase(requests_triggered_cf_active_total[5m]))",
-          "format": "time_series",
-          "instant": false,
-          "interval": "1m",
-          "legendFormat": "active",
-          "refId": "active"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "$datasource"
-          },
-          "exemplar": true,
           "expr": "sum(increase(requests_triggered_cf_report_total[5m]))",
           "hide": false,
           "interval": "",
@@ -2193,7 +2410,7 @@
           "refId": "report"
         }
       ],
-      "title": "Content Filter ",
+      "title": "Content Filter  Reported",
       "type": "stat"
     },
     {
@@ -2209,8 +2426,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "orange",
@@ -2232,6 +2448,7 @@
         "y": 56
       },
       "id": 45,
+      "interval": "5m",
       "options": {
         "orientation": "auto",
         "reduceOptions": {
@@ -2256,7 +2473,7 @@
           "expr": "(round(sum by (level) (increase(risk_level_active_total[5m])) ))",
           "format": "time_series",
           "instant": false,
-          "interval": "",
+          "interval": "5m",
           "legendFormat": "Risk Level Blocked : {{level}}",
           "refId": "risk level"
         }
@@ -2289,8 +2506,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "orange",
@@ -2406,8 +2622,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -2426,6 +2641,7 @@
         "y": 64
       },
       "id": 14,
+      "interval": "5m",
       "options": {
         "graph": {},
         "legend": {
@@ -2450,7 +2666,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "sum by (ruleid) (increase(top_ruleid_active_total[5m])) ",
+          "expr": "topk(20,(sum by (ruleid) (increase(top_ruleid_active_total[5m])) ))",
           "format": "time_series",
           "instant": false,
           "interval": "10s",
@@ -2510,8 +2726,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -2523,30 +2738,6 @@
         },
         "overrides": [
           {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "passed: __acldefault__"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "graph": true,
-                  "legend": false,
-                  "tooltip": false
-                }
-              }
-            ]
-          },
-          {
             "matcher": {
               "id": "byName",
               "options": "passed: __acldefault__"
@@ -2557,6 +2748,30 @@
                 "value": {
                   "fixedColor": "semi-dark-purple",
                   "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "active:05ac96d7b825"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
                 }
               }
             ]
@@ -2596,6 +2811,18 @@
           "interval": "",
           "legendFormat": "passed: {{aclid}}",
           "refId": "top_aclid_passed_total"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "$datasource"
+          },
+          "editorMode": "code",
+          "expr": "sum by (aclid) (increase(top_aclid_active_total[5m])) ",
+          "hide": false,
+          "legendFormat": "active:{{aclid}}",
+          "range": true,
+          "refId": "A"
         }
       ],
       "title": "Requests Triggered by Access Control List (ACL)",
@@ -2649,8 +2876,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -2693,7 +2919,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(increase(section_active_total[5m]))",
+          "expr": "topk(10,(round(increase(section_active_total[5m]))))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -2706,7 +2932,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(increase(section_passed_total[5m])) ",
+          "expr": "topk(10,(round(increase(section_passed_total[5m])) ))",
           "hide": false,
           "interval": "",
           "legendFormat": "passed:{{section}}",
@@ -2718,7 +2944,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(increase(section_reported_total[5m])) ",
+          "expr": "topk(10,(round(increase(section_reported_total[5m])) ))",
           "hide": false,
           "interval": "",
           "legendFormat": "repot:{{section}}",
@@ -2785,8 +3011,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "yellow",
-                "value": null
+                "color": "yellow"
               },
               {
                 "color": "green",
@@ -2829,7 +3054,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(sum by (group) (increase(top_max_args_per_request[5m]))) ",
+          "expr": "topk(10,(round(sum by (group) (increase(top_max_args_per_request[5m]))) ))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -2842,7 +3067,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(sum by (group) (increase(top_max_cookies_per_request[5m]))) ",
+          "expr": "topk(10,(round(sum by (group) (increase(top_max_cookies_per_request[5m]))) ))",
           "hide": false,
           "interval": "",
           "legendFormat": "cookies:{{group}}",
@@ -2854,7 +3079,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "round(sum by (group) (increase(top_max_headers_per_request[5m]))) ",
+          "expr": "topk(10,(round(sum by (group) (increase(top_max_headers_per_request[5m]))) ))",
           "hide": false,
           "interval": "",
           "legendFormat": "headers:{{group}}",
@@ -2899,6 +3124,6 @@
   "timezone": "",
   "title": "Reblaze Threats Overview [v5]",
   "uid": "8KP9HSH4r",
-  "version": 5,
+  "version": 19,
   "weekStart": ""
 }
