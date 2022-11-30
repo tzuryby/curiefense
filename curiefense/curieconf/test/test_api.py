@@ -546,34 +546,3 @@ def test_entries_delete(curieapi, doc):
             r = curieapi.entries.get("pytest", doc, e["id"])
         with pytest.raises(NotFoundError):
             r = curieapi.entries.delete("pytest", doc, e["id"])
-
-
-@pytest.mark.parametrize("docname", vec_documents.keys())
-def test_entries_list_versions(curieapi, docname):
-    r = curieapi.documents.get("pytest", docname)
-    assert r.status_code == 200
-    old = r.body
-    assert len(old) > 0
-
-    e = old[0]
-    eid = e["id"]
-    r = curieapi.entries.list_versions("pytest", docname, eid)
-    assert r.status_code == 200
-    v1 = r.body
-    assert len(v1) == 1
-
-    r = curieapi.entries.update(
-        "pytest", docname, e["id"], body={**e, **{"name": "%s" % time.time()}}
-    )
-    r = curieapi.entries.list_versions("pytest", docname, e["id"])
-    assert r.status_code == 200
-    v2 = r.body
-    assert len(v2) == len(v1) + 1
-
-    r = curieapi.entries.create(
-        "pytest", docname, body={**e, **{"id": "qdsqd", "name": "%s" % time.time()}}
-    )
-    r = curieapi.entries.list_versions("pytest", docname, eid)
-    assert r.status_code == 200
-    v3 = r.body
-    assert len(v3) == len(v2)

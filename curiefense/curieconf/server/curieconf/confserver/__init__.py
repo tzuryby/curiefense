@@ -20,6 +20,8 @@ app.include_router(api.router)
 @app.on_event("startup")
 async def startup():
     Instrumentator().instrument(app).expose(app)
+## Import all versions
+from .v3 import api as api_v3
 
 
 logging.basicConfig(
