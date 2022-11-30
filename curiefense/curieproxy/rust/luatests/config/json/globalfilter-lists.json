@@ -649,25 +649,37 @@
     ]
   },
   {
-    "action": "fq8faptj",
+    "action": "addipheader",
     "active": true,
     "description": "Add headers",
     "id": "addheaders",
     "mdate": "2021-07-01T09:50:58.505Z",
     "name": "add headers",
-    "rule": {
-      "relation": "AND",
-      "entries": [
-        [
-          "ip",
-          "82.13.8.87",
-          null
-        ]
-      ]
-    },
+    "rule": [
+      "ip",
+      "82.13.8.87",
+      null
+    ],
     "source": "self-managed",
     "tags": [
       "wheaders"
+    ]
+  },
+  {
+    "action": "monitorheader",
+    "active": true,
+    "description": "Monitor request and forward header",
+    "id": "addheaders",
+    "mdate": "2021-07-01T09:50:58.505Z",
+    "name": "monitor-header",
+    "rule": [
+      "ip",
+      "82.13.8.89",
+      null
+    ],
+    "source": "self-managed",
+    "tags": [
+      "monitor-header"
     ]
   },
   {
@@ -860,7 +872,7 @@
     "action": "ye8qyg0h",
     "rule": {
       "relation": "OR",
-      "entries": [["headers", ["test-global-filter-trigger", "true"], ""]]
+      "entries": [["headers", ["test-global-filter-trigger", "header_value"], ""]]
     },
     "mdate": "",
     "source": "self-managed"

@@ -39,6 +39,50 @@ pub fn stronger_decision(d1: SimpleDecision, d2: SimpleDecision) -> SimpleDecisi
     }
 }
 
+/// Merge two decisions together.
+///
+/// If the two decisions have differents priorities, returns the one with
+/// the highest one.
+/// If the two decisions have the same priority and have action of type
+/// Monitor, returns the first one, with headers merged from the two
+/// decisions
+/// If the two decisions have the same priority, but not actions of type
+/// Monitor, retunrs the first decision.
+///
+/// In all cases, block reasons are always merged.
+///
+/// Priorities of actions are: Skip > Block > Monitor > None
+pub fn merge_decisions(d1: Decision, d2: Decision) -> Decision {
+    // Choose which decision to keep, and which decision to throw away
+    let (mut kept, thrown) = {
+        match (&d1.maction, &d2.maction) {
+            (Some(a1), Some(a2)) => {
+                if a1.atype.priority() >= a2.atype.priority() {
+                    (d1, d2)
+                } else {
+                    (d2, d1)
+                }
+            }
+            (None, Some(_)) => (d2, d1),
+            (Some(_), None) | (None, None) => (d1, d2),
+        }
+    };
+
+    // Merge headers if kept action is monitor
+    if let Some(action) = &mut kept.maction {
+        if action.atype == ActionType::Monitor {
+            if let Some(headers) = &mut action.headers {
+                let throw_headers = thrown.maction.and_then(|action| action.headers).unwrap_or_default();
+                headers.extend(throw_headers)
+            }
+        }
+    }
+
+    kept.reasons.extend(thrown.reasons);
+
+    kept
+}
+
 #[derive(Debug)]
 pub struct AnalyzeResult {
     pub decision: Decision,
@@ -88,10 +132,7 @@ impl Decision {
     }
 
     pub fn response_json(&self) -> String {
-        let action_desc = match self.maction {
-            None => "pass",
-            Some(_) => "custom_response",
-        };
+        let action_desc = if self.is_blocking() { "custom_response" } else { "pass" };
         let response =
             serde_json::to_value(&self.maction).unwrap_or_else(|rr| serde_json::Value::String(rr.to_string()));
         let j = serde_json::json!({
@@ -156,7 +197,7 @@ pub async fn jsonlog(
 pub fn jsonlog_rinfo(
     dec: &Decision,
     rinfo: &RequestInfo,
-    rcode: Option<u32>,
+    mut rcode: Option<u32>,
     tags: &Tags,
     stats: &Stats,
     logs: &Logs,
@@ -223,6 +264,18 @@ pub fn jsonlog_rinfo(
             )
         }
     }
+
+    // If we have a monitor action, remove the return code to prevent tag
+    // addition. This could be fixed with a better Action structure, but
+    // requires more changes.
+    if let Some(Action {
+        atype: ActionType::Monitor,
+        ..
+    }) = &dec.maction
+    {
+        rcode = None;
+    }
+
     map_ser.serialize_entry(
         "tags",
         &LogTags {
@@ -434,6 +487,14 @@ impl ActionType {
     /// is the action final (no further processing)
     pub fn is_final(&self) -> bool {
         !matches!(self, ActionType::Monitor)
+    }
+
+    pub fn priority(&self) -> u32 {
+        match self {
+            ActionType::Block => 6,
+            ActionType::Monitor => 1,
+            ActionType::Skip => 9,
+        }
     }
 }
 

@@ -13,11 +13,12 @@
       "action": "pass",
       "global_filter_triggers": [
         {
-          "active": true,
+          "ruleid": "filter-header",
           "section": "headers",
-          "name": "test-global-filter-trigger",
           "value": "header_value",
-          "id": "filter-header"
+          "type": "name: Filter header",
+          "name": "test-global-filter-trigger",
+          "active": true
         }
       ]
     }

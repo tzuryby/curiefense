@@ -79,10 +79,21 @@
         "h1": "${ip} - ${args.dd} - ${args.ee}"
       }
     },
-    "type": "monitor",
-    "id": "fq8faptj",
+    "type": "custom",
+    "id": "addipheader",
     "tags": [],
-    "name": "fq8faptj"
+    "name": "Add IP header to response"
+  },
+  {
+    "params": {
+      "headers": {
+        "header_1": "value_1"
+      }
+    },
+    "type": "monitor",
+    "id": "monitorheader",
+    "tags": [],
+    "name": "Add header to forwarded request"
   },
   {
     "type": "monitor",
@@ -108,9 +119,7 @@
     "name": "ye8qyg0h"
   },
   {
-    "tags": [
-      "myextratag"
-    ],
+    "tags": ["myextratag"],
     "type": "custom",
     "params": {
       "status": 403,

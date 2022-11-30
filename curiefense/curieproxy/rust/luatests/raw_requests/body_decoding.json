@@ -444,43 +444,5 @@
         "deny"
       ]
     }
-  },
-  {
-    "headers": {
-      ":authority": "localhost:30081",
-      ":method": "POST",
-      ":path": "/content-filter/expect/all",
-      "content-type": "text/xml",
-      "user-agent": "dummy",
-      "x-forwarded-for": "3.4.5.5"
-    },
-    "name": "no body, expect all (pass)",
-    "response": {
-      "action": "pass",
-      "content_filter_triggers": [
-        {
-          "active": true,
-          "section": "body",
-          "type": "body_missing"
-        }
-      ],
-      "tags": [
-        "host:localhost:30081",
-        "cookies:0",
-        "headers:3",
-        "args:0",
-        "all",
-        "ip:3-4-5-5",
-        "network:3-4-5-0-24",
-        "sante",
-        "securitypolicy-entry:expectall",
-        "contentfiltername:expect-all",
-        "securitypolicy:default-entry",
-        "aclname:from-tags",
-        "aclid:fromtags",
-        "contentfilterid:expectall",
-        "bot"
-      ]
-    }
   }
 ]

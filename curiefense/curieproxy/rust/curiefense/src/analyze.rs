@@ -8,7 +8,9 @@ use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query, FlowCheck, FlowResult};
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
-use crate::interface::{AclStage, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags};
+use crate::interface::{
+    merge_decisions, AclStage, AnalyzeResult, BDecision, BlockReason, Decision, Location, SimpleDecision, Tags,
+};
 use crate::limit::{limit_build_query, limit_info, limit_process, limit_resolve_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::redis::redis_async_conn;
@@ -31,7 +33,7 @@ pub struct APhase0 {
 #[derive(Clone)]
 pub struct AnalysisInfo {
     is_human: bool,
-    reasons: Vec<BlockReason>,
+    p0_decision: Decision,
     reqinfo: RequestInfo,
     stats: StatsCollect<BStageMapped>,
     tags: Tags,
@@ -123,12 +125,9 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
     }
     logs.debug("challenge phase2 ignored");
 
-    let mut brs = Vec::new();
-
-    if let SimpleDecision::Action(action, reason) = globalfilter_dec {
+    let decision = if let SimpleDecision::Action(action, reason) = globalfilter_dec {
         logs.debug(|| format!("Global filter decision {:?}", reason));
-        brs.extend(reason);
-        let decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
+        let decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, reason);
         if decision.is_final() {
             return InitResult::Res(AnalyzeResult {
                 decision,
@@ -139,14 +138,16 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         }
         // if the decision was not adopted, get the reason vector back
         // (this is because we passed it to action.to_decision)
-        brs = decision.reasons;
-    }
+        decision
+    } else {
+        Decision::pass(Vec::new())
+    };
 
     let limit_checks = limit_info(logs, &reqinfo, &securitypolicy.limits, &tags);
     let flow_checks = flow_info(logs, &p0.flows, &reqinfo, &tags);
     let info = AnalysisInfo {
         is_human,
-        reasons: brs,
+        p0_decision: decision,
         reqinfo,
         stats,
         tags,
@@ -218,7 +219,8 @@ pub fn analyze_finish<GH: Grasshopper>(
     // destructure the info structure, so that each field can be consumed independently
     let info = p2.info;
     let mut tags = info.tags;
-    let mut brs = info.reasons;
+    let mut cumulated_decision = info.p0_decision;
+
     let is_human = info.is_human;
     let reqinfo = info.reqinfo;
     let secpol = &reqinfo.rinfo.secpolicy;
@@ -227,19 +229,16 @@ pub fn analyze_finish<GH: Grasshopper>(
     let (limit_check, stats) = limit_process(stats, 0, &p2.limits, &mut tags);
 
     if let SimpleDecision::Action(action, curbrs) = limit_check {
-        brs.extend(curbrs);
-        let decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
-        if decision.is_final() {
+        let limit_decision = action.to_decision(is_human, mgh, &reqinfo, &mut tags, curbrs);
+        cumulated_decision = merge_decisions(cumulated_decision, limit_decision);
+        if cumulated_decision.is_final() {
             return AnalyzeResult {
-                decision,
+                decision: cumulated_decision,
                 tags,
                 rinfo: masking(reqinfo),
                 stats: stats.limit_stage_build(),
             };
         }
-        // if the decision was not adopted, get the reason vector back
-        // (this is because we passed it to action.to_decision)
-        brs = decision.reasons;
     }
     logs.debug("limit checks done");
 
@@ -255,11 +254,14 @@ pub fn analyze_finish<GH: Grasshopper>(
             br.decision.inactive();
         }
         let blocking = br.decision == BDecision::Blocking;
-        brs.push(br);
+
+        let acl_decision = Decision::pass(vec![br]);
+        cumulated_decision = merge_decisions(cumulated_decision, acl_decision);
 
         // insert the extra tags
         if !secpol.acl_profile.tags.is_empty() {
-            let locs = brs
+            let locs = cumulated_decision
+                .reasons
                 .iter()
                 .flat_map(|r| r.location.iter())
                 .cloned()
@@ -271,24 +273,24 @@ pub fn analyze_finish<GH: Grasshopper>(
 
         if secpol.acl_active && bypass {
             return AnalyzeResult {
-                decision: Decision::pass(brs),
+                decision: cumulated_decision,
                 tags,
                 rinfo: masking(reqinfo),
                 stats: stats.acl_stage_build(),
             };
         }
 
-        let acl_block = |reasons: Vec<BlockReason>, tags: &mut Tags| {
+        let acl_block = |tags: &mut Tags| {
             secpol
                 .acl_profile
                 .action
-                .to_decision(is_human, mgh, &reqinfo, tags, reasons)
+                .to_decision(is_human, mgh, &reqinfo, tags, Vec::new())
         };
 
         // Send challenge, even if the acl is inactive in sec_pol.
         if decision.challenge {
             let decision = match (reqinfo.headers.get("user-agent"), mgh) {
-                (Some(ua), Some(gh)) => challenge_phase01(gh, ua, brs),
+                (Some(ua), Some(gh)) => challenge_phase01(gh, ua, Vec::new()),
                 (gua, ggh) => {
                     logs.debug(|| {
                         format!(
@@ -297,12 +299,13 @@ pub fn analyze_finish<GH: Grasshopper>(
                             ggh.is_some()
                         )
                     });
-                    acl_block(brs, &mut tags)
+                    acl_block(&mut tags)
                 }
             };
 
+            cumulated_decision = merge_decisions(cumulated_decision, decision);
             return AnalyzeResult {
-                decision,
+                decision: cumulated_decision,
                 tags,
                 rinfo: masking(reqinfo),
                 stats: stats.acl_stage_build(),
@@ -310,15 +313,16 @@ pub fn analyze_finish<GH: Grasshopper>(
         }
 
         if blocking {
-            let decision = acl_block(brs, &mut tags);
+            let decision = acl_block(&mut tags);
+            cumulated_decision = merge_decisions(cumulated_decision, decision);
             return AnalyzeResult {
-                decision,
+                decision: cumulated_decision,
                 tags,
                 rinfo: masking(reqinfo),
                 stats: stats.acl_stage_build(),
             };
         }
-    }
+    };
 
     let mut cfcheck =
         |stats, mrls| content_filter_check(logs, stats, &mut tags, &reqinfo, &secpol.content_filter_profile, mrls);
@@ -335,8 +339,8 @@ pub fn analyze_finish<GH: Grasshopper>(
     };
     logs.debug("Content Filter checks done");
 
-    let decision = match content_filter_result {
-        Ok(()) => Decision::pass(brs),
+    let content_filter_decision = match content_filter_result {
+        Ok(()) => Decision::pass(Vec::new()),
         Err(cfblock) => {
             // insert extra tags
             if !secpol.content_filter_profile.tags.is_empty() {
@@ -350,28 +354,34 @@ pub fn analyze_finish<GH: Grasshopper>(
                     tags.insert_locs(t, locs.clone());
                 }
             }
-            brs.extend(cfblock.reasons.into_iter().map(|mut reason| {
-                if !secpol.content_filter_active {
-                    reason.decision.inactive();
-                }
-                reason
-            }));
+            let br = cfblock
+                .reasons
+                .into_iter()
+                .map(|mut reason| {
+                    if !secpol.content_filter_active {
+                        reason.decision.inactive();
+                    }
+                    reason
+                })
+                .collect();
             if cfblock.blocking {
                 let mut dec = secpol
                     .content_filter_profile
                     .action
-                    .to_decision(is_human, mgh, &reqinfo, &mut tags, brs);
+                    .to_decision(is_human, mgh, &reqinfo, &mut tags, br);
                 if let Some(mut action) = dec.maction.as_mut() {
                     action.block_mode &= secpol.content_filter_active;
                 }
                 dec
             } else {
-                Decision::pass(brs)
+                Decision::pass(br)
             }
         }
     };
+
+    cumulated_decision = merge_decisions(cumulated_decision, content_filter_decision);
     AnalyzeResult {
-        decision,
+        decision: cumulated_decision,
         tags,
         rinfo: masking(reqinfo),
         stats: stats.cf_stage_build(),

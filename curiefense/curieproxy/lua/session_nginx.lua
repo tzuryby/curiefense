@@ -216,6 +216,15 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
         if response_table["action"] == "custom_response" then
             custom_response(handle, response_table["response"])
         end
+        if response_table["action"] == "pass" then
+            local analyser_response = response_table["response"]
+            handle.log(handle.DEBUG, "altering: " .. cjson.encode(analyser_response))
+            if analyser_response["headers"] and analyser_response["headers"] ~= cjson.null then
+                for k, v in pairs(analyser_response.headers) do
+                    handle.req.set_header(k, v)
+                end
+            end
+        end
     end
 end
 

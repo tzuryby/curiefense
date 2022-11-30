@@ -4,10 +4,10 @@ use crate::config::globalfilter::{
 use crate::config::raw::Relation;
 use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
-use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 
 struct MatchResult {
@@ -258,6 +258,7 @@ pub fn tag_request(
 
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
+    let mut monitor_headers = HashMap::new();
     for psection in globalfilters {
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
@@ -267,6 +268,10 @@ pub fn tag_request(
                 .with_raw_tags_locs(psection.tags.clone(), &mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
+                // merge headers from Monitor decision
+                if a.atype == SimpleActionT::Monitor {
+                    monitor_headers.extend(a.headers.clone().unwrap_or_default());
+                }
                 let curdec = SimpleDecision::Action(
                     a.clone(),
                     vec![BlockReason::global_filter(
@@ -276,10 +281,22 @@ pub fn tag_request(
                         &mtch.matched,
                     )],
                 );
+
                 decision = stronger_decision(decision, curdec);
             }
         }
     }
+
+    // if the final decision is a monitor, use cumulated monitor headers as headers
+    decision = if let SimpleDecision::Action(mut action, block_reasons) = decision {
+        if action.atype == SimpleActionT::Monitor {
+            action.headers = Some(monitor_headers);
+        }
+        SimpleDecision::Action(action, block_reasons)
+    } else {
+        decision
+    };
+
     (tags, decision, stats.mapped(globalfilters.len(), matched))
 }
 

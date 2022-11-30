@@ -10,8 +10,7 @@
     "name": "specific arg not used",
     "response": {
       "action": "pass",
-      "block_mode": false,
-      "status": 200
+      "block_mode": false
     }
   },
   {
@@ -41,8 +40,7 @@
     "name": "specific arg ok in query",
     "response": {
       "action": "pass",
-      "block_mode": false,
-      "status": 200
+      "block_mode": false
     }
   }
 ]

@@ -251,75 +251,146 @@ local function equals(o1, o2)
     return true
   end
 
+local function test_status(expected_response, actual_response)
+  local expected_status = expected_response.response.status
+
+  if expected_status == nil then
+    -- nothing to check
+    return true
+  end
+
+  if actual_response.response == cjson.null then
+    print("Expected response status " .. cjson.encode(expected_status) .. ", but got no response" )
+    return false
+  end
+
+  local actual_status = actual_response.response.status
+
+  if actual_status ~= expected_status then
+    print("Expected status " .. cjson.encode(expected_status) .. ", but got " .. cjson.encode(actual_status))
+    return false
+  end
+
+  return true
+end
+
+local function test_block_mode(expected_response, actual_response)
+  local expected_block_mode = expected_response.response.block
+
+  if expected_block_mode == nil then
+    -- nothing to check
+    return true
+  end
+
+  if actual_response.response == cjson.null then
+    print("Expected block_mode " .. cjson.encode(expected_block_mode) .. ", but got no response" )
+    return false
+  end
+
+  local actual_block_mode = actual_response.response.block_mode
+
+  if actual_block_mode ~= expected_block_mode then
+    print("Expected block_mode " ..
+      cjson.encode(expected_block_mode) .. ", but got " .. cjson.encode(actual_block_mode))
+    return false
+  end
+
+  return true
+end
+
+local function test_headers(expected_response, actual_response)
+  local expected_headers = expected_response.response.headers
+
+  if expected_headers == nil then
+    -- nothing to check
+    return true
+  end
+
+  if actual_response.response == cjson.null then
+    print("Expected headers " ..
+      cjson.encode(expected_headers) .. ", but got no response" )
+    return false
+  end
+
+  local actual_headers = actual_response.response.headers
+
+  local good = true
+  for h, v in pairs(expected_headers) do
+    if actual_headers[h] ~= v then
+      print("Header " .. h .. ", expected " .. cjson.encode(v) .. " but got " ..
+        cjson.encode(actual_headers[h]))
+      good = false
+    end
+  end
+
+  if not good then
+    print("Returned headers are " .. cjson.encode(actual_headers))
+  end
+
+  return good
+end
+
+local function test_trigger(expected_response, parsed_responses, trigger_name)
+  local expected_trigger = expected_response.response[trigger_name]
+
+  if expected_trigger == nil then
+    -- nothing to check
+    return true
+  end
+
+  local actual_trigger = parsed_responses[trigger_name]
+  if actual_trigger == cjson.null then
+    print("Expected " .. trigger_name .. ":" .. cjson.encode(expected_response) .. ", but got no trigger" )
+    return false
+  end
+
+
+  if equals(actual_trigger, expected_trigger) == false then
+    print("Expected " .. trigger_name .. ":")
+    print("  " ..  cjson.encode(expected_trigger))
+    print("but got:")
+    print("  " .. cjson.encode(actual_trigger))
+    return false
+  end
+
+  return true
+end
+
 -- testing from envoy metadata
 local function test_raw_request(request_path, mode)
   print("Testing " .. request_path .. " mode=" .. mode)
   local raw_request_maps = load_json_file(request_path)
-  for _, raw_request_map in pairs(raw_request_maps) do
-    local res = run_inspect_request(raw_request_map, mode)
+  for _, expected in pairs(raw_request_maps) do
+    local res = run_inspect_request(expected, mode)
 
-    local r = cjson.decode(res.response)
+    local actual = cjson.decode(res.response)
     local request_map = cjson.decode(res:request_map(nil))
 
-    local good = compare_tag_list(raw_request_map.name, request_map.tags, raw_request_map.response.tags)
-    if r.action ~= raw_request_map.response.action then
-      print("Expected action " .. cjson.encode(raw_request_map.response.action) ..
-        ", but got " .. cjson.encode(r.action))
+    local good = compare_tag_list(expected.name, request_map.tags, expected.response.tags)
+    if actual.action ~= expected.response.action then
+      print("Expected action " .. cjson.encode(expected.response.action) ..
+        ", but got " .. cjson.encode(actual.action))
       good = false
     end
-    if r.response ~= cjson.null then
-      if r.response.status ~= raw_request_map.response.status then
-        print("Expected status " .. cjson.encode(raw_request_map.response.status) ..
-          ", but got " .. cjson.encode(r.response.status))
-        good = false
-      end
-      if r.response.block_mode ~= raw_request_map.response.block_mode then
-        print("Expected block_mode " .. cjson.encode(raw_request_map.response.block_mode) ..
-          ", but got " .. cjson.encode(r.response.block_mode))
-        good = false
-      end
-      if raw_request_map.response.headers then
-        local hgood = true
-        for h, v in pairs(raw_request_map.response.headers) do
-          if r.response.headers[h] ~= v then
-            print("Header " .. h .. ", expected " .. cjson.encode(v) .. " but got " ..
-              cjson.encode(r.response.headers[h]))
-            good = false
-            hgood = false
-          end
-        end
-        if not hgood then
-          print("Returned headers are " .. cjson.encode(r.response.headers))
-        end
-      end
-      for _, trigger_name in pairs({
-         "acl_triggers",
-         "rate_limit_triggers",
-         "global_filter_triggers",
-         "content_filter_triggers"
-      }) do
-        local expected = raw_request_map.response[trigger_name]
-        if expected then
-          local actual = request_map[trigger_name]
+    good = test_status(expected, actual) or good
+    good = test_block_mode(expected, actual) or good
+    good = test_headers(expected, actual) or good
 
-          if equals(actual, expected) == false then
-            local jactual = cjson.encode(actual)
-            local jexpected = cjson.encode(expected)
-            print("Expected " .. trigger_name .. ":")
-            print("  " ..  jexpected)
-            print("but got:")
-            print("  " .. jactual)
-            good = false
-          end
-        end
-      end
+    local triggers = {
+      "acl_triggers",
+      "rate_limit_triggers",
+      "global_filter_triggers",
+      "content_filter_triggers"
+    }
+    for _, trigger_name in pairs(triggers) do
+      good = test_trigger(expected, request_map, trigger_name) or good
     end
 
     if not good then
       show_logs(request_map.logs)
       print(res.response)
       print(res:request_map(nil))
-      error("mismatch in " .. raw_request_map.name)
+      error("mismatch in " .. expected.name)
     end
   end
 end
