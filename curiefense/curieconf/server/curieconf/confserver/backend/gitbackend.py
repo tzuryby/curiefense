@@ -377,7 +377,7 @@ class GitBackend(CurieBackend):
                         doc = self.update_doc(doc, addd[docname])
                     if docname in deld:
                         deleid = {
-                            eid for eid, val in deld[docname].items() if val is True
+                            entry["id"] for entry in deld[docname]
                         }
                         doc = [entry for entry in doc if entry["id"] not in deleid]
                     self.add_document(docname, doc)

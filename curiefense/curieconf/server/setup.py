@@ -33,7 +33,10 @@ setup(
         "fasteners",
         "jsonpath-ng==1.5.3",
         "pydash==5.0.2",
-        "fastapi==0.87.0"
+        "fastapi==0.87.0",
+        "prometheus-fastapi-instrumentator==5.9.1",
+        "pydantic==1.10.2",
+        "uvicorn==0.19.0"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

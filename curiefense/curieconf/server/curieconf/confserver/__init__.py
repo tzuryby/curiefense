@@ -1,15 +1,48 @@
 #! /usr/bin/env python3
-
+import json
 import os
+
 from .backend import Backends
 import uvicorn
+import logging
 from curieconf.confserver.v3 import api
-from prometheus_flask_exporter import PrometheusMetrics
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.encoders import jsonable_encoder
+from prometheus_fastapi_instrumentator import Instrumentator
 
-app = FastAPI()
+app = FastAPI(docs_url="/api/v3/")
 app.include_router(api.router)
+
+
+@app.on_event("startup")
+async def startup():
+    Instrumentator().instrument(app).expose(app)
+
+
+logging.basicConfig(
+    handlers=[
+        logging.FileHandler("fastapi.log"),
+        logging.StreamHandler()
+    ],
+    level=logging.INFO,
+    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger("filters-maxmind")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
+    # # or logger.error(f'{exc}')
+    # logger.error(exc_str)
+    # content = {'status_code': 10422, 'message': exc_str, 'data': None}
+    #
+    # return JSONResponse
+    return PlainTextResponse(str(exc), status_code=400)
 
 
 def drop_into_pdb(app, exception):
@@ -49,7 +82,7 @@ def main(args=None):
 
     options = parser.parse_args(args)
 
-    #TODO - find replacements for got_request_exception and prometheus_flask_exporter
+    # TODO - find replacements for got_request_exception and prometheus_flask_exporter
     # if options.pdb:
     #     flask.got_request_exception.connect(drop_into_pdb)
     # metrics = PrometheusMetrics(app)
@@ -62,3 +95,7 @@ def main(args=None):
     #        app.run(debug=options.debug, host=options.host, port=options.port)
     finally:
         pass
+
+
+if __name__ == '__main__':
+    main()
