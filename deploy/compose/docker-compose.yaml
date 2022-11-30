@@ -52,6 +52,7 @@ services:
       - TARGET_ADDRESS_B=${TARGET_ADDRESS_B:-juiceshop}
       - TARGET_PORT_B=${TARGET_PORT_B:-3000}
       - FILEBEAT=${FILEBEAT:-yes}
+      - NGINX_CONFIGURATION_TEMPLATE=${NGINX_CONFIGURATION_TEMPLATE:-yes}
       - FILEBEAT_LOG_LEVEL
       - AGGREGATED_LOG_FILE=${AGGREGATED_LOG_FILE:-/var/log/nginx.metrics.json.log}
       - NGINX_ACCESS_LOG=${NGINX_ACCESS_LOG:-/var/log/nginx.access.json.log}
