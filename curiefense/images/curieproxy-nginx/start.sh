@@ -6,7 +6,7 @@ mv /usr/local/openresty/nginx/conf/nginx.conf.1 /usr/local/openresty/nginx/conf/
 
 /usr/local/bin/nginx-conf-watch.sh&
 
-if [ "$FILEBEAT" = "yes" ]
+if [ "$NGINX_CONFIGURATION_TEMPLATE" = "yes" ]
 then
   envsubst '${TARGET_ADDRESS_A},${TARGET_PORT_A},${TARGET_ADDRESS_B},${TARGET_PORT_B},${AGGREGATED_STATS_LOG_FILE},${NGINX_ACCESS_LOG},${NGINX_ERROR_LOG},${CF_LOG_LEVEL},${NGINX_LOG_LEVEL}' < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf
   /usr/local/openresty/bin/openresty -g "daemon off;" | grep -v '^.$' | /usr/bin/filebeat --path.config /etc
