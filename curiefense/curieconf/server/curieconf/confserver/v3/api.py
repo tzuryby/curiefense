@@ -1124,7 +1124,7 @@ async def _filter(data, keys):
     #     if data.get(key, False):
     #         filtered[key] = data[key]
     # return filtered
-    return {key: data[key] for key in keys if key in data}
+    return {key: data[key] for key in switch_alias(keys) if key in data}
 
 
 @router.post("/configs/{config}/d/{document}/", tags=[Tags.congifs])
@@ -1138,7 +1138,7 @@ async def document_resource_post(config: str, document: str, basic_entries: List
     data = [await _filter(dict(entry), list(models[document].__fields__.keys())) for entry in as_dict]
     print(data[0])
     for entry in data:
-        isValid, err = validateJson(data, document)
+        isValid, err = validateJson(entry, document)
         if isValid is False:
             raise HTTPException(500, "schema mismatched: \n" + err)
     res = request.app.backend.documents_create(
@@ -1248,7 +1248,7 @@ async def document_version_resource_get(config: str, document: str, version: str
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.documents_get(config, document, version)
-    return [{key: r[key] for key in list(models[document].__fields__.keys()) if key in r} for r in res]
+    return [{key: r[key] for key in switch_alias(list(models[document].__fields__.keys())) if key in r} for r in res]
 
 
 # @ns_configs.route("/<string:config>/d/<string:document>/v/<string:version>/")
@@ -1299,7 +1299,7 @@ async def entries_resource_post(config: str, document: str, basic_entry: BasicEn
         raise HTTPException(404, "document does not exist")
     isValid, err = validateJson(data_json, document)
     if isValid:
-        keys = list(models[document].__fields__.keys())
+        keys = switch_alias(list(models[document].__fields__.keys()))
         data = {key: data_json[key] for key in keys if key in data_json}
         res = request.app.backend.entries_create(
             config, document, data, get_gitactor(request)
@@ -1441,7 +1441,7 @@ async def entry_version_resource_get(config: str, document: str, entry: str, ver
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.entries_get(config, document, entry, version)
-    keys = list(models[document].__fields__.keys())
+    keys = switch_alias(list(models[document].__fields__.keys()))
     return {key: res[key] for key in keys if key in res}
 
 
