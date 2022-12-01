@@ -22,14 +22,15 @@ async def startup():
     Instrumentator().instrument(app).expose(app)
 
 
+## Import all versions
+from .v3 import api as api_v3
+
+
 logging.basicConfig(
-    handlers=[
-        logging.FileHandler("fastapi.log"),
-        logging.StreamHandler()
-    ],
+    handlers=[logging.FileHandler("fastapi.log"), logging.StreamHandler()],
     level=logging.INFO,
-    format='[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
+    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+    datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("filters-maxmind")
 
@@ -97,5 +98,5 @@ def main(args=None):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
