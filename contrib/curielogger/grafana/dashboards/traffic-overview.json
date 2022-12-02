@@ -123,7 +123,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "sum(increase(hits_total[5m]))",
+          "expr": "sum(increase(hits_total[5m]))  ",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -137,9 +137,9 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${datasource}"
       },
-      "description": "number of requests grouped by http status class",
+      "description": "total number of requests   total ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -164,13 +164,13 @@
         "x": 12,
         "y": 3
       },
-      "id": 8,
+      "id": 50,
       "interval": "5m",
       "options": {
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ],
           "fields": "",
           "values": false
@@ -183,32 +183,27 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${datasource}"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^2' }[5m]))",
+          "expr": " sum(increase(status_classes_total{code_class='2'}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "legendFormat": "{{code_class}}xx",
-          "refId": "class x"
+          "refId": "blocked"
         }
       ],
       "title": "2xx",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {}
-        }
-      ],
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${datasource}"
       },
-      "description": "number of requests grouped by http status class",
+      "description": "total number of requests   total ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -233,13 +228,13 @@
         "x": 15,
         "y": 3
       },
-      "id": 48,
+      "id": 51,
       "interval": "5m",
       "options": {
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ],
           "fields": "",
           "values": false
@@ -252,32 +247,27 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${datasource}"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^3' }[5m]))",
+          "expr": " sum(increase(status_classes_total{code_class='3'}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "legendFormat": "{{code_class}}xx",
-          "refId": "class x"
+          "refId": "blocked"
         }
       ],
       "title": "3xx",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {}
-        }
-      ],
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${datasource}"
       },
-      "description": "number of requests grouped by http status class",
+      "description": "total number of requests   total ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -302,13 +292,13 @@
         "x": 18,
         "y": 3
       },
-      "id": 46,
+      "id": 52,
       "interval": "5m",
       "options": {
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ],
           "fields": "",
           "values": false
@@ -321,32 +311,27 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${datasource}"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^4' }[5m]))",
+          "expr": " sum(increase(status_classes_total{code_class='4'}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "legendFormat": "{{code_class}}xx",
-          "refId": "class x"
+          "refId": "blocked"
         }
       ],
       "title": "4xx",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {}
-        }
-      ],
       "type": "gauge"
     },
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "$datasource"
+        "uid": "${datasource}"
       },
-      "description": "number of requests grouped by http status class",
+      "description": "total number of requests   total ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -371,13 +356,13 @@
         "x": 21,
         "y": 3
       },
-      "id": 47,
+      "id": 53,
       "interval": "5m",
       "options": {
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ],
           "fields": "",
           "values": false
@@ -390,24 +375,19 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "$datasource"
+            "uid": "${datasource}"
           },
+          "editorMode": "code",
           "exemplar": true,
-          "expr": "sum by (code_class) (increase(status_classes_total{code_class =~'^5' }[5m]))",
+          "expr": " sum(increase(status_classes_total{code_class='5'}[5m]))",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "legendFormat": "{{code_class}}xx",
-          "refId": "class x"
+          "refId": "blocked"
         }
       ],
       "title": "5xx",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {}
-        }
-      ],
       "type": "gauge"
     },
     {
@@ -518,30 +498,6 @@
                 "value": {
                   "fixedColor": "blue",
                   "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "passed"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
                 }
               }
             ]
@@ -851,7 +807,7 @@
       },
       "id": 43,
       "options": {
-        "content": "<font size= \"4\"> <center>  Top Countries, Organisations  </center></font> ",
+        "content": "<font size= \"4\"> <center>  Top Organisations, Countries  </center></font> ",
         "mode": "markdown"
       },
       "pluginVersion": "9.0.5",
@@ -982,7 +938,7 @@
             "uid": "$datasource"
           },
           "exemplar": true,
-          "expr": "topk(10,((sum by (asn) (increase(top_asn_passed_total[5m])))))",
+          "expr": "topk(30,((sum by (asn) (increase(top_asn_passed_total[5m])))))",
           "hide": false,
           "interval": "",
           "legendFormat": "passed: {{asn}}",
@@ -1051,32 +1007,7 @@
           },
           "unit": "short"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "passed: ch"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 10,
@@ -1113,7 +1044,7 @@
             "uid": "${datasource}"
           },
           "exemplar": true,
-          "expr": "topk(10,(round((sum by (country) (increase(top_country_passed_total[5m]))) )))",
+          "expr": "topk(20,(round((sum by (country) (increase(top_country_passed_total[5m]))) )))",
           "hide": false,
           "interval": "",
           "legendFormat": "passed: {{country}}",
@@ -1217,7 +1148,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "topk(10,(sum by (asn) (increase(top_asn_active_total[5m]))))",
+          "expr": "topk(30,(sum by (asn) (increase(top_asn_active_total[5m]))))",
           "format": "time_series",
           "instant": false,
           "interval": "10s",
@@ -1325,7 +1256,7 @@
           },
           "editorMode": "code",
           "exemplar": true,
-          "expr": "round(sum by (country) (increase(top_country_active_total[5m])))",
+          "expr": "(round(sum by (country) (increase(top_country_active_total[5m]))))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -2087,7 +2018,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "yellow",
@@ -2320,7 +2252,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "yellow",
@@ -2599,7 +2532,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "yellow",
@@ -2726,7 +2660,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "yellow",
@@ -2853,7 +2788,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "yellow",
@@ -3035,9 +2971,9 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "round(sum((unique_user_agent_passed))) + round(sum(unique_user_agent_active)) + round(sum((unique_user_agent_reported))) ",
+          "expr": "topk(30,(round(sum((unique_user_agent_passed))) + round(sum(unique_user_agent_active)) + round(sum((unique_user_agent_reported))) ))",
           "hide": false,
-          "legendFormat": "unique IPs total",
+          "legendFormat": "unique User Agents total",
           "range": true,
           "refId": "D"
         },
@@ -3047,7 +2983,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "round(sum((unique_user_agent_passed)))",
+          "expr": "topk(30,(round(sum((unique_user_agent_passed)))))",
           "hide": false,
           "legendFormat": "unique User Agents  passed",
           "range": true,
@@ -3059,7 +2995,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "round(sum(unique_user_agent_active))",
+          "expr": "topk(30,(round(sum(unique_user_agent_active))))",
           "hide": false,
           "legendFormat": "unique User Agents blocked",
           "range": true,
@@ -3090,7 +3026,7 @@
     "list": [
       {
         "current": {
-          "selected": false,
+          "selected": true,
           "text": "dataplaneprometheus",
           "value": "dataplaneprometheus"
         },
@@ -3109,13 +3045,13 @@
     ]
   },
   "time": {
-    "from": "now-12h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Reblaze Traffic Overview [v5]",
   "uid": "tUZcMWHVr",
-  "version": 3,
+  "version": 7,
   "weekStart": ""
 }
