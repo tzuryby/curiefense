@@ -382,6 +382,7 @@ pub fn jsonlog_rinfo(
             mp.end()
         }
     }
+    map_ser.serialize_entry("profiling", &stats.timing)?;
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
 }

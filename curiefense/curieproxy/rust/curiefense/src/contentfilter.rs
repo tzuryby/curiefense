@@ -567,7 +567,7 @@ mod test {
             Some(&masked),
             None,
             &Tags::new(&VirtualTags::default()),
-            &Stats::default(),
+            &Stats::new(std::time::Instant::now(), "test".to_string()),
             &Logs::default(),
             HashMap::new(),
         ));
@@ -712,7 +712,7 @@ mod test {
             Some(&masked),
             None,
             &Tags::new(&VirtualTags::default()),
-            &Stats::default(),
+            &Stats::new(std::time::Instant::now(), "test".to_string()),
             &Logs::default(),
             HashMap::new(),
         ));
