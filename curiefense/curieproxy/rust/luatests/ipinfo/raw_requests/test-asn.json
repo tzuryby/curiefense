@@ -24,7 +24,7 @@
         "geo-city:mountain-view",
         "securitypolicy-entry:default",
         "geo-org:google-llc",
-        "geo-country:us"
+        "geo-country:nil"
       ],
       "action": "pass"
     },
