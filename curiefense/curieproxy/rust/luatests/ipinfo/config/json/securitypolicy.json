@@ -3,6 +3,7 @@
     "match": "__default__",
     "id": "__default__",
     "name": "default entry",
+    "tags": [],
     "map": [
       {
         "match": "/",
