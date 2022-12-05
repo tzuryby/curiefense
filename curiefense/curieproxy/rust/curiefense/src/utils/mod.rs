@@ -21,7 +21,7 @@ use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
 use crate::geo::{
     get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn, get_maxmind_city,
-    get_maxmind_country,
+    get_maxmind_country, USE_IPINFO,
 };
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
@@ -412,6 +412,116 @@ impl InspectionResult {
     }
 }
 
+pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
+    let get_name = |mmap: &Option<std::collections::BTreeMap<&str, &str>>| {
+        mmap.as_ref().and_then(|mp| mp.get("en")).map(|s| s.to_lowercase())
+    };
+
+    if let Ok((asninfo, _)) = get_maxmind_asn(ip) {
+        geoip.asn = asninfo.autonomous_system_number;
+        geoip.company = asninfo.autonomous_system_organization.map(|s| s.to_string());
+    }
+
+    let extract_continent = |g: &mut GeoIp, mcnt: Option<country::Continent>| {
+        if let Some(continent) = mcnt {
+            g.continent_code = continent.code.map(|s| s.to_string());
+            g.continent_name = get_name(&continent.names);
+        }
+    };
+
+    let extract_country = |g: &mut GeoIp, mcnt: Option<country::Country>| {
+        if let Some(country) = mcnt {
+            g.in_eu = country.is_in_european_union;
+            g.country_iso = country.iso_code.as_ref().map(|s| s.to_lowercase());
+            g.country_name = get_name(&country.names);
+        }
+    };
+
+    let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
+    let extract_mm_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
+        if let Some(traits) = mcnt {
+            g.is_anonymous_proxy = traits.is_anonymous_proxy;
+            g.is_satellite_provider = traits.is_satellite_provider;
+        }
+    };
+
+    // first put country data in the geoip
+    if let Ok((cnty, network)) = get_maxmind_country(ip) {
+        extract_continent(geoip, cnty.continent);
+        extract_country(geoip, cnty.country);
+        extract_network(geoip, network);
+        extract_mm_traits(geoip, cnty.traits);
+    }
+
+    // potentially overwrite some with the city data
+    if let Ok((cty, network)) = get_maxmind_city(ip) {
+        extract_continent(geoip, cty.continent);
+        extract_country(geoip, cty.country);
+        extract_network(geoip, network);
+        extract_mm_traits(geoip, cty.traits);
+        geoip.location = cty
+            .location
+            .as_ref()
+            .and_then(|l| l.latitude.and_then(|lat| l.longitude.map(|lon| (lat, lon))));
+        if let Some(subs) = cty.subdivisions {
+            match &subs[..] {
+                [] => (),
+                [region] => geoip.region = get_name(&region.names),
+                [region, subregion] => {
+                    geoip.region = region.iso_code.map(|s| s.to_string());
+                    geoip.subregion = subregion.iso_code.map(|s| s.to_string());
+                }
+                _ => logs.error(|| format!("Too many subdivisions were reported for {}", ip)),
+            }
+        }
+        geoip.city_name = cty.city.as_ref().and_then(|c| get_name(&c.names));
+    }
+}
+
+pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
+    let extract_string = |s: String| {
+        if !s.is_empty() {
+            Some(s)
+        } else {
+            None
+        }
+    };
+
+    let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
+
+    // override using ipinfo
+    if let Ok((loc, network)) = get_ipinfo_location(ip) {
+        extract_network(geoip, network);
+        geoip.city_name = Some(loc.city);
+        geoip.country_iso = Some(loc.country);
+        geoip.region = Some(loc.region);
+        geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
+        if let (Ok(lat), Ok(lng)) = (loc.lat.parse(), loc.lng.parse()) {
+            geoip.location = Some((lat, lng))
+        };
+    }
+
+    if let Ok((privacy, _)) = get_ipinfo_privacy(ip) {
+        geoip.is_vpn = privacy.vpn.parse().ok();
+        geoip.is_anonymous_proxy = privacy.proxy.parse().ok();
+        geoip.is_tor = privacy.tor.parse().ok();
+        geoip.is_relay = privacy.relay.parse().ok();
+        geoip.is_hosting = privacy.hosting.parse().ok();
+        geoip.privacy_service = extract_string(privacy.service)
+    }
+
+    if let Ok((company, network)) = get_ipinfo_company(ip) {
+        extract_network(geoip, network);
+        geoip.company = extract_string(company.name);
+        geoip.asn = company.asn.strip_prefix("AS").and_then(|asn| asn.parse().ok());
+    }
+
+    if let Ok((carrier, _)) = get_ipinfo_carrier(ip) {
+        geoip.is_mobile = Some(true);
+        geoip.network = Some(carrier.network)
+    }
+}
+
 pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     let pip = ipstr.trim().parse();
     let mut geoip = GeoIp {
@@ -447,112 +557,14 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         }
     };
 
-    // fill struct using maxmind
-    let get_name = |mmap: &Option<std::collections::BTreeMap<&str, &str>>| {
-        mmap.as_ref().and_then(|mp| mp.get("en")).map(|s| s.to_lowercase())
-    };
-
-    if let Ok((asninfo, _)) = get_maxmind_asn(ip) {
-        geoip.asn = asninfo.autonomous_system_number;
-        geoip.company = asninfo.autonomous_system_organization.map(|s| s.to_string());
-    }
-
-    let extract_continent = |g: &mut GeoIp, mcnt: Option<country::Continent>| {
-        if let Some(continent) = mcnt {
-            g.continent_code = continent.code.map(|s| s.to_string());
-            g.continent_name = get_name(&continent.names);
-        }
-    };
-
-    let extract_country = |g: &mut GeoIp, mcnt: Option<country::Country>| {
-        if let Some(country) = mcnt {
-            g.in_eu = country.is_in_european_union;
-            g.country_iso = country.iso_code.as_ref().map(|s| s.to_lowercase());
-            g.country_name = get_name(&country.names);
-        }
-    };
-
-    let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
-    let extract_mm_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
-        if let Some(traits) = mcnt {
-            g.is_anonymous_proxy = traits.is_anonymous_proxy;
-            g.is_satellite_provider = traits.is_satellite_provider;
-        }
-    };
-
-    // first put country data in the geoip
-    if let Ok((cnty, network)) = get_maxmind_country(ip) {
-        extract_continent(&mut geoip, cnty.continent);
-        extract_country(&mut geoip, cnty.country);
-        extract_network(&mut geoip, network);
-        extract_mm_traits(&mut geoip, cnty.traits);
-    }
-
-    // potentially overwrite some with the city data
-    if let Ok((cty, network)) = get_maxmind_city(ip) {
-        extract_continent(&mut geoip, cty.continent);
-        extract_country(&mut geoip, cty.country);
-        extract_network(&mut geoip, network);
-        extract_mm_traits(&mut geoip, cty.traits);
-        geoip.location = cty
-            .location
-            .as_ref()
-            .and_then(|l| l.latitude.and_then(|lat| l.longitude.map(|lon| (lat, lon))));
-        if let Some(subs) = cty.subdivisions {
-            match &subs[..] {
-                [] => (),
-                [region] => geoip.region = get_name(&region.names),
-                [region, subregion] => {
-                    geoip.region = region.iso_code.map(|s| s.to_string());
-                    geoip.subregion = subregion.iso_code.map(|s| s.to_string());
-                }
-                _ => logs.error(|| format!("Too many subdivisions were reported for {}", ip)),
-            }
-        }
-        geoip.city_name = cty.city.as_ref().and_then(|c| get_name(&c.names));
-    }
-
-    let extract_string = |s: String| {
-        if !s.is_empty() {
-            Some(s)
-        } else {
-            None
-        }
-    };
-
-    // override using ipinfo
-    if let Ok((loc, network)) = get_ipinfo_location(ip) {
-        extract_network(&mut geoip, network);
-        geoip.city_name = Some(loc.city);
-        geoip.country_iso = Some(loc.country);
-        geoip.region = Some(loc.region);
-        geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
-        if let (Ok(lat), Ok(lng)) = (loc.lat.parse(), loc.lng.parse()) {
-            geoip.location = Some((lat, lng))
-        };
-    }
-
-    if let Ok((privacy, _)) = get_ipinfo_privacy(ip) {
-        geoip.is_vpn = privacy.vpn.parse().ok();
-        geoip.is_anonymous_proxy = privacy.proxy.parse().ok();
-        geoip.is_tor = privacy.tor.parse().ok();
-        geoip.is_relay = privacy.relay.parse().ok();
-        geoip.is_hosting = privacy.hosting.parse().ok();
-        geoip.privacy_service = extract_string(privacy.service)
-    }
-
-    if let Ok((company, network)) = get_ipinfo_company(ip) {
-        extract_network(&mut geoip, network);
-        geoip.company = extract_string(company.name);
-        geoip.asn = company.asn.strip_prefix("AS").and_then(|asn| asn.parse().ok());
-    }
-
-    if let Ok((carrier, _)) = get_ipinfo_carrier(ip) {
-        geoip.is_mobile = Some(true);
-        geoip.network = Some(carrier.network)
-    }
-
     geoip.ip = Some(ip);
+
+    if *USE_IPINFO {
+        find_geoip_ipinfo(logs, &mut geoip, ip)
+    } else {
+        find_geoip_maxmind(logs, &mut geoip, ip)
+    }
+
     geoip
 }
 

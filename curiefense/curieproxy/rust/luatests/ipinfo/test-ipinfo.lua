@@ -1,3 +1,21 @@
+-- Test requests analysis the same way as `test.lua`, but with a different set
+-- of test, revolving around ipinfo (https://ipinfo.io/). The tests are stored
+-- inside `ipinfo/`.
+--
+-- In order for those tests to work properly, the following environment
+-- variables must be set and valid for the proxy: 
+--
+-- * IPINFO_ROOT=/cf-config/current/config/ipinfo
+-- * IPINFO_LOCATION=artifacts_standard_location.mmdb
+-- * IPINFO_COMPANY=artifacts_standard_company.mmdb
+-- * IPINFO_PRIVACY=artifacts_privacy.mmdb
+-- * IPINFO_CARRIER=artifacts_carrier.mmdb
+--
+-- The values given here works if you put ipifo mmdb files inside 
+-- `curiefense/curiefense/images/confserver/bootstrap/confdb-initial-data/prod/config/`.
+--
+-- The easiest way to start the start is by using the command `make test-ipinfo`.
+
 package.path = package.path .. ";lua/?.lua"
 local curiefense = require "curiefense"
 

@@ -79,7 +79,7 @@ test-ipinfo: ctarget/target/debug/libcuriefense_lua.so
 						 -v `pwd`/luatests/ipinfo/test-ipinfo.lua:/home/builder/test.lua \
 						 -v `pwd`/luatests/ipinfo/config/json:/cf-config/current/config/json \
 						 -v `pwd`/luatests/ipinfo:/home/builder/luatests \
-						 -e DISABLE_MAXMIND_GEO=true \
+						 -e USE_IPINFO=true \
 						 -e IPINFO_ROOT=/cf-config/current/config/ipinfo \
 						 -e IPINFO_LOCATION=artifacts_standard_location.mmdb \
 						 -e IPINFO_COMPANY=artifacts_standard_company.mmdb \

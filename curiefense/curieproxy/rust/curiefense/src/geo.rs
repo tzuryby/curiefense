@@ -1,9 +1,8 @@
 //! Geographic lookup from IP address.
 //!
-//! The intelligence is provided through MaxMind GeoIP2, ipinfo, or both.
-//!
-//! MaxMind can be disabled altogether by setting the environment variable
-//! `DISABLE_MAXMIND_GEO` to `true`.
+//! The intelligence is provided by through MaxMind GeoIP2 or ipinfo. By default
+//! MaxMind GeoIP2 is used with free database, but you can use ipinfo instead by
+//! setting the enviroment variable to `USE_IPINFO`.
 
 use anyhow::anyhow;
 use ipnet::IpNet;
@@ -36,7 +35,7 @@ struct IpinfoGeo {
 
 lazy_static! {
     // as they are lazy, these loads will not be triggered in test mode
-    static ref MAXMIND_DISABLED: bool = std::env::var("DISABLE_MAXMIND_GEO").map(|s| s.parse().unwrap_or(false)).unwrap_or(false);
+    pub static ref USE_IPINFO: bool = std::env::var("USE_IPINFO").map(|s| s.parse().unwrap_or(false)).unwrap_or(false);
 
     static ref MAXMIND: anyhow::Result<MaxmindGeo> = {
         let maxmind_root = std::env::var("MAXMIND_ROOT").unwrap_or_else(|_| "/cf-config/current/config/maxmind".to_string());
@@ -97,8 +96,8 @@ fn compute_network<T>(data: T, addr: IpAddr, prefix_len: usize) -> (T, Option<Ip
 /// Retrieves the english name of the country associated with this IP
 #[cfg(not(test))]
 pub fn get_maxmind_country(addr: IpAddr) -> Result<(Country<'static>, Option<IpNet>), String> {
-    if *MAXMIND_DISABLED {
-        return Err("Maxmind is not enabled".to_string());
+    if *USE_IPINFO {
+        return Err("Maxmind is not enabled. You can enable it by setting USE_IPINFO=false".to_string());
     }
 
     match MAXMIND.deref() {
@@ -112,8 +111,8 @@ pub fn get_maxmind_country(addr: IpAddr) -> Result<(Country<'static>, Option<IpN
 
 #[cfg(not(test))]
 pub fn get_maxmind_asn(addr: IpAddr) -> Result<(Asn<'static>, Option<IpNet>), String> {
-    if *MAXMIND_DISABLED {
-        return Err("Maxmind is not enabled".to_string());
+    if *USE_IPINFO {
+        return Err("Maxmind is not enabled. You can enable it by setting USE_IPINFO=false".to_string());
     }
 
     match MAXMIND.deref() {
@@ -127,8 +126,8 @@ pub fn get_maxmind_asn(addr: IpAddr) -> Result<(Asn<'static>, Option<IpNet>), St
 
 #[cfg(not(test))]
 pub fn get_maxmind_city(addr: IpAddr) -> Result<(City<'static>, Option<IpNet>), String> {
-    if *MAXMIND_DISABLED {
-        return Err("Maxmind is not enabled".to_string());
+    if *USE_IPINFO {
+        return Err("Maxmind is not enabled. You can enable it by setting USE_IPINFO=false".to_string());
     }
 
     match MAXMIND.deref() {
@@ -142,6 +141,10 @@ pub fn get_maxmind_city(addr: IpAddr) -> Result<(City<'static>, Option<IpNet>), 
 
 #[cfg(not(test))]
 pub fn get_ipinfo_location(addr: IpAddr) -> Result<(LocationDetails, Option<IpNet>), String> {
+    if !(*USE_IPINFO) {
+        return Err("Ipinfo is not enabled. You can enable it by setting USE_IPINFO=true".to_string());
+    }
+
     match IPINFO.deref() {
         Err(rr) => Err(format!("could not read city db: {}", rr)),
         Ok(ipinfo) => match ipinfo.location.lookup_prefix(addr) {
@@ -153,6 +156,10 @@ pub fn get_ipinfo_location(addr: IpAddr) -> Result<(LocationDetails, Option<IpNe
 
 #[cfg(not(test))]
 pub fn get_ipinfo_privacy(addr: IpAddr) -> Result<(PrivacyDetails, Option<IpNet>), String> {
+    if !(*USE_IPINFO) {
+        return Err("Ipinfo is not enabled. You can enable it by setting USE_IPINFO=true".to_string());
+    }
+
     match IPINFO.deref() {
         Err(rr) => Err(format!("could not read city db: {}", rr)),
         Ok(ipinfo) => match ipinfo.privacy.lookup_prefix(addr) {
@@ -164,6 +171,10 @@ pub fn get_ipinfo_privacy(addr: IpAddr) -> Result<(PrivacyDetails, Option<IpNet>
 
 #[cfg(not(test))]
 pub fn get_ipinfo_company(addr: IpAddr) -> Result<(CompanyDetails, Option<IpNet>), String> {
+    if !(*USE_IPINFO) {
+        return Err("Ipinfo is not enabled. You can enable it by setting USE_IPINFO=true".to_string());
+    }
+
     match IPINFO.deref() {
         Err(rr) => Err(format!("could not read city db: {}", rr)),
         Ok(ipinfo) => match ipinfo.company.lookup_prefix(addr) {
