@@ -114,7 +114,6 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
         -- TODO: avoid connecting to redis when there are no flows and all limits are zero limits
         if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
             -- Redis required
-            -- TODO: write a pipelined implementation that will run through all the flow and limits at once!
             local red = redis_connect(handle)
             red:init_pipeline()
             for _, flow in pairs(flows) do
@@ -218,8 +217,8 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
         end
         if response_table["action"] == "pass" then
             local analyser_response = response_table["response"]
-            handle.log(handle.DEBUG, "altering: " .. cjson.encode(analyser_response))
-            if analyser_response["headers"] and analyser_response["headers"] ~= cjson.null then
+            if analyser_response ~= cjson.null and analyser_response["headers"] and
+                analyser_response["headers"] ~= cjson.null then
                 for k, v in pairs(analyser_response.headers) do
                     handle.req.set_header(k, v)
                 end
