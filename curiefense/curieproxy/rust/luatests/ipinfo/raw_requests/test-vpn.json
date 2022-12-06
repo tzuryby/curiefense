@@ -16,7 +16,7 @@
         "geo-org:korea-cable-tv-kwangju-broadcasting",
         "all",
         "bot",
-        "geo-continent-code:nil",
+        "geo-continent-code:as",
         "aclname:default-acl",
         "geo-region:gwangju",
         "geo-city:gwangju",
@@ -24,7 +24,7 @@
         "geo-subregion:61272",
         "securitypolicy-entry:default",
         "ipinfo-privacy-service:vpn-gate",
-        "geo-continent-name:nil",
+        "geo-continent-name:asia",
         "aclid:--default--"
       ],
       "action": "pass"

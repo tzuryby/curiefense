@@ -21,7 +21,7 @@ use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
 use crate::geo::{
     get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn, get_maxmind_city,
-    get_maxmind_country, ipinfo_resolve_country_name, USE_IPINFO,
+    get_maxmind_country, ipinfo_country_in_eu, ipinfo_resolve_continent, ipinfo_resolve_country_name, USE_IPINFO,
 };
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
@@ -445,7 +445,6 @@ pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
         }
     };
 
-    // first put country data in the geoip
     if let Ok((cnty, network)) = get_maxmind_country(ip) {
         extract_continent(geoip, cnty.continent);
         extract_country(geoip, cnty.country);
@@ -453,7 +452,6 @@ pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
         extract_mm_traits(geoip, cnty.traits);
     }
 
-    // potentially overwrite some with the city data
     if let Ok((cty, network)) = get_maxmind_city(ip) {
         extract_continent(geoip, cty.continent);
         extract_country(geoip, cty.country);
@@ -489,11 +487,15 @@ pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
 
     let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
 
-    // override using ipinfo
     if let Ok((loc, network)) = get_ipinfo_location(ip) {
         extract_network(geoip, network);
         geoip.city_name = Some(loc.city);
         geoip.country_name = ipinfo_resolve_country_name(loc.country.as_str());
+        geoip.in_eu = Some(ipinfo_country_in_eu(loc.country.as_str()));
+        if let Some(continent) = ipinfo_resolve_continent(loc.country.as_str()) {
+            geoip.continent_code = Some(continent.code.to_string());
+            geoip.continent_name = Some(continent.name.to_string());
+        }
         geoip.country_iso = Some(loc.country);
         geoip.region = Some(loc.region);
         geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind

@@ -11,6 +11,7 @@ use maxminddb::{
     geoip2::{Asn, City, Country},
     Reader,
 };
+use serde::Deserialize;
 
 #[cfg(not(test))]
 use std::ops::Deref;
@@ -20,6 +21,10 @@ use crate::ipinfo::{CarrierDetails, CompanyDetails, LocationDetails, PrivacyDeta
 
 /// From https://github.com/ipinfo/rust/blob/master/assets/countries.json
 const IPINFO_COUNTRY_NAME_RAW: &str = include_str!("../assets/ipinfo/countries.json");
+/// From https://github.com/ipinfo/rust/blob/master/assets/eu.json
+const IPINFO_COUNTRY_IN_EU_RAW: &str = include_str!("../assets/ipinfo/eu.json");
+/// https://github.com/ipinfo/rust/blob/master/assets/continent.json
+const IPINFO_CONTINENT_RAW: &str = include_str!("../assets/ipinfo/continent.json");
 
 #[allow(dead_code)]
 struct MaxmindGeo {
@@ -34,6 +39,12 @@ struct IpinfoGeo {
     company: Reader<Vec<u8>>,
     privacy: Reader<Vec<u8>>,
     carrier: Reader<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IpInfoContinent<'a> {
+    pub code: &'a str,
+    pub name: &'a str,
 }
 
 lazy_static! {
@@ -87,13 +98,22 @@ lazy_static! {
             _ => Err(anyhow!("Could not read ipinfo")) // TODO: add actual error in Err
         }
     };
-    pub static ref IPINFO_COUNTRY_NAME: HashMap<&'static str, &'static str> = serde_json::from_str(IPINFO_COUNTRY_NAME_RAW).unwrap();
+    static ref IPINFO_COUNTRY_NAME: HashMap<&'static str, &'static str> = serde_json::from_str(IPINFO_COUNTRY_NAME_RAW).unwrap();
+    static ref IPINFO_COUNTRY_IN_EU: Vec<&'static str> = serde_json::from_str(IPINFO_COUNTRY_IN_EU_RAW).unwrap();
+    static ref IPINFO_CONTINENT: HashMap<&'static str, IpInfoContinent<'static>> = serde_json::from_str(IPINFO_CONTINENT_RAW).unwrap();
 
 }
 
-#[cfg(not(test))]
 pub fn ipinfo_resolve_country_name(country_iso: &str) -> Option<String> {
     IPINFO_COUNTRY_NAME.get(country_iso).map(|c| c.to_string())
+}
+
+pub fn ipinfo_country_in_eu(country_iso: &str) -> bool {
+    IPINFO_COUNTRY_IN_EU.contains(&country_iso)
+}
+
+pub fn ipinfo_resolve_continent(country_iso: &str) -> Option<&IpInfoContinent<'static>> {
+    IPINFO_CONTINENT.get(country_iso)
 }
 
 #[cfg(not(test))]
@@ -237,9 +257,4 @@ pub fn get_ipinfo_company(_addr: IpAddr) -> Result<(CompanyDetails, Option<IpNet
 #[cfg(test)]
 pub fn get_ipinfo_carrier(_addr: IpAddr) -> Result<(CarrierDetails, Option<IpNet>), String> {
     Err("TEST".into())
-}
-
-#[cfg(test)]
-pub fn ipinfo_resolve_country_name(_country_iso: &str) -> Option<String> {
-    None
 }
