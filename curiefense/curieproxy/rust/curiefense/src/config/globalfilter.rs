@@ -339,14 +339,17 @@ impl GlobalFilterSection {
 
         fn convert_rule(logs: &mut Logs, rule: RawGlobalFilterRule) -> anyhow::Result<GlobalFilterRule> {
             match rule {
-                RawGlobalFilterRule::Rel(rl) => Ok(GlobalFilterRule::Rel(GlobalFilterRelation {
-                    relation: rl.relation,
-                    entries: rl
+                RawGlobalFilterRule::Rel(rl) => {
+                    let entries = rl
                         .entries
                         .into_iter()
                         .map(|e| convert_rule(logs, e))
-                        .collect::<Result<Vec<_>, _>>()?,
-                })),
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok(GlobalFilterRule::Rel(GlobalFilterRelation {
+                        relation: rl.relation,
+                        entries: optimize_ipranges(rl.relation, entries),
+                    }))
+                }
                 RawGlobalFilterRule::Entry(e) => convert_entry(logs, e.tp, e.vl).map(GlobalFilterRule::Entry),
             }
         }
