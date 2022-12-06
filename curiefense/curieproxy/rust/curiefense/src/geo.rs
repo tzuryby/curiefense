@@ -14,9 +14,12 @@ use maxminddb::{
 
 #[cfg(not(test))]
 use std::ops::Deref;
-use std::{net::IpAddr, path::PathBuf};
+use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 
 use crate::ipinfo::{CarrierDetails, CompanyDetails, LocationDetails, PrivacyDetails};
+
+/// From https://github.com/ipinfo/rust/blob/master/assets/countries.json
+const IPINFO_COUNTRY_NAME_RAW: &str = include_str!("../assets/ipinfo/countries.json");
 
 #[allow(dead_code)]
 struct MaxmindGeo {
@@ -84,7 +87,13 @@ lazy_static! {
             _ => Err(anyhow!("Could not read ipinfo")) // TODO: add actual error in Err
         }
     };
+    pub static ref IPINFO_COUNTRY_NAME: HashMap<&'static str, &'static str> = serde_json::from_str(IPINFO_COUNTRY_NAME_RAW).unwrap();
 
+}
+
+#[cfg(not(test))]
+pub fn ipinfo_resolve_country_name(country_iso: &str) -> Option<String> {
+    IPINFO_COUNTRY_NAME.get(country_iso).map(|c| c.to_string())
 }
 
 #[cfg(not(test))]
@@ -228,4 +237,9 @@ pub fn get_ipinfo_company(_addr: IpAddr) -> Result<(CompanyDetails, Option<IpNet
 #[cfg(test)]
 pub fn get_ipinfo_carrier(_addr: IpAddr) -> Result<(CarrierDetails, Option<IpNet>), String> {
     Err("TEST".into())
+}
+
+#[cfg(test)]
+pub fn ipinfo_resolve_country_name(_country_iso: &str) -> Option<String> {
+    None
 }

@@ -65,7 +65,7 @@ local function load_json_file(path)
 end
 
 local function should_skip_tag(tag)
-  local prefixes = {"container:", "geo-", "network:"}
+  local prefixes = {"container:"}
   for _, prefix in ipairs(prefixes) do
     if startswith(tag, prefix) then
       return true

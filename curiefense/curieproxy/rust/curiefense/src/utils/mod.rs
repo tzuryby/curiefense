@@ -21,7 +21,7 @@ use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
 use crate::geo::{
     get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn, get_maxmind_city,
-    get_maxmind_country, USE_IPINFO,
+    get_maxmind_country, ipinfo_resolve_country_name, USE_IPINFO,
 };
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
@@ -493,6 +493,7 @@ pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
     if let Ok((loc, network)) = get_ipinfo_location(ip) {
         extract_network(geoip, network);
         geoip.city_name = Some(loc.city);
+        geoip.country_name = ipinfo_resolve_country_name(loc.country.as_str());
         geoip.country_iso = Some(loc.country);
         geoip.region = Some(loc.region);
         geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
