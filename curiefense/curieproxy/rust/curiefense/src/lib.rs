@@ -142,7 +142,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         None
                     };
 
-                    let stats = StatsCollect::new(cfg.revision.clone())
+                    let stats = StatsCollect::new(slogs.start, cfg.revision.clone())
                         .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
                     // if the max depth is equal to 0, the body will not be parsed
                     let reqinfo = map_request(
@@ -179,7 +179,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     decision: Decision::action(action, vec![br]),
                     tags,
                     rinfo,
-                    stats: Stats::default(),
+                    stats: Stats::new(logs.start, "unknown".into()),
                 });
             }
             Some(RequestMappingResult::NoSecurityPolicy) => {
@@ -191,7 +191,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo,
-                    stats: Stats::default(),
+                    stats: Stats::new(logs.start, "unknown".into()),
                 });
             }
             None => {
@@ -203,7 +203,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     decision: Decision::pass(Vec::new()),
                     tags,
                     rinfo,
-                    stats: Stats::default(),
+                    stats: Stats::new(logs.start, "unknown".into()),
                 });
             }
         };

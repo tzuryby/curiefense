@@ -20,7 +20,7 @@ use crate::{
     },
     grasshopper::Grasshopper,
     interface::{
-        stats::{BStageSecpol, SecpolStats, Stats, StatsCollect},
+        stats::{BStageSecpol, SecpolStats, StatsCollect},
         Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags,
     },
     logs::{LogLevel, Logs},
@@ -90,7 +90,7 @@ pub fn inspect_init(
     match mr {
         None => Err("could not find a matching security policy".to_string()),
         Some(secpol) => {
-            let stats = StatsCollect::new(config.revision.clone())
+            let stats = StatsCollect::new(logs.start, config.revision.clone())
                 .secpol(SecpolStats::build(&secpol, config.globalfilters.len()));
             Ok(IData {
                 start: start.unwrap_or_else(Utc::now),
@@ -134,7 +134,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
             decision: Decision::action(action, vec![br]),
             tags: Tags::new(&VirtualTags::default()),
             rinfo: reqinfo,
-            stats: Stats::default(),
+            stats: idata.stats.early_exit(),
         },
     )
 }
