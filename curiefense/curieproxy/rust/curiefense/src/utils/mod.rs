@@ -205,28 +205,49 @@ pub struct QueryInfo {
 
 #[derive(Debug, Clone)]
 pub struct GeoIp {
+    // IP informations
     pub ipstr: String,
     pub ip: Option<IpAddr>,
+    pub network: Option<String>,
+
+    // Localisation informations
     pub location: Option<(f64, f64)>, // (lat, lon)
-    pub in_eu: Option<bool>,
-    pub city_name: Option<String>,
-    pub country_iso: Option<String>,
-    pub country_name: Option<String>,
     pub continent_name: Option<String>,
     pub continent_code: Option<String>,
-    pub asn: Option<u32>,
-    pub company: Option<String>,
+    pub country_iso: Option<String>,
+    pub country_name: Option<String>,
+    pub in_eu: Option<bool>,
     pub region: Option<String>,
     pub subregion: Option<String>,
-    pub network: Option<String>,
-    pub is_anonymous_proxy: Option<bool>,
-    pub is_satellite_provider: Option<bool>,
+    pub city_name: Option<String>,
+
+    // Company informations
+    pub company: Option<String>,
+    pub company_country: Option<String>,
+    pub company_domain: Option<String>,
+    pub company_type: Option<String>,
+
+    /// Autonomous System informations
+    pub asn: Option<u32>,
+    pub as_name: Option<String>,
+    pub as_domain: Option<String>,
+    pub as_type: Option<String>,
+
+    // Mobile informations
+    pub is_mobile: Option<bool>,
+    pub mobile_carrier_name: Option<String>,
+    pub mobile_country: Option<String>,
+    pub mobile_mcc: Option<u32>,
+    pub mobile_mnc: Option<u32>,
+
+    // Privacy informations
+    pub is_proxy: Option<bool>,
+    pub is_satellite: Option<bool>,
     pub is_vpn: Option<bool>,
     pub is_tor: Option<bool>,
     pub is_relay: Option<bool>,
     pub is_hosting: Option<bool>,
     pub privacy_service: Option<String>,
-    pub is_mobile: Option<bool>,
 }
 
 impl GeoIp {
@@ -274,8 +295,8 @@ impl GeoIp {
         out.insert("company", json!(self.company));
         out.insert("region", json!(self.region));
         out.insert("subregion", json!(self.subregion));
-        out.insert("is_anon", json!(self.is_anonymous_proxy));
-        out.insert("is_sat", json!(self.is_satellite_provider));
+        out.insert("is_anon", json!(self.is_proxy));
+        out.insert("is_sat", json!(self.is_satellite));
 
         out
     }
@@ -440,8 +461,8 @@ pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
     let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
     let extract_mm_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
         if let Some(traits) = mcnt {
-            g.is_anonymous_proxy = traits.is_anonymous_proxy;
-            g.is_satellite_provider = traits.is_satellite_provider;
+            g.is_proxy = traits.is_anonymous_proxy;
+            g.is_satellite = traits.is_satellite_provider;
         }
     };
 
@@ -476,6 +497,7 @@ pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
     }
 }
 
+// Network field priority: ASN > Carrier > Company > Location
 pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
     let extract_string = |s: String| {
         if !s.is_empty() {
@@ -506,23 +528,44 @@ pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
 
     if let Ok((privacy, _)) = get_ipinfo_privacy(ip) {
         geoip.is_vpn = privacy.vpn.parse().ok();
-        geoip.is_anonymous_proxy = privacy.proxy.parse().ok();
+        geoip.is_proxy = privacy.proxy.parse().ok();
         geoip.is_tor = privacy.tor.parse().ok();
         geoip.is_relay = privacy.relay.parse().ok();
         geoip.is_hosting = privacy.hosting.parse().ok();
         geoip.privacy_service = extract_string(privacy.service)
+    } else {
+        geoip.is_vpn = Some(false);
+        geoip.is_proxy = Some(false);
+        geoip.is_tor = Some(false);
+        geoip.is_relay = Some(false);
+        geoip.is_hosting = Some(false);
     }
 
     if let Ok((company, network)) = get_ipinfo_company(ip) {
         extract_network(geoip, network);
         geoip.company = extract_string(company.name);
+        geoip.company_country = extract_string(company.country);
+        geoip.company_domain = extract_string(company.domain);
+        geoip.company_type = extract_string(company.company_type);
+
         geoip.asn = company.asn.strip_prefix("AS").and_then(|asn| asn.parse().ok());
+        geoip.as_name = extract_string(company.as_name);
+        geoip.as_domain = extract_string(company.as_domain);
+        geoip.as_type = extract_string(company.as_type);
     }
 
     if let Ok((carrier, _)) = get_ipinfo_carrier(ip) {
         geoip.is_mobile = Some(true);
+        geoip.mobile_carrier_name = extract_string(carrier.carrier);
+        geoip.mobile_country = extract_string(carrier.country_code);
+        geoip.mobile_mcc = carrier.mcc.parse().ok();
+        geoip.mobile_mnc = carrier.mnc.parse().ok();
+        // do not re parse network using `extract_network` as it is already
+        // well formatted.
         geoip.network = Some(carrier.network)
     }
+
+    // TODO: asn DB, route=>network, asn, as_name, as_domain, as_type
 }
 
 pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
@@ -537,19 +580,29 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         country_name: None,
         continent_name: None,
         continent_code: None,
-        asn: None,
-        company: None,
         region: None,
         subregion: None,
         network: None,
-        is_anonymous_proxy: None,
-        is_satellite_provider: None,
+        company: None,
+        company_country: None,
+        company_domain: None,
+        company_type: None,
+        asn: None,
+        as_domain: None,
+        as_name: None,
+        as_type: None,
+        is_proxy: None,
+        is_satellite: None,
         is_hosting: None,
         is_relay: None,
         is_tor: None,
         is_vpn: None,
         privacy_service: None,
         is_mobile: None,
+        mobile_carrier_name: None,
+        mobile_country: None,
+        mobile_mcc: None,
+        mobile_mnc: None,
     };
 
     let ip = match pip {
@@ -563,9 +616,9 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     geoip.ip = Some(ip);
 
     if *USE_IPINFO {
-        find_geoip_ipinfo(logs, &mut geoip, ip)
+        find_geoip_ipinfo(logs, &mut geoip, ip);
     } else {
-        find_geoip_maxmind(logs, &mut geoip, ip)
+        find_geoip_maxmind(logs, &mut geoip, ip);
     }
 
     geoip

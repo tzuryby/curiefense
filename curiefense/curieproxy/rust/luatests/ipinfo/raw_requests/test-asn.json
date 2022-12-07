@@ -16,7 +16,7 @@
         "aclid:--default--",
         "cookies:0",
         "geo-continent-name:north-america",
-        "ipinfo-hosting",
+        "geo-hosting",
         "host:localhost:30081",
         "geo-asn:15169",
         "network:8-8-4-0-24",

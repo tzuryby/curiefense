@@ -66,6 +66,9 @@ pub struct CompanyDetails {
     /// The name of the entity that owns the IP address.
     pub name: String,
 
+    /// The country (iso code) of the company that owns this IP address.
+    pub country: String,
+
     /// The domain for the entity that owns this IP address.
     pub domain: String,
 

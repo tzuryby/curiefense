@@ -241,29 +241,29 @@ pub fn tag_request(
         rinfo.rinfo.geoip.network.as_deref().unwrap_or("nil"),
         Location::Ip,
     );
-    if rinfo.rinfo.geoip.is_anonymous_proxy.unwrap_or(false) {
-        tags.insert("mm-anon", Location::Ip)
+    if rinfo.rinfo.geoip.is_proxy.unwrap_or(false) {
+        tags.insert("geo-anon", Location::Ip)
     }
-    if rinfo.rinfo.geoip.is_satellite_provider.unwrap_or(false) {
-        tags.insert("mm-sat", Location::Ip)
+    if rinfo.rinfo.geoip.is_satellite.unwrap_or(false) {
+        tags.insert("geo-sat", Location::Ip)
     }
     if rinfo.rinfo.geoip.is_vpn.unwrap_or(false) {
-        tags.insert("ipinfo-vpn", Location::Ip)
+        tags.insert("geo-vpn", Location::Ip)
     }
     if rinfo.rinfo.geoip.is_tor.unwrap_or(false) {
-        tags.insert("ipinfo-tor", Location::Ip)
+        tags.insert("geo-tor", Location::Ip)
     }
     if rinfo.rinfo.geoip.is_relay.unwrap_or(false) {
-        tags.insert("ipinfo-relay", Location::Ip)
+        tags.insert("geo-relay", Location::Ip)
     }
     if rinfo.rinfo.geoip.is_hosting.unwrap_or(false) {
-        tags.insert("ipinfo-hosting", Location::Ip)
+        tags.insert("geo-hosting", Location::Ip)
     }
     if let Some(privacy_service) = rinfo.rinfo.geoip.privacy_service.as_deref() {
-        tags.insert_qualified("ipinfo-privacy-service", privacy_service, Location::Ip)
+        tags.insert_qualified("geo-privacy-service", privacy_service, Location::Ip)
     }
     if rinfo.rinfo.geoip.is_mobile.unwrap_or(false) {
-        tags.insert("ipinfo-mobile", Location::Ip);
+        tags.insert("geo-mobile", Location::Ip);
     }
 
     for tag in rinfo.rinfo.secpolicy.tags.iter() {

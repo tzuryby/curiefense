@@ -10,7 +10,7 @@
         "network:77-204-144-0-24",
         "geo-continent-code:eu",
         "host:localhost:30081",
-        "ipinfo-mobile",
+        "geo-mobile",
         "ip:77-204-144-53",
         "geo-country:france",
         "args:0",

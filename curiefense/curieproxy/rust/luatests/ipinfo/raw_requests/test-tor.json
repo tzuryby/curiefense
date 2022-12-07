@@ -12,7 +12,7 @@
         "network:109-70-100-0-24",
         "geo-continent-code:eu",
         "host:localhost:30081",
-        "ipinfo-tor",
+        "geo-tor",
         "ip:109-70-100-8",
         "bot",
         "geo-subregion:1010",
