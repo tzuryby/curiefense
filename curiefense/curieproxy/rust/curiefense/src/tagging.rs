@@ -463,12 +463,6 @@ mod tests {
             }
             GlobalFilterRule::Entry(e) => GlobalFilterRule::Entry(e.clone()),
         }
-        /*
-        GlobalFilterSection {
-            relation: ss.relation,
-            entries: optimize_ipranges(ss.relation, ss.entries.clone()),
-        }
-        */
     }
 
     fn check_iprange(rel: Relation, input: &[&str], samples: &[(&str, bool)]) {
