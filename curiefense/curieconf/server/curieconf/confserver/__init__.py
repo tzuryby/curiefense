@@ -7,13 +7,13 @@ import uvicorn
 import logging
 from curieconf.confserver.v3 import api
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse
-from fastapi.encoders import jsonable_encoder
+from fastapi.responses import PlainTextResponse
 from prometheus_fastapi_instrumentator import Instrumentator
+from werkzeug.exceptions import HTTPException as WerkzeugHTTPException
 
-app = FastAPI(docs_url="/api/v3/")
+app = FastAPI(docs_url=os.environ.get("SWAGGER_BASE_PATH", "/api/v3/"))
 app.include_router(api.router)
 
 
@@ -24,7 +24,6 @@ async def startup():
 
 ## Import all versions
 from .v3 import api as api_v3
-
 
 logging.basicConfig(
     handlers=[logging.FileHandler("fastapi.log"), logging.StreamHandler()],
@@ -37,13 +36,18 @@ logger = logging.getLogger("filters-maxmind")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # exc_str = f'{exc}'.replace('\n', ' ').replace('   ', ' ')
-    # # or logger.error(f'{exc}')
-    # logger.error(exc_str)
-    # content = {'status_code': 10422, 'message': exc_str, 'data': None}
-    #
-    # return JSONResponse
-    return PlainTextResponse(str(exc), status_code=400)
+    return PlainTextResponse(str(exc), status_code=409)
+
+
+# this is ctaching flasks' "abort" from the gitbackend
+@app.exception_handler(WerkzeugHTTPException)
+async def werkzeug_exception_handler(request: Request, exc: WerkzeugHTTPException):
+    return PlainTextResponse(str(exc), status_code=exc.code)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_exception_handler(request: Request, exc: HTTPException):
+    return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 
 def drop_into_pdb(app, exception):
