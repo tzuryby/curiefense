@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, List, Union
 
 from fastapi import Request, HTTPException, APIRouter
-from pydantic import BaseModel, Field, validator, StrictStr, StrictBool, StrictInt
+from pydantic import BaseModel, Field, validator, StrictStr, StrictBool, StrictInt, Extra
 import jsonschema
 
 # monkey patch to force RestPlus to use Draft3 validator to benefit from "any" json type
@@ -192,7 +192,7 @@ class VirtualTag(BaseModel):
 
 
 # custom
-class Custom(BaseModel):
+class Custom(BaseModel, extra=Extra.allow):
     id: StrictStr
     name: StrictStr
 
@@ -214,7 +214,7 @@ models = {
 
 
 ### Other models
-class DocumentMask(BaseModel):
+class DocumentMask(BaseModel, extra=Extra.allow):
     id: StrictStr
     name: StrictStr
     description: Optional[StrictStr]
@@ -244,15 +244,12 @@ class DocumentMask(BaseModel):
     type_: Optional[StrictStr] = Field(alias="type")
     star_: Optional[List[typing.Any]] = Field(alias="*")
 
-    class Config:
-        fields = {"_type": "type"}
 
-
-class VersionLog(BaseModel):
+class VersionLog(BaseModel, extra=Extra.allow):
     version: Optional[StrictStr]
     # TODO - dt_format="iso8601"
     date: Optional[datetime.datetime]
-    star_: Optional[List[typing.Any]] = Field(alias="*")
+    # star_: Optional[List[typing.Any]] = Field(alias="*")
 
 
 class Meta(BaseModel):
@@ -393,7 +390,7 @@ securitypolicies_file_path = (base_path / "./json/security-policies.schema").res
 with open(securitypolicies_file_path) as json_file:
     securitypolicies_schema = json.load(json_file)
 content_filter_profile_file_path = (
-    base_path / "./json/content-filter-profile.schema"
+        base_path / "./json/content-filter-profile.schema"
 ).resolve()
 with open(content_filter_profile_file_path) as json_file:
     content_filter_profile_schema = json.load(json_file)
@@ -404,7 +401,7 @@ flowcontrol_file_path = (base_path / "./json/flow-control.schema").resolve()
 with open(flowcontrol_file_path) as json_file:
     flowcontrol_schema = json.load(json_file)
 content_filter_rule_file_path = (
-    base_path / "./json/content-filter-rule.schema"
+        base_path / "./json/content-filter-rule.schema"
 ).resolve()
 with open(content_filter_rule_file_path) as json_file:
     content_filter_rule_schema = json.load(json_file)
@@ -461,10 +458,11 @@ async def configs_post(config: Config, request: Request):
     return request.app.backend.configs_create(data=data, actor=get_gitactor(request))
 
 
-@router.get("/configs/{config}/", tags=[Tags.congifs], response_model=Config)
+@router.get("/configs/{config}/", tags=[Tags.congifs])
 async def config_get(config: str, request: Request):
     """Retrieve a complete configuration"""
-    return request.app.backend.configs_get(config)
+    res = request.app.backend.configs_get(config)
+    return {key: res[key] for key in Config.__fields__.keys() if key in res}
 
 
 @router.post("/configs/{config}/", tags=[Tags.congifs])
@@ -496,7 +494,7 @@ async def config_clone_post(config: str, meta: Meta, request: Request):
 
 @router.post("/configs/{config}/clone/{new_name}/", tags=[Tags.congifs])
 async def config_clone_name_post(
-    config: str, new_name: str, meta: Meta, request: Request
+        config: str, new_name: str, meta: Meta, request: Request
 ):
     """Clone a configuration. New name is provided URL"""
     data = await request.json()
@@ -518,12 +516,11 @@ def filter_x_fields(res, x_fields):
 @router.get(
     "/configs/{config}/v/",
     tags=[Tags.congifs],
-    response_model=List[VersionLog],
-    response_model_exclude_unset=True,
 )
 async def config_list_version_get(config: str, request: Request):
     """Get all versions of a given configuration"""
     res = request.app.backend.configs_list_versions(config)
+
     if request.headers.get("X-fields", False):
         res = filter_x_fields(res, request.headers["X-fields"])
     return res
@@ -565,7 +562,7 @@ async def blob_resource_get(config: str, blob: str, request: Request):
 
 @router.post("/configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_post(
-    config: str, blob: str, blob_entry: BlobEntry, request: Request
+        config: str, blob: str, blob_entry: BlobEntry, request: Request
 ):
     """Create a new blob"""
     b_entry = await request.json()
@@ -576,7 +573,7 @@ async def blob_resource_post(
 
 @router.put("/configs/{config}/b/{blob}/", tags=[Tags.congifs])
 async def blob_resource_put(
-    config: str, blob: str, blob_entry: BlobEntry, request: Request
+        config: str, blob: str, blob_entry: BlobEntry, request: Request
 ):
     """upaate an existing blob"""
     b_entry = await request.json()
@@ -594,9 +591,7 @@ async def blob_resource_delete(config: str, blob: str, request: Request):
 
 @router.get(
     "/configs/{config}/b/{blob}/v/",
-    tags=[Tags.congifs],
-    response_model=List[VersionLog],
-    response_model_exclude_unset=True,
+    tags=[Tags.congifs]
 )
 async def blob_list_version_resource_get(config: str, blob: str, request: Request):
     """Retrieve the list of versions of a given blob"""
@@ -612,7 +607,7 @@ async def blob_list_version_resource_get(config: str, blob: str, request: Reques
     response_model=BlobEntry,
 )
 async def blob_version_resource_get(
-    config: str, blob: str, version: str, request: Request
+        config: str, blob: str, version: str, request: Request
 ):
     """Retrieve the given version of a blob"""
 
@@ -624,7 +619,7 @@ async def blob_version_resource_get(
 
 @router.put("/configs/{config}/b/{blob}/v/{version}/revert/", tags=[Tags.congifs])
 async def blob_revert_resource_put(
-    config: str, blob: str, version: str, request: Request
+        config: str, blob: str, version: str, request: Request
 ):
     """Create a new version for a blob from an old version"""
     return request.app.backend.blobs_revert(
@@ -655,10 +650,12 @@ async def document_resource_get(config: str, document: str, request: Request):
                 x_fields = x_fields[1:-1]
             x_fields = x_fields.replace(" ", "")
             fields = x_fields.split(",")
+            return [{field: r[field] for field in fields if field in r} for r in res]
         else:
-            fields = switch_alias(DocumentMask.__fields__.keys())
+            return res
 
-        return [{field: r[field] for field in fields if field in r} for r in res]
+
+
 
     """Get a complete document"""
 
@@ -666,6 +663,7 @@ async def document_resource_get(config: str, document: str, request: Request):
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
     res = request.app.backend.documents_get(config, document)
+
     return filter_document_mask(res, headers.get("x-fields", None))
 
 
@@ -675,7 +673,7 @@ async def _filter(data, keys):
 
 @router.post("/configs/{config}/d/{document}/", tags=[Tags.congifs])
 async def document_resource_post(
-    config: str, document: str, basic_entries: List[BasicEntry], request: Request
+        config: str, document: str, basic_entries: List[BasicEntry], request: Request
 ):
     """Create a new complete document"""
     if document not in models.keys():
@@ -685,10 +683,12 @@ async def document_resource_post(
         )
 
     as_dict = await request.json()
-    data = [
-        await _filter(dict(entry), list(models[document].__fields__.keys()))
-        for entry in as_dict
-    ]
+    if document == "custom":
+        data = as_dict
+    else:
+        data = [
+            await _filter(dict(entry), list(models[document].__fields__.keys()))
+            for entry in as_dict]
     for entry in data:
         isValid, err = validateJson(entry, document)
         if isValid is False:
@@ -701,16 +701,19 @@ async def document_resource_post(
 
 @router.put("/configs/{config}/d/{document}/", tags=[Tags.congifs])
 async def document_resource_put(
-    config: str, document: str, basic_entries: List[BasicEntry], request: Request
+        config: str, document: str, basic_entries: List[BasicEntry], request: Request
 ):
     """Update an existing document"""
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
     as_dict = await request.json()
-    data = [
-        await _filter(entry, switch_alias(list(models[document].__fields__.keys())))
-        for entry in as_dict
-    ]
+    if document == "custom":
+        data = as_dict
+    else:
+        data = [
+            await _filter(entry, switch_alias(list(models[document].__fields__.keys())))
+            for entry in as_dict
+        ]
     for entry in data:
         isValid, err = validateJson(entry, document)
         if isValid is False:
@@ -735,10 +738,9 @@ async def document_resource_delete(config: str, document: str, request: Request)
 @router.get(
     "/configs/{config}/d/{document}/v/",
     tags=[Tags.congifs],
-    response_model=List[VersionLog],
 )
 async def document_list_version_resource_get(
-    config: str, document: str, request: Request
+        config: str, document: str, request: Request
 ):
     """Retrieve the existing versions of a given document"""
     if document not in models:
@@ -750,25 +752,28 @@ async def document_list_version_resource_get(
 
 @router.get("/configs/{config}/d/{document}/v/{version}/", tags=[Tags.congifs])
 async def document_version_resource_get(
-    config: str, document: str, version: str, request: Request
+        config: str, document: str, version: str, request: Request
 ):
     """Get a given version of a document"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.documents_get(config, document, version)
-    return [
-        {
-            key: r[key]
-            for key in switch_alias(list(models[document].__fields__.keys()))
-            if key in r
-        }
-        for r in res
-    ]
+    if document == "custom":
+        return res
+    else:
+        return [
+            {
+                key: r[key]
+                for key in switch_alias(list(models[document].__fields__.keys()))
+                if key in r
+            }
+            for r in res
+        ]
 
 
 @router.put("/configs/{config}/d/{document}/v/{version}/revert/", tags=[Tags.congifs])
 async def document_revert_resource_put(
-    config: str, document: str, version: str, request: Request
+        config: str, document: str, version: str, request: Request
 ):
     """Create a new version for a document from an old version"""
     return request.app.backend.documents_revert(
@@ -792,7 +797,7 @@ async def entries_resource_get(config: str, document: str, request: Request):
 
 @router.post("/configs/{config}/d/{document}/e/", tags=[Tags.congifs])
 async def entries_resource_post(
-    config: str, document: str, basic_entry: BasicEntry, request: Request
+        config: str, document: str, basic_entry: BasicEntry, request: Request
 ):
     "Create an entry in a document"
 
@@ -801,11 +806,16 @@ async def entries_resource_post(
         raise HTTPException(404, "document does not exist")
     isValid, err = validateJson(data_json, document)
     if isValid:
-        keys = switch_alias(list(models[document].__fields__.keys()))
-        data = {key: data_json[key] for key in keys if key in data_json}
-        res = request.app.backend.entries_create(
-            config, document, data, get_gitactor(request)
-        )
+        if document == "custom":
+            res = request.app.backend.entries_create(
+                config, document, data_json, get_gitactor(request)
+            )
+        else:
+            keys = switch_alias(list(models[document].__fields__.keys()))
+            data = {key: data_json[key] for key in keys if key in data_json}
+            res = request.app.backend.entries_create(
+                config, document, data, get_gitactor(request)
+            )
         return res
     else:
         raise HTTPException(500, "schema mismatched: \n" + err)
@@ -821,13 +831,15 @@ async def entry_resource_get(config: str, document: str, entry: str, request: Re
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.entries_get(config, document, entry)
+    if document == "custom":
+        return res
     keys = switch_alias(list(models[document].__fields__.keys()))
     return {key: res[key] for key in keys if key in res}
 
 
 @router.put("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
 async def entry_resource_put(
-    config: str, document: str, entry: str, basic_entry: BasicEntry, request: Request
+        config: str, document: str, entry: str, basic_entry: BasicEntry, request: Request
 ):
     """Update an entry in a document"""
     data_json = await request.json()
@@ -835,11 +847,14 @@ async def entry_resource_put(
         raise HTTPException(404, "document does not exist")
     isValid, err = validateJson(data_json, document)
     if isValid:
-        data = {
-            key: data_json[key]
-            for key in switch_alias(list(models[document].__fields__.keys()))
-            if key in data_json
-        }
+        if document == "custom":
+            data = data_json
+        else:
+            data = {
+                key: data_json[key]
+                for key in switch_alias(list(models[document].__fields__.keys()))
+                if key in data_json
+            }
 
         res = request.app.backend.entries_update(
             config, document, entry, data, get_gitactor(request)
@@ -850,8 +865,8 @@ async def entry_resource_put(
 
 
 @router.delete("/configs/{config}/d/{document}/e/{entry}/", tags=[Tags.congifs])
-async def entry_resource_deleye(
-    config: str, document: str, entry: str, request: Request
+async def entry_resource_delete(
+        config: str, document: str, entry: str, request: Request
 ):
     """Delete an entry from a document"""
     if document not in models:
@@ -864,15 +879,13 @@ async def entry_resource_deleye(
 
 @router.get(
     "/configs/{config}/d/{document}/e/{entry}/v/",
-    tags=[Tags.congifs],
-    response_model=List[VersionLog],
-    response_model_exclude_unset=True,
+    tags=[Tags.congifs]
 )
 async def entry_list_version_resource_get(
-    config: str,
-    document: str,
-    entry: str,
-    request: Request,
+        config: str,
+        document: str,
+        entry: str,
+        request: Request,
 ):
     """Get the list of existing versions of a given entry in a document"""
     if document not in models:
@@ -885,12 +898,14 @@ async def entry_list_version_resource_get(
     "/configs/{config}/d/{document}/e/{entry}/v/{version}/", tags=[Tags.congifs]
 )
 async def entry_version_resource_get(
-    config: str, document: str, entry: str, version: str, request: Request
+        config: str, document: str, entry: str, version: str, request: Request
 ):
     """Get a given version of a document entry"""
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.entries_get(config, document, entry, version)
+    if document == "custom":
+        return res
     keys = switch_alias(list(models[document].__fields__.keys()))
     return {key: res[key] for key in keys if key in res}
 
@@ -1036,7 +1051,7 @@ async def fetch_resource_get(url: str):
 @router.put("/tools/publish/{config}/", tags=[Tags.tools])
 @router.put("/tools/publish/{config}/v/{version}/", tags=[Tags.tools])
 async def publish_resource_put(
-    config: str, request: Request, buckets: List[Bucket], version: str = None
+        config: str, request: Request, buckets: List[Bucket], version: str = None
 ):
     """Push configuration to s3 buckets"""
     conf = request.app.backend.configs_get(config, version)
