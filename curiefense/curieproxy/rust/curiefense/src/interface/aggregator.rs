@@ -5,6 +5,7 @@ use pdatastructs::hyperloglog::HyperLogLog;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
+use std::hash::Hash;
 
 use crate::utils::RequestInfo;
 
@@ -81,6 +82,54 @@ impl<T: Serialize> Arp<T> {
     }
 }
 
+/// Helper structure to display both the Autonomous System number and name in
+/// aggregated data.
+///
+/// It is just a wrapper around a u32, with an additional string description.
+#[derive(Debug, Default, Clone)]
+struct AutonomousSystem {
+    number: u32,
+    company_name: Option<String>,
+}
+
+impl PartialEq for AutonomousSystem {
+    fn eq(&self, other: &Self) -> bool {
+        self.number == other.number
+    }
+}
+impl Eq for AutonomousSystem {}
+
+impl PartialOrd for AutonomousSystem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.number.partial_cmp(&other.number)
+    }
+}
+
+impl Ord for AutonomousSystem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.number.cmp(&other.number)
+    }
+}
+
+impl Hash for AutonomousSystem {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.number.hash(state);
+    }
+}
+
+impl Serialize for AutonomousSystem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(company_name) = &self.company_name {
+            serializer.serialize_str(&format!("{} ({})", self.number, company_name))
+        } else {
+            serializer.serialize_str(self.number.to_string().as_str())
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct AggregatedCounters {
     status: Bag<u32>,
@@ -124,7 +173,7 @@ struct AggregatedCounters {
     uri: Metric<String>,
     user_agent: Metric<String>,
     country: Metric<String>,
-    asn: Metric<u32>,
+    asn: Metric<AutonomousSystem>,
     headers_amount: Bag<usize>,
     cookies_amount: Bag<usize>,
     args_amount: Bag<usize>,
@@ -667,7 +716,13 @@ impl AggregatedCounters {
             }
         }
         if let Some(asn) = &rinfo.rinfo.geoip.asn {
-            self.asn.inc(asn, cursor);
+            self.asn.inc(
+                &AutonomousSystem {
+                    number: *asn,
+                    company_name: rinfo.rinfo.geoip.company.clone(),
+                },
+                cursor,
+            );
         }
 
         self.args_amount.inc(rinfo.rinfo.qinfo.args.len());
