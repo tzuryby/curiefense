@@ -2,7 +2,7 @@ use crate::config::hostmap::SecurityPolicy;
 /// this file contains all the data type that are used when interfacing with a proxy
 use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
-use crate::grasshopper::{challenge_phase01, Grasshopper};
+use crate::grasshopper::{challenge_phase01, GHMode, Grasshopper, PrecisionLevel};
 use crate::logs::Logs;
 use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
@@ -203,10 +203,7 @@ pub async fn jsonlog(
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
             match jsonlog_rinfo(dec, rinfo, status_code, tags, stats, logs, proxy, &now) {
-                Err(rr) => {
-                    println!("JSON creation error: {}", rr);
-                    (b"null".to_vec(), now)
-                }
+                Err(rr) => (b"null".to_vec(), now),
                 Ok(y) => (y, now),
             }
         }
@@ -480,7 +477,7 @@ pub enum SimpleActionT {
     Skip,
     Monitor,
     Custom { content: String },
-    Challenge,
+    Challenge { ch_level: GHMode },
 }
 
 impl SimpleActionT {
@@ -488,7 +485,7 @@ impl SimpleActionT {
         use SimpleActionT::*;
         match self {
             Custom { content: _ } => 8,
-            Challenge => 6,
+            Challenge { ch_level: _ } => 6,
             Monitor => 1,
             Skip => 9,
         }
@@ -498,7 +495,7 @@ impl SimpleActionT {
         use SimpleActionT::*;
         match self {
             Custom { content: _ } => 8,
-            Challenge => 6,
+            Challenge { .. } => 6,
             Monitor => 1,
             // skip action should be ignored when using with rate limit
             Skip => 0,
@@ -514,7 +511,7 @@ impl SimpleActionT {
             SimpleActionT::Skip => RawActionType::Skip,
             SimpleActionT::Monitor => RawActionType::Monitor,
             SimpleActionT::Custom { .. } => RawActionType::Custom,
-            SimpleActionT::Challenge => RawActionType::Challenge,
+            SimpleActionT::Challenge { .. } => RawActionType::Challenge,
         }
     }
 }
@@ -610,7 +607,12 @@ impl SimpleAction {
             RawActionType::Custom => SimpleActionT::Custom {
                 content: rawaction.params.content.clone().unwrap_or_default(),
             },
-            RawActionType::Challenge => SimpleActionT::Challenge,
+            RawActionType::Challenge => SimpleActionT::Challenge {
+                ch_level: GHMode::Active,
+            },
+            RawActionType::Ichallenge => SimpleActionT::Challenge {
+                ch_level: GHMode::Interactive,
+            },
         };
         let status = rawaction.params.status.unwrap_or(503);
         let headers = rawaction.params.headers.as_ref().map(|hm| {
@@ -652,7 +654,7 @@ impl SimpleAction {
                 action.atype = ActionType::Block;
                 action.content = content.clone();
             }
-            SimpleActionT::Challenge => {
+            SimpleActionT::Challenge { ch_level } => {
                 if !is_human {
                     return None;
                 }
@@ -664,7 +666,8 @@ impl SimpleAction {
 
     pub fn to_decision<GH: Grasshopper>(
         &self,
-        is_human: bool,
+        logs: &mut Logs,
+        precision_level: PrecisionLevel,
         mgh: Option<&GH>,
         rinfo: &RequestInfo,
         tags: &mut Tags,
@@ -679,9 +682,19 @@ impl SimpleAction {
                 reasons: reason,
             };
         }
-        let action = match self.to_action(rinfo, tags, is_human) {
-            None => match (mgh, rinfo.headers.get("user-agent")) {
-                (Some(gh), Some(ua)) => return challenge_phase01(gh, ua, reason),
+        //phase01 for challenge/ichallenge (active/interactive challenge)
+        let mut ch_mode: GHMode = GHMode::Active;
+        match &self.atype {
+            SimpleActionT::Challenge { ch_level } => {
+                ch_mode = *ch_level;
+            }
+            _ => (),
+        }
+        //for active/interactive challenge
+        let action = match self.to_action(rinfo, tags, precision_level.is_human()) {
+            None => match mgh {
+                //if None-must be one of the challenge actions
+                Some(gh) => return challenge_phase01(gh, logs, rinfo, reason, ch_mode),
                 _ => Action::default(),
             },
             Some(a) => a,

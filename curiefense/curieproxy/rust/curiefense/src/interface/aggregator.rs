@@ -524,7 +524,7 @@ impl AggregatedCounters {
                     false
                 }
                 RawActionType::Monitor => false,
-                RawActionType::Custom | RawActionType::Challenge => {
+                RawActionType::Custom | RawActionType::Challenge | RawActionType::Ichallenge => {
                     blocked = true;
                     true
                 }

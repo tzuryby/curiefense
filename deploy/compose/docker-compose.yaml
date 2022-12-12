@@ -45,6 +45,7 @@ services:
       - curieproxy_config:/cf-config
       - ./filebeat/ilm.json:/usr/share/filebeat/ilm.json
       - ./filebeat/template.json:/usr/share/filebeat/template.json
+
     environment:
       - XFF_TRUSTED_HOPS=${XFF_TRUSTED_HOPS:-1}
       - TARGET_ADDRESS_A=${TARGET_ADDRESS_A:-echo}

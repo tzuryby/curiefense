@@ -4,8 +4,13 @@ use curiefense::config::contentfilter::{ContentFilterProfile, ContentFilterRules
 use curiefense::config::hostmap::{PolicyId, SecurityPolicy};
 use curiefense::config::raw::AclProfile;
 use curiefense::config::virtualtags::VirtualTags;
+<<<<<<< HEAD
 use curiefense::grasshopper::DummyGrasshopper;
 use curiefense::interface::{SecpolStats, StatsCollect};
+=======
+use curiefense::grasshopper::{DummyGrasshopper, PrecisionLevel};
+use curiefense::interface::{SecpolStats, SimpleDecision, StatsCollect};
+>>>>>>> 3519ab92 (Brand new grasshopper module)
 use curiefense::logs::{LogLevel, Logs};
 use curiefense::tagging::tag_request;
 use curiefense::utils::{map_request, RawRequest, RequestMeta};
@@ -49,11 +54,19 @@ fn logging_empty(c: &mut Criterion) {
     let stats =
         StatsCollect::new(std::time::Instant::now(), "QSDQSDQSD".into()).secpol(SecpolStats::build(&secpolicy, 0));
     let reqinfo = map_request(&mut logs, secpolicy, None, &raw, None, HashMap::new());
+<<<<<<< HEAD
     let (itags, globalfilter_dec, stats) = tag_request(stats, false, &[], &reqinfo, &VirtualTags::default());
     let p0 = APhase0 {
         flows: HashMap::new(),
         globalfilter_dec,
         is_human: false,
+=======
+    let (itags, _, stats) = tag_request(stats, PrecisionLevel::Invalid, &[], &reqinfo, &VirtualTags::default());
+    let p0 = APhase0 {
+        flows: HashMap::new(),
+        globalfilter_dec: SimpleDecision::Pass,
+        precision_level: PrecisionLevel::Invalid,
+>>>>>>> 3519ab92 (Brand new grasshopper module)
         itags,
         reqinfo,
         stats,

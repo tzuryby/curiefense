@@ -22,7 +22,7 @@ use crate::{
         virtualtags::VirtualTags,
         Config,
     },
-    grasshopper::Grasshopper,
+    grasshopper::{Grasshopper, PrecisionLevel},
     interface::{
         stats::{BStageSecpol, SecpolStats, StatsCollect},
         Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags,
@@ -285,14 +285,19 @@ pub async fn finalize<GH: Grasshopper>(
         idata.plugins,
     );
 
-    // without grasshopper, default to being human
-    let is_human = if let Some(gh) = mgh {
+    let precision_level = if let Some(gh) = mgh {
         challenge_verified(gh, &reqinfo, &mut logs)
     } else {
-        false
+        PrecisionLevel::Invalid
     };
-
-    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo, &vtags);
+    // without grasshopper, default to being human
+    let (mut tags, globalfilter_dec, stats) = tag_request(
+        idata.stats,
+        precision_level,
+        globalfilters,
+        &reqinfo,
+        &vtags,
+    );
     tags.insert("all", Location::Request);
 
     let dec = analyze(
@@ -302,7 +307,7 @@ pub async fn finalize<GH: Grasshopper>(
             stats,
             itags: tags,
             reqinfo,
-            is_human,
+            precision_level,
             globalfilter_dec,
             flows: flows.clone(),
         },
