@@ -20,8 +20,9 @@ use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
 use crate::geo::{
-    get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn, get_maxmind_city,
-    get_maxmind_country, ipinfo_country_in_eu, ipinfo_resolve_continent, ipinfo_resolve_country_name, USE_IPINFO,
+    get_ipinfo_asn, get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn,
+    get_maxmind_city, get_maxmind_country, ipinfo_country_in_eu, ipinfo_resolve_continent, ipinfo_resolve_country_name,
+    USE_IPINFO,
 };
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
@@ -565,7 +566,14 @@ pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
         geoip.network = Some(carrier.network)
     }
 
-    // TODO: asn DB, route=>network, asn, as_name, as_domain, as_type
+    if let Ok((asn, _)) = get_ipinfo_asn(ip) {
+        // TODO: always get Err here, should be fixed
+        geoip.network = Some(asn.route);
+        geoip.asn = asn.asn.parse().ok();
+        geoip.as_name = Some(asn.name);
+        geoip.as_domain = Some(asn.domain);
+        geoip.as_type = Some(asn.asn_type);
+    }
 }
 
 pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {

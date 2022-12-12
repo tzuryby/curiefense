@@ -17,7 +17,7 @@ use serde::Deserialize;
 use std::ops::Deref;
 use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 
-use crate::ipinfo::{CarrierDetails, CompanyDetails, LocationDetails, PrivacyDetails};
+use crate::ipinfo::{AsnDetails, CarrierDetails, CompanyDetails, LocationDetails, PrivacyDetails};
 
 /// From https://github.com/ipinfo/rust/blob/master/assets/countries.json
 const IPINFO_COUNTRY_NAME_RAW: &str = include_str!("../assets/ipinfo/countries.json");
@@ -37,6 +37,7 @@ struct MaxmindGeo {
 struct IpinfoGeo {
     location: Reader<Vec<u8>>,
     company: Reader<Vec<u8>>,
+    asn: Reader<Vec<u8>>,
     privacy: Reader<Vec<u8>>,
     carrier: Reader<Vec<u8>>,
 }
@@ -75,16 +76,19 @@ lazy_static! {
         let ipinfo_root = std::env::var("IPINFO_ROOT");
         let ipinfo_location = std::env::var("IPINFO_LOCATION");
         let ipinfo_company = std::env::var("IPINFO_COMPANY");
+        let ipinfo_asn = std::env::var("IPINFO_ASN");
         let ipinfo_privacy = std::env::var("IPINFO_PRIVACY");
         let ipinfo_carrier = std::env::var("IPINFO_CARRIER");
 
-        match (ipinfo_root, ipinfo_location, ipinfo_company, ipinfo_privacy, ipinfo_carrier) {
-            (Ok(root), Ok(location), Ok(company), Ok(privacy), Ok(carrier)) => {
+        match (ipinfo_root, ipinfo_location, ipinfo_company, ipinfo_asn, ipinfo_privacy, ipinfo_carrier) {
+            (Ok(root), Ok(location), Ok(company), Ok(asn), Ok(privacy), Ok(carrier)) => {
                     let root_path = PathBuf::from(root);
                     let mut location_path = root_path.clone();
                     location_path.push(location);
                     let mut company_path = root_path.clone();
                     company_path.push(company);
+                    let mut asn_path = root_path.clone();
+                    asn_path.push(asn);
                     let mut privacy_path = root_path.clone();
                     privacy_path.push(privacy);
                     let mut carrier_path = root_path;
@@ -92,8 +96,9 @@ lazy_static! {
                     Reader::open_readfile(location_path)
                         .and_then(|location| Reader::open_readfile(company_path)
                         .and_then(|company| Reader::open_readfile(privacy_path)
+                        .and_then(|asn| Reader::open_readfile(asn_path)
                         .and_then(|privacy| Reader::open_readfile(carrier_path)
-                        .map(|carrier| IpinfoGeo { location, company, privacy, carrier } )))).map_err(|rr| anyhow!("{}", rr))
+                        .map(|carrier| IpinfoGeo { location, company, asn, privacy, carrier } ))))).map_err(|rr| anyhow!("{}", rr))
             }
             _ => Err(anyhow!("Could not read ipinfo")) // TODO: add actual error in Err
         }
@@ -214,7 +219,26 @@ pub fn get_ipinfo_company(addr: IpAddr) -> Result<(CompanyDetails, Option<IpNet>
 }
 
 #[cfg(not(test))]
+pub fn get_ipinfo_asn(addr: IpAddr) -> Result<(AsnDetails, Option<IpNet>), String> {
+    if !(*USE_IPINFO) {
+        return Err("Ipinfo is not enabled. You can enable it by setting USE_IPINFO=true".to_string());
+    }
+
+    match IPINFO.deref() {
+        Err(rr) => Err(format!("could not read asn db: {}", rr)),
+        Ok(ipinfo) => match ipinfo.asn.lookup_prefix(addr) {
+            Ok((asn, prefix_len)) => Ok(compute_network::<AsnDetails>(asn, addr, prefix_len)),
+            Err(rr) => Err(format!("{}", rr)),
+        },
+    }
+}
+
+#[cfg(not(test))]
 pub fn get_ipinfo_carrier(addr: IpAddr) -> Result<(CarrierDetails, Option<IpNet>), String> {
+    if !(*USE_IPINFO) {
+        return Err("Ipinfo is not enabled. You can enable it by setting USE_IPINFO=true".to_string());
+    }
+
     match IPINFO.deref() {
         Err(rr) => Err(format!("could not read city db: {}", rr)),
         Ok(ipinfo) => match ipinfo.carrier.lookup_prefix(addr) {
@@ -251,6 +275,11 @@ pub fn get_ipinfo_privacy(_addr: IpAddr) -> Result<(PrivacyDetails, Option<IpNet
 
 #[cfg(test)]
 pub fn get_ipinfo_company(_addr: IpAddr) -> Result<(CompanyDetails, Option<IpNet>), String> {
+    Err("TEST".into())
+}
+
+#[cfg(test)]
+pub fn get_ipinfo_asn(_addr: IpAddr) -> Result<(AsnDetails, Option<IpNet>), String> {
     Err("TEST".into())
 }
 

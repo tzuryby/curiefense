@@ -83,6 +83,7 @@ test-ipinfo: ctarget/target/debug/libcuriefense_lua.so
 						 -e IPINFO_ROOT=/cf-config/current/config/ipinfo \
 						 -e IPINFO_LOCATION=artifacts_standard_location.mmdb \
 						 -e IPINFO_COMPANY=artifacts_standard_company.mmdb \
+						 -e IPINFO_ASN=artifacts_asn.mmdb \
 						 -e IPINFO_PRIVACY=artifacts_privacy.mmdb \
 						 -e IPINFO_CARRIER=artifacts_carrier.mmdb \
 						 --rm \

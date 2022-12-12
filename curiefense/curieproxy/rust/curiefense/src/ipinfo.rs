@@ -90,6 +90,26 @@ pub struct CompanyDetails {
     pub as_type: String,
 }
 
+/// ASN details.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AsnDetails {
+    /// The AS number.
+    pub asn: String,
+
+    /// The name of the entity that owns this AS.
+    pub name: String,
+
+    /// The domain for the entity that owns this AS.
+    pub domain: String,
+
+    /// The route for this AS.
+    pub route: String,
+
+    /// The entity type that owns this AS. (i.e., business, education, hosting, isp)
+    #[serde(rename = "type")]
+    pub asn_type: String,
+}
+
 /// Mobile carrier details.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CarrierDetails {
