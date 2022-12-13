@@ -123,18 +123,6 @@ impl Location {
         out
     }
 
-    pub fn request() -> HashSet<Self> {
-        let mut out = HashSet::new();
-        out.insert(Location::Request);
-        out
-    }
-
-    pub fn body() -> HashSet<Self> {
-        let mut out = HashSet::new();
-        out.insert(Location::Body);
-        out
-    }
-
     pub fn from_value(idx: SectionIdx, name: &str, value: &str) -> Self {
         match idx {
             SectionIdx::Headers => Location::HeaderValue(name.to_string(), value.to_string()),
@@ -172,28 +160,28 @@ impl Location {
         match self {
             Location::Request => (),
             Location::Attributes => {
-                // map.serialize_entry("section", "attributes")?; // BQ TODO
+                map.serialize_entry("section", "attributes")?;
             }
             Location::Ip => {
-                map.serialize_entry("section", "ip")?; // BQ TODO: should be request-element
+                map.serialize_entry("request_element", "ip")?;
             }
             Location::Uri => {
-                map.serialize_entry("section", "uri")?; // BQ TODO: should be request-element
+                map.serialize_entry("request_element", "uri")?;
             }
             Location::RefererPath => {
-                // map.serialize_entry("section", "referer_path")?;
+                map.serialize_entry("request_element", "referer_path")?;
             }
             Location::RefererPathpart(part) => {
-                // map.serialize_entry("part", part)?; // BQ TODO
+                map.serialize_entry("part", part)?;
             }
             Location::RefererPathpartValue(_, value) => {
                 map.serialize_entry("value", value)?;
             }
             Location::Path => {
-                // map.serialize_entry("section", "path")?; // BQ TODO
+                map.serialize_entry("section", "path")?;
             }
             Location::Pathpart(part) => {
-                // map.serialize_entry("part", part)?; // BQ TODO
+                map.serialize_entry("part", part)?;
             }
             Location::PathpartValue(_, value) => {
                 map.serialize_entry("value", value)?;
@@ -583,9 +571,6 @@ mod test {
             Cookies,
             Cookie("foo".to_string()),
             CookieValue("foo".to_string(), "foo".to_string()),
-            Plugins,
-            Plugin("foo".to_string()),
-            PluginValue("foo".to_string(), "foo".to_string()),
         ];
         for location in locations {
             let res = serde_json::to_string(location).unwrap();

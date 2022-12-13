@@ -16,11 +16,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "denybot",
-          "ruleid": "denybot",
+          "tags": [
+            "denybot"
+          ],
           "name": "denybot",
-          "type": "deny_bot"
+          "stage": "deny_bot",
+          "id":"FROMTAGS"
         }
       ],
       "tags": [
@@ -64,11 +67,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
           "name": "deny",
-          "type": "deny"
+          "stage": "deny",
+          "id":"FROMTAGS"
         }
       ],
       "tags": [

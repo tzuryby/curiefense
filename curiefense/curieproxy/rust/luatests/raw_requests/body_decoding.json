@@ -17,11 +17,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
           "name": "deny",
-          "type": "deny"
+          "stage": "deny",
+          "id": "FROMTAGS"
         }
       ],
       "tags": [
@@ -60,11 +63,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectjson",
+          "type": "malformed body",
+          "actual": "Invalid content type=None, accepted types=[Json]",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -104,11 +110,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectjson",
+          "type": "malformed body",
+          "actual": "Invalid content type=Some(\"text\/xml\"), accepted types=[Json]",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -151,11 +160,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
           "name": "deny1",
-          "type": "deny"
+          "stage": "deny",
+          "id": "FROMTAGS"
         }
       ],
       "tags": [
@@ -195,11 +207,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectxml",
+          "type": "malformed body",
+          "actual": "XML parsing error: invalid attribute at 1:6 cause expected '=' not '<' at 1:11",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -237,11 +252,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectxml",
+          "type": "malformed body",
+          "actual": "Invalid content type=None, accepted types=[Xml]",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -280,11 +298,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectxml",
+          "type": "malformed body",
+          "actual": "Invalid content type=Some(\"application\/json\"), accepted types=[Xml]",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -323,11 +344,14 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "restriction_triggers": [
         {
           "active": true,
           "section": "body",
-          "type": "body_malformed"
+          "id": "expectall",
+          "type": "malformed body",
+          "actual": "Invalid JSON body: expected value at line 1 column 1",
+          "expected": "well-formed"
         }
       ],
       "tags": [
@@ -369,11 +393,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
           "name": "deny",
-          "type": "deny"
+          "stage": "deny",
+          "id": "FROMTAGS"
         }
       ],
       "tags": [
@@ -416,11 +443,14 @@
       "acl_triggers": [
         {
           "active": true,
-          "section": "uri",
+          "request_element": "uri",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
           "name": "deny1",
-          "type": "deny"
+          "stage": "deny",
+          "id": "FROMTAGS"
         }
       ],
       "tags": [

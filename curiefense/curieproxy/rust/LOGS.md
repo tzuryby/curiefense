@@ -92,7 +92,7 @@ The `active` key is also always present, and is `false` for decisions that did t
 
 ### Location data
 
-The following entries are all optional:
+The following entries are **all optional**:
 
  * `request_element`, can be `ip`, `uri`, `referer_path`
  * `section`, can be `attributes`, `path`, `body`, `headers`, `body` or `plugins`;
@@ -106,75 +106,45 @@ The following triggers are defined:
 
 #### ACL triggers
 
-There usual trigger has the following keys:
+Contains:
 
-  * `tags`, the list of tags that matched the ACL column,
-  * `stage`, the ACL column.
+  * `id`, a string, representing the ACL id,
+  * `tags`, list of strings, the list of tags that matched the ACL column,
+  * `stage`, a string, the ACL column.
 
-Another possibility is:
-
-  * `type`, can be `phase1` or `phase2`, representing the stage where the grasshopper plug-in failed,
-  * `details`, an optional entry describing the issue.
 
 #### Rate limit triggers
 
-There is one kind of trigger, with the following keys:
+Contains:
 
-  * `id`, representing the rate limit id,
-  * `name`, representing the rate limit name,
-  * `threshold`, a number representing the limit threshold,
-  * `counter`, representing the actual number of requests (will always be equal to `threshold` + 1).
-
-#### Flow control triggers
-
-There is one kind of trigger, with the following keys:
-
-  * `id`, representing the flow control id,
-  * `name`, representing the flow control name.
+  * `id`, a string, representing the rate limit id,
+  * `limitname`, a string, representing the rate limit name,
+  * `threshold`, a number, representing the limit threshold,
 
 #### Global filter triggers
 
 There is one kind of trigger, with the following keys:
 
-  * `id`, representing the global filter entry id,
-  * `name`, representing the global filter entry name.
+  * `id`, a string, representing the global filter entry id,
+  * `name`, a string, representing the global filter entry name.
 
 #### Content filter triggers
 
-There are several entries, that can be distinguished with the `type` entry:
+Contains:
 
-When `type` is `signature`, it represents a content filter match, with the following entries:
+  * `id`, a string, the content filter id
+  * `ruleid`, a string, the id of the matching rule,
+  * `risk_level`, a number, the risk level of the matching rule.
 
-  * `ruleid`, the id of the matching rule,
-  * `risk_level`, the risk level of the matching rule.
 
-When `type` is `body_missing`, it means that the body was expected, but was missing.
+#### Restriction triggers
 
-When `type` is `body_malformed`, it means that the body was expected to be of a specific type (such as Json),
-but was malformed. There is no extra information.
+Contains:
 
-When `type` is `body_too_deep`, it means that the body was parsed as a recursive data format (such as Json),
-but was deeper than expected. The following entries are present:
-
-  * `expected`, the maximum depth, as defined by the security policy,
-  * `actual`, the actual depth where the processing stopped. This is usually `expected` + 1.
-
-When `type` is `sqli`, it represents a *libinjection* SQLI match, with the `fp` entry that holds details.
-
-When `type` is `xss`, it represents a *libinjection* XSS match, with no additional data.
-
-When `type` is `restricted`, it means that some part of the request was marked as restricted and did not
-match the corresponding regular expression.
-
-When `type` is `too_many_entries`, it means that there were too many entries in a section, with the following entries:
-
-   * `expected`, maximum amount of entries, as described in the security policy,
-   * `actual`, actual amount of entries.
-
-When `type` is `entry_too_large`, it means that a section entry was too large, with the following entries:
-
-   * `expected`, maximum size of entries, as described in the security policy,
-   * `actual`, actual size of the offending entry.
+  * `id`, a string, representing the content filter id,
+  * `type`, a string, can be `too deep`, `too large`, `missing body`, `malformed body`, `too many`, `too large`, `restricted`
+  * `actual`, a string
+  * `expected`, a string
 
 # Sample log
 
@@ -191,12 +161,12 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
   "biometric": {},
   "content_filter_triggers": [
     {
+      "id": "dqssdqs",
       "active": true,
       "name": "lapin",
       "risk_level": 5,
       "ruleid": "100016",
       "section": "uri",
-      "type": "signature",
       "value": "xp_cmdshell"
     }
   ],

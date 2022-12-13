@@ -14,13 +14,12 @@
       "status": 403,
       "content_filter_triggers": [
         {
-          "active": true,
-          "section": "uri",
+          "risk_level": 5,
           "value": "xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_",
-          "type": "signature",
+          "request_element": "uri",
+          "active": true,
           "name": "arg",
-          "ruleid": "100016",
-          "risk_level": 5
+          "id": "100016"
         }
       ],
       "tags": [

@@ -132,6 +132,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                             && !secpolicy.content_filter_profile.ignore_body
                         {
                             Some(body_too_large(
+                                secpolicy.content_filter_profile.id.clone(),
                                 secpolicy.content_filter_profile.max_body_size,
                                 body.len(),
                             ))

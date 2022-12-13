@@ -93,7 +93,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
     if !securitypolicy.content_filter_profile.content_type.is_empty() {
         // note that having no body is perfectly OK
         if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
-            let reason = BlockReason::body_malformed(rr);
+            let reason = BlockReason::body_malformed(securitypolicy.content_filter_profile.id.clone(), rr);
             // we expect the body to be properly decoded
             let decision = securitypolicy.content_filter_profile.action.to_decision(
                 is_human,
@@ -249,7 +249,11 @@ pub fn analyze_finish<GH: Grasshopper>(
     let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });
     if let Some(decision) = acl_decision {
         let bypass = decision.stage == AclStage::Bypass;
-        let mut br = BlockReason::acl(decision.tags, decision.stage);
+        let mut br = BlockReason::acl(
+            reqinfo.rinfo.secpolicy.acl_profile.id.clone(),
+            decision.tags,
+            decision.stage,
+        );
         if !secpol.acl_active {
             br.decision.inactive();
         }
@@ -263,7 +267,7 @@ pub fn analyze_finish<GH: Grasshopper>(
             let locs = cumulated_decision
                 .reasons
                 .iter()
-                .flat_map(|r| r.location.iter())
+                .flat_map(|r| std::iter::once(&r.location).chain(r.extra_locations.iter()))
                 .cloned()
                 .collect::<HashSet<_>>();
             for t in &secpol.acl_profile.tags {
@@ -347,7 +351,7 @@ pub fn analyze_finish<GH: Grasshopper>(
                 let locs: HashSet<Location> = cfblock
                     .reasons
                     .iter()
-                    .flat_map(|r| r.location.iter())
+                    .flat_map(|r| std::iter::once(&r.location).chain(r.extra_locations.iter()))
                     .cloned()
                     .collect();
                 for t in &secpol.content_filter_profile.tags {
