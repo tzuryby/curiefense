@@ -237,7 +237,7 @@ pub async fn finalize<GH: Grasshopper>(
         .unwrap_or(CfRulesArg::Global);
     let reqinfo = map_request(
         &mut logs,
-        secpolicy,
+        secpolicy.clone(),
         idata.container_name,
         &rawrequest,
         Some(idata.start),

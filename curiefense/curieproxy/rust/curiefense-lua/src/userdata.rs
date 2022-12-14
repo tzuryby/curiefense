@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use curiefense::analyze::APhase1;
+use curiefense::analyze::{APhase1, APhase2I};
 use curiefense::flow::{FlowCheck, FlowResult, FlowResultType};
 use curiefense::interface::Tags;
 use curiefense::limit::{LimitCheck, LimitResult};
@@ -69,13 +69,13 @@ impl mlua::UserData for LuaInspectionResult {
 
 /// Data type for the "dialog" API, phase 1, initialization
 #[derive(Clone)]
-pub enum LInitResult {
+pub enum LInitResult<T> {
     P0Result(Box<InspectionResult>),
     P0Error(String),
-    P1(Logs, Box<APhase1>),
+    P1(Logs, Box<T>),
 }
 
-impl LInitResult {
+impl<T> LInitResult<T> {
     fn get_with_o<F, A>(&self, f: F) -> LuaResult<Option<A>>
     where
         F: FnOnce(&InspectionResult) -> Option<A>,
@@ -93,7 +93,7 @@ impl LInitResult {
     }
 }
 
-impl mlua::UserData for LInitResult {
+impl mlua::UserData for LInitResult<APhase1> {
     fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
         use LInitResult::*;
 
@@ -128,6 +128,59 @@ impl mlua::UserData for LInitResult {
                 P0Error(_) => None,
             })
         });
+
+        fields.add_field_method_get("desc", |_, this| {
+            Ok(match this {
+                P0Result(_) => "result".to_string(),
+                P0Error(_) => "error".to_string(),
+                P1(_, _) => "p1".to_string(),
+            })
+        });
+    }
+
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("request_map", |lua, this, proxy: LuaValue| {
+            let emr = match FromLua::from_lua(proxy, lua) {
+                Err(_) | Ok(None) => this.get_with(|r| r.log_json_block(HashMap::new())),
+                Ok(Some(proxy)) => this.get_with(|r| r.log_json_block(proxy)),
+            };
+            match emr {
+                Err(rr) => Err(rr),
+                Ok(None) => Ok(None),
+                Ok(Some(v)) => Ok(Some(lua.create_string(&v)?)),
+            }
+        });
+    }
+}
+
+impl mlua::UserData for LInitResult<APhase2I> {
+    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+        use LInitResult::*;
+
+        fields.add_field_method_get("decided", |_, this| Ok(!matches!(this, P1(_, _))));
+        fields.add_field_method_get("error", |_, this| {
+            Ok(match this {
+                P0Result(res) => res.err.clone(),
+                P0Error(r) => Some(r.clone()),
+                P1(_, _) => None,
+            })
+        });
+        fields.add_field_method_get("blocking", |_, this| {
+            Ok(match this {
+                P0Result(r) => r.decision.is_blocking(),
+                _ => false,
+            })
+        });
+        fields.add_field_method_get("tags", |_, this| {
+            this.get_with(|r| {
+                r.tags
+                    .as_ref()
+                    .map(|tgs: &Tags| tgs.as_hash_ref().keys().cloned().collect::<Vec<_>>())
+            })
+        });
+        fields.add_field_method_get("logs", |_, this| this.get_with(|r| r.logs.to_stringvec()));
+        fields.add_field_method_get("response", |_, this| this.get_with(|r| r.decision.response_json()));
+
         fields.add_field_method_get("limits", |_, this| {
             Ok(match this {
                 P1(_, a1) => Some(a1.limits.iter().map(|f| LuaLimitCheck(f.clone())).collect::<Vec<_>>()),

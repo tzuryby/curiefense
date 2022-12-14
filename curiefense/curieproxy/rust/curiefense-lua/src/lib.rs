@@ -1,8 +1,12 @@
 pub mod userdata;
 
 use curiefense::analyze::analyze_finish;
+use curiefense::analyze::analyze_flows;
 use curiefense::analyze::analyze_init;
-use curiefense::analyze::APhase2;
+use curiefense::analyze::APhase1;
+use curiefense::analyze::APhase2I;
+use curiefense::analyze::APhase2O;
+use curiefense::analyze::APhase3;
 use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
 use curiefense::grasshopper::DynGrasshopper;
@@ -161,7 +165,7 @@ fn lua_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectionResu
 /// ****************************************
 /// Lua interface for the "async dialog" API
 /// ****************************************
-fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult> {
+fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult<APhase1>> {
     match lua_convert_args(lua, args) {
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
@@ -188,18 +192,29 @@ fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult> {
     }
 }
 
+fn lua_inspect_flows(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LInitResult<APhase2I>> {
+    let (lpr1, lflow_results) = args;
+    let pr1: LInitResult<APhase1> = FromLua::from_lua(lpr1, lua)?;
+    let lflow_results: Vec<LuaFlowResult> = FromLua::from_lua(lflow_results, lua)?;
+    let flow_results = lflow_results.into_iter().map(|lf| lf.0).collect();
+    Ok(match pr1 {
+        LInitResult::P0Result(r) => LInitResult::P0Result(r),
+        LInitResult::P0Error(r) => LInitResult::P0Error(r),
+        LInitResult::P1(mut logs, bp1) => {
+            let p2o = APhase2O::from_phase1(*bp1, flow_results);
+            let p2i = analyze_flows(&mut logs, p2o);
+            LInitResult::P1(logs, Box::new(p2i))
+        }
+    })
+}
+
 /// This is the processing function, that will an analysis result
-fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue, LuaValue)) -> LuaResult<LuaInspectionResult> {
-    let (lpred, lflow_results, llimit_results) = args;
+fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LuaInspectionResult> {
+    let (lpred, llimit_results) = args;
     let lerr = |msg| Ok(LuaInspectionResult(Err(msg)));
-    let pred = match FromLua::from_lua(lpred, lua) {
-        Err(rr) => return lerr(format!("Could not convert the pred argument: {}", rr)),
+    let pred: LInitResult<APhase2I> = match FromLua::from_lua(lpred, lua) {
+        Err(rr) => return lerr(format!("Could not convert the pred(2I) argument: {}", rr)),
         Ok(m) => m,
-    };
-    let rflow_results: Result<Vec<LuaFlowResult>, mlua::Error> = FromLua::from_lua(lflow_results, lua);
-    let flow_results = match rflow_results {
-        Err(rr) => return lerr(format!("Could not convert the flow_result argument: {}", rr)),
-        Ok(m) => m.into_iter().map(|n| n.0).collect(),
     };
     let rlimit_results: Result<Vec<LuaLimitResult>, mlua::Error> = FromLua::from_lua(llimit_results, lua);
     let limit_results = match rlimit_results {
@@ -207,16 +222,16 @@ fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue, LuaValue)) -> LuaRe
         Ok(m) => m.into_iter().map(|n| n.0).collect(),
     };
 
-    let (mut logs, p1) = match pred {
+    let (mut logs, p2) = match pred {
         LInitResult::P0Result(_) => {
             return lerr("The first parameter is an inspection result, and should not have been used here!".to_string())
         }
         LInitResult::P0Error(rr) => return lerr(format!("The first parameter is an error: {}", rr)),
-        LInitResult::P1(logs, p1) => (logs, p1),
+        LInitResult::P1(logs, p2) => (logs, p2),
     };
-    let p2 = APhase2::from_phase1(*p1, flow_results, limit_results);
+    let p3 = APhase3::from_phase2(*p2, limit_results);
     let grasshopper = &DynGrasshopper {};
-    let res = analyze_finish(&mut logs, Some(grasshopper), CfRulesArg::Global, p2);
+    let res = analyze_finish(&mut logs, Some(grasshopper), CfRulesArg::Global, p3);
     Ok(LuaInspectionResult(Ok(InspectionResult::from_analyze(logs, res))))
 }
 
@@ -350,6 +365,7 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     // end-to-end inspection
     exports.set("inspect_request", lua.create_function(lua_inspect_request)?)?;
     exports.set("inspect_request_init", lua.create_function(lua_inspect_init)?)?;
+    exports.set("inspect_request_flows", lua.create_function(lua_inspect_flows)?)?;
     exports.set("inspect_request_process", lua.create_function(lua_inspect_process)?)?;
     exports.set(
         "aggregated_values",
