@@ -13,10 +13,9 @@
       "action": "pass",
       "global_filter_triggers": [
         {
-          "ruleid": "filter-header",
+          "id": "filter-header",
           "section": "headers",
           "value": "header_value",
-          "type": "name: Filter header",
           "name": "test-global-filter-trigger",
           "active": true
         }

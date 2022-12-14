@@ -144,6 +144,8 @@ struct AggregatedCounters {
     requests_triggered_globalfilter_report: usize,
     requests_triggered_cf_active: usize,
     requests_triggered_cf_report: usize,
+    requests_triggered_restriction_active: usize,
+    requests_triggered_restriction_report: usize,
     requests_triggered_acl_active: usize,
     requests_triggered_acl_report: usize,
     requests_triggered_ratelimit_active: usize,
@@ -536,7 +538,7 @@ impl AggregatedCounters {
                         self.requests_triggered_globalfilter_report += 1;
                     }
                 }
-                Acl { tags: _, stage } => {
+                Acl { id: _, tags: _, stage } => {
                     if this_blocked {
                         acl_blocked = true;
                         self.requests_triggered_acl_active += 1;
@@ -569,7 +571,7 @@ impl AggregatedCounters {
                     }
                 }
 
-                ContentFilter { ruleid, risk_level } => {
+                ContentFilter { id, risk_level } => {
                     let cursor = if this_blocked {
                         cf_blocked = true;
                         self.requests_triggered_cf_active += 1;
@@ -579,25 +581,18 @@ impl AggregatedCounters {
                         self.requests_triggered_cf_report += 1;
                         ArpCursor::Report
                     };
-                    self.ruleid.get_mut(cursor).inc(ruleid.clone());
+                    self.ruleid.get_mut(cursor).inc(id.clone());
                     self.risk_level.get_mut(cursor).inc(*risk_level);
                 }
-                BodyTooDeep { actual: _, expected: _ }
-                | BodyMissing
-                | BodyMalformed(_)
-                | Sqli(_)
-                | Xss
-                | Restricted
-                | TooManyEntries { actual: _, expected: _ }
-                | EntryTooLarge { actual: _, expected: _ } => {
+                Restriction { .. } => {
                     if this_blocked {
-                        self.requests_triggered_cf_active += 1;
+                        self.requests_triggered_restriction_active += 1;
                     } else {
-                        self.requests_triggered_cf_report += 1;
+                        self.requests_triggered_restriction_report += 1;
                     }
                 }
             }
-            for loc in &r.location {
+            for loc in std::iter::once(&r.location).chain(r.extra_locations.iter()) {
                 let aggloc = if this_blocked {
                     self.location.get_mut(ArpCursor::Active)
                 } else {
@@ -778,6 +773,14 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     content.insert(
         "requests_triggered_globalfilter_report".into(),
         Value::Number(serde_json::Number::from(e.requests_triggered_globalfilter_report)),
+    );
+    content.insert(
+        "requests_triggered_restriction_active".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_active)),
+    );
+    content.insert(
+        "requests_triggered_restriction_report".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_report)),
     );
     content.insert(
         "requests_triggered_cf_active".into(),

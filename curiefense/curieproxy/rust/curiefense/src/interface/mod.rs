@@ -98,13 +98,15 @@ pub struct Decision {
 }
 
 impl Decision {
-    pub fn skip(initiator: Initiator, location: HashSet<Location>) -> Self {
+    pub fn skip(initiator: Initiator, location: Location) -> Self {
         Decision {
             maction: None,
             reasons: vec![BlockReason {
                 initiator,
                 location,
                 decision: BDecision::Skip,
+                extra_locations: Vec::new(),
+                extra: serde_json::Value::Null,
             }],
         }
     }
@@ -212,20 +214,19 @@ pub fn jsonlog_rinfo(
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
+    //     map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
     map_ser.serialize_entry("request_id", &request_id)?;
     map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
-    // TODO BQ
-    // map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
+    map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
     map_ser.serialize_entry("path_parts", &rinfo.rinfo.qinfo.path_as_map)?;
     map_ser.serialize_entry("authority", &rinfo.rinfo.host)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
     if !rinfo.plugins.is_empty() {
-        // TODO BQ
-        // map_ser.serialize_entry("plugins", &rinfo.plugins)?;
+        map_ser.serialize_entry("plugins", &rinfo.plugins)?;
     }
     map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
@@ -233,10 +234,12 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("response_code", &rcode)?;
     map_ser.serialize_entry("logs", logs)?;
     map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
+
     map_ser.serialize_entry("acl_triggers", get_trigger(&InitiatorKind::Acl))?;
     map_ser.serialize_entry("rate_limit_triggers", get_trigger(&InitiatorKind::RateLimit))?;
     map_ser.serialize_entry("global_filter_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
     map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
+    map_ser.serialize_entry("restriction_triggers", get_trigger(&InitiatorKind::Restriction))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
 
     // it's too bad one can't directly write the recursive structures from just the serializer object

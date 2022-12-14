@@ -380,10 +380,11 @@ local function test_raw_request(request_path, mode)
       "acl_triggers",
       "rate_limit_triggers",
       "global_filter_triggers",
-      "content_filter_triggers"
+      "content_filter_triggers",
+      "restriction_triggers"
     }
     for _, trigger_name in pairs(triggers) do
-      good = test_trigger(expected, request_map, trigger_name) or good
+      good = test_trigger(expected, request_map, trigger_name) and good
     end
 
     if not good then

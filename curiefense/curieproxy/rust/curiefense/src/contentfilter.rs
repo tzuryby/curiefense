@@ -83,6 +83,7 @@ pub fn content_filter_check(
     for idx in &ALL_SECTION_IDX {
         if let Err(reason) = section_check(
             logs,
+            &profile.id,
             tags,
             *idx,
             profile.sections.get(*idx),
@@ -181,6 +182,7 @@ pub fn content_filter_check(
 /// checks a section (headers, args, cookies) against the policy
 fn section_check(
     logs: &mut Logs,
+    cfid: &str,
     tags: &Tags,
     idx: SectionIdx,
     section: &ContentFilterSection,
@@ -190,7 +192,12 @@ fn section_check(
 ) -> Result<(), BlockReason> {
     if idx != SectionIdx::Path && params.len() > section.max_count {
         if section.max_count > 0 {
-            return Err(BlockReason::too_many_entries(idx, params.len(), section.max_count));
+            return Err(BlockReason::too_many_entries(
+                cfid.to_string(),
+                idx,
+                params.len(),
+                section.max_count,
+            ));
         } else {
             logs.warning(|| format!("In section {:?}, param_count = 0", idx));
         }
@@ -200,7 +207,13 @@ fn section_check(
         // skip decoded parameters for length checks
         if !name.ends_with(":decoded") && value.len() > section.max_length {
             if section.max_length > 0 {
-                return Err(BlockReason::entry_too_large(idx, name, value.len(), section.max_length));
+                return Err(BlockReason::entry_too_large(
+                    cfid.to_string(),
+                    idx,
+                    name,
+                    value.len(),
+                    section.max_length,
+                ));
             } else {
                 logs.warning(|| format!("In section {:?}, max_length = 0", idx));
             }
@@ -214,15 +227,20 @@ fn section_check(
 
         // logic for checking an entry
         let mut check_entry = |name_entry: &ContentFilterEntryMatch| {
-            let matched = if let Some(re) = &name_entry.reg {
-                re.matches(value)
+            let (matched, mre) = if let Some(re) = &name_entry.reg {
+                (re.matches(value), Some(re.inner.as_str()))
             } else {
-                false
+                (false, None)
             };
             if matched {
                 omit.entries.at(idx).insert(name.to_string());
             } else if name_entry.restrict {
-                return Err(BlockReason::restricted(Location::from_value(idx, name, value)));
+                return Err(BlockReason::restricted(
+                    cfid.to_string(),
+                    Location::from_value(idx, name, value),
+                    value.to_string(),
+                    mre.unwrap_or_default().to_string(),
+                ));
             } else if tags.has_intersection(&name_entry.exclusions) {
                 omit.entries.at(idx).insert(name.to_string());
             } else if !name_entry.exclusions.is_empty() {
@@ -388,11 +406,13 @@ fn hyperscan(
             .into_iter()
             .map(|(sigid, location, decision, risk_level)| BlockReason {
                 initiator: Initiator::ContentFilter {
-                    ruleid: sigid.to_string(),
+                    id: sigid.to_string(),
                     risk_level,
                 },
-                location: std::iter::once(location).collect(),
+                location,
                 decision,
+                extra_locations: Vec::new(),
+                extra: serde_json::Value::Null,
             })
             .collect()),
         stats.cf_matches(sigs.ids.len(), matches, nactive),

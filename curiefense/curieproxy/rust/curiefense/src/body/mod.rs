@@ -340,7 +340,7 @@ pub fn parse_body(
     }
 }
 
-pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
+pub fn body_too_deep(id: String, expected: usize, actual: usize) -> (Action, BlockReason) {
     (
         Action {
             atype: ActionType::Block,
@@ -350,11 +350,11 @@ pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
             content: "Access denied".to_string(),
             extra_tags: None,
         },
-        BlockReason::body_too_deep(actual, expected),
+        BlockReason::body_too_deep(id, actual, expected),
     )
 }
 
-pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
+pub fn body_too_large(id: String, expected: usize, actual: usize) -> (Action, BlockReason) {
     (
         Action {
             atype: ActionType::Block,
@@ -364,7 +364,7 @@ pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
             content: "Access denied".to_string(),
             extra_tags: None,
         },
-        BlockReason::body_too_large(actual, expected),
+        BlockReason::body_too_large(id, actual, expected),
     )
 }
 
