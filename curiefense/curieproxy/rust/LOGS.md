@@ -1,49 +1,47 @@
-# Log format
+# New Log Format
 
 The log is by default sent to stdout. In the Curieproxy containers, it is piped to *filebeat* that will store it
 in ElasticSearch.
 
 The log file is a JSON encoded data structure, where the top level is an object with the following members:
 
- * `timestamp`: time when the request started to be processed, encoded as a string,
- * `curiesession`: a session identifier (a string),
- * `curiesession_ids`: extra session identifiers (a list of NV items, see below),
- * `request_id`: unique identifier for the request, currently only provided by envoy,
- * `security_config`: see the *security config* section,
- * `arguments`: a list of NV items representing arguments,
- * `path`: query path,
+ * `timestamp`: time when the request started to be processed, encoded as a string.
+ * `curiesession`: a session identifier (a string)
+ * `curiesession_ids`: extra session identifiers (a list of NV items, see below).
+ * `request_id`: unique identifier for the request - provised by both, Envoy and Nginx
+ * `security_config`: see the *security config* section.
+ * `arguments`: a list of NV items representing arguments.
+ * `path`: the path withour the query string
  * `path_parts`: a list of NV items representing path parts,
- * `authority`: the authority meta data, if it exists, or the *host* header,
- * `cookies`: a list of NV items representing cookies,
- * `headers`: a list of NV items representing headers,
- * `tags`: a list of strings, representing the request tags,
- * `uri`: request URI, as a string,
- * `ip`: request IP, as a string,
- * `method`: request method verb, as a string,
- * `response_code`: the response code that was served to the user,
- * `logs`: a list of string, destined for human consumption, with an unspecified format,
+ * `authority`: the authority meta data, if it exists, or the *host* header
+ * `cookies`: a list of NV items representing cookies
+ * `headers`: a list of NV items representing request headers
+ * `tags`: a list of strings, representing the request tags
+ * `uri`: request URI, as a string, including the query-string
+ * `ip`: request IP, as a string
+ * `method`: request method verb, as a string
+ * `response_code`: the response code that was served to the user
+ * `logs`: a list of string, destined for human consumption, with an unspecified format
  * `processing_stage`: a number representing the stage where the request stopped being processed:
-    * 0: initialization, should never happen,
-    * 1: security policy level, this means no security policy could be selected,
-    * 2: global filter stage,
-    * 3: flow control stage,
-    * 4: rate limit stage,
-    * 5: ACL stage,
+    * 0: initialization, should never happen
+    * 1: security policy level, this means no security policy could be selected
+    * 2: global filter stage
+    * 3: flow control stage
+    * 4: rate limit stage
+    * 5: ACL stage
     * 6: content filter stage.
  * `trigger_counters`: a list of KV items of the form:
     * `TRIGGER`: length of the `TRIGGER` list,
     * `TRIGGER_active`: amount of items in the `TRIGGER` list that would cause a block.
-    Here, `TRIGGER` can be `acl`, `global_filters`, `flow_control`, `rate_limit` or `content_filters`.
-
- * `acl_triggers`: triggers for the `acl` trigger type (see below),
- * `rate_limit_triggers`: triggers for the `rate_limit` trigger type (see below),
- * `flow_control_triggers`: triggers for the `flow_control` trigger type (see below),
- * `global_filter_triggers`: triggers for the `global_filter` trigger type (see below),
- * `content_filter_triggers`: triggers for the `content_filter` trigger type (see below),
- * `proxy`: an object with a single key, `location`, containing a pair of floating values, representing the geo localized coordinates, when available,
+    Here, `TRIGGER` can be `acl`, `global_filters`, `rate_limit` or `content_filters`.
+ * `acl_triggers`: triggers for the `acl` trigger type (see below).
+ * `rate_limit_triggers`: triggers for the `rate_limit` trigger type (see below).
+ * `global_filter_triggers`: triggers for the `global_filter` trigger type (see below)
+ * `content_filter_triggers`: triggers for the `content_filter` trigger type (see below)
+ * `proxy`: a list of NV items representing variety of information such as the geo localized coordinates, when available
  * `reason`: a string describing why a decision was reached,
- * `profiling`: for now, an empty object,
- * `biometrics`: for now, an empty object.
+ * `profiling`: a list of micrseconds since start, per stage and function.
+ * `biometrics`: a list of NV items, for now, an empty object
 
 ## list of NV items
 
@@ -71,18 +69,18 @@ This represents a dictionary as a list of name/values items, in order to be easi
 ```
 
 ## Security configuration object
-
 This is an object representing the security configuration when the request was matched:
 
  * `revision`: string, the revision, from the manifest file,
  * `acl_active`: boolean, true if ACL is enabled,
  * `cf_active`: boolean, true if content filters are enabled,
  * `cf_rules`: amount of content filter rules that were matched against the request,
- * `rate_limit_rules`: amount of rate limit rules,
- * `global_filters_active`: amount of global filters.
+ * `rl_rules`: amount of rate limit rules
+	 * **Q: we have global and active flags, are they all counted as one?**
+ * `gf_rules`: number of active global filter rules
+	 * ???`gf_active`: amount of global filters???
 
 ## Trigger lists
-
 The fields named `TYPE_triggers` are lists of objects, representing the filter elements that were triggered.
 Each of these objects contain information about the part of the request that triggered, as well as information
 specific to the type of trigger.
@@ -91,21 +89,20 @@ The `active` key is also always present, and is `false` for decisions that did t
 (monitor decisions), and `true` otherwise.
 
 ### Location data
-
 The following entries are **all optional**:
 
- * `request_element`, can be `ip`, `uri`, `referer_path`
- * `section`, can be `attributes`, `path`, `body`, `headers`, `body` or `plugins`;
  * `part`, indicate a "path part". Path parts are elements separated by slashes;
+	 * should be unified with `section`
+ * `request_element`, can be `ip`, `uri`, `referer_path`
+	 * should be unified with `section`
+ * `section`, can be `attributes`, `path`, `body`, `headers`, `body` or `plugins`
  * `name`, name of the argument, header or cookie that triggered the response;
  * `value`, actual value that triggered the response.
 
 ### Trigger specific entries
-
 The following triggers are defined:
 
 #### ACL triggers
-
 Contains:
 
   * `id`, a string, representing the ACL id,
@@ -114,7 +111,6 @@ Contains:
 
 
 #### Rate limit triggers
-
 Contains:
 
   * `id`, a string, representing the rate limit id,
@@ -122,7 +118,6 @@ Contains:
   * `threshold`, a number, representing the limit threshold,
 
 #### Global filter triggers
-
 There is one kind of trigger, with the following keys:
 
   * `id`, a string, representing the global filter entry id,
