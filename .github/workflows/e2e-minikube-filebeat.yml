@@ -75,8 +75,6 @@ jobs:
             kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=curielogger
             echo "--- Logs for confserver ---"
             kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=confserver
-            echo "--- Logs for uiserver ---"
-            kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=uiserver
             echo "--- Logs for kibana ---"
             kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=kibana
             echo "--- Logs for elasticsearch ---"

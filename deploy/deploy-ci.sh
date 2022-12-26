@@ -45,7 +45,7 @@ popd || exit
 PARAMS=()
 
 pushd deploy/curiefense-helm || exit
-./deploy.sh -f use-local-bucket.yaml -f e2e-ci.yaml "${PARAMS[@]}" "$@"
+./deploy.sh -f use-local-bucket.yaml --set 'global.images.uiserver=curiefense/uiserver:main' -f e2e-ci.yaml "${PARAMS[@]}" "$@"
 
 # Expose services
 # No need to pass the namespace as it's already
