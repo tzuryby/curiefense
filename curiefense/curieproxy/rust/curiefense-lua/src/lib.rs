@@ -9,6 +9,7 @@ use curiefense::analyze::APhase2O;
 use curiefense::analyze::APhase3;
 use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
+use curiefense::config::reload_config;
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
 use curiefense::inspect_generic_request_map;
@@ -235,6 +236,20 @@ fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LuaIn
     Ok(LuaInspectionResult(Ok(InspectionResult::from_analyze(logs, res))))
 }
 
+fn lua_reload_conf(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<()> {
+    let (lfilename, lconfigpath) = args;
+
+    let raw_files: String = FromLua::from_lua(lfilename, lua).map_err(mlua::Error::external)?;
+    let files: Vec<String> = serde_json::from_str(&raw_files).map_err(mlua::Error::external)?;
+    let configpath: String = match lconfigpath {
+        LuaNil => String::from("/cf-config/current/config"),
+        v => FromLua::from_lua(v, lua).map_err(mlua::Error::external)?,
+    };
+
+    reload_config(&configpath, files);
+    Ok(())
+}
+
 struct DummyGrasshopper {
     humanity: bool,
 }
@@ -371,6 +386,7 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
         "aggregated_values",
         lua.create_function(|_, ()| Ok(aggregated_values_block()))?,
     )?;
+    exports.set("lua_reload_conf", lua.create_function(lua_reload_conf)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
 
