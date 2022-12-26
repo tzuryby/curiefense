@@ -1,26 +1,28 @@
-# Log format
-
 The log is by default sent to stdout. In the Curieproxy containers, it is piped to *filebeat* that will store it
 in ElasticSearch.
 
 The log file is a JSON encoded data structure, where the top level is an object with the following members:
 
- * `timestamp`: time when the request started to be processed, encoded as a string,
+ * `timestamp`: time when the request started to be processed, encoded as a string
  * `curiesession`: a session identifier (a string),
  * `curiesession_ids`: extra session identifiers (a list of NV items, see below),
- * `request_id`: unique identifier for the request, currently only provided by envoy,
- * `security_config`: see the *security config* section,
- * `arguments`: a list of NV items representing arguments,
- * `path`: query path,
+ * `request_id`: unique identifier for the request, provided by either envoy or Nginx `ngx.var.request_id`
+ * `security_config`: see the *security config* section
+ * `arguments`: a list of NV items representing arguments
+ * ~~`uri`: request URI, as a string~~
+ * `path`: query path
+	 * raw as submitted
+ * `query`: Query string
+	 * raw as submitted (with the "?" when presented)
  * `path_parts`: a list of NV items representing path parts,
- * `authority`: the authority meta data, if it exists, or the *host* header,
- * `cookies`: a list of NV items representing cookies,
- * `headers`: a list of NV items representing headers,
- * `tags`: a list of strings, representing the request tags,
- * `uri`: request URI, as a string,
- * `ip`: request IP, as a string,
- * `method`: request method verb, as a string,
- * `response_code`: the response code that was served to the user,
+	 * decoded
+ * `authority`: the `:authority` meta data, if it exists, or the *host* header
+ * `cookies`: a list of NV items representing cookies
+ * `headers`: a list of NV items representing headers
+ * `tags`: a list of strings, representing the request tags
+ * `ip`: request IP, as a string
+ * `method`: request method verb, as a string (uppercased)
+ * `response_code`: the response code that was served to the user (integer)
  * `logs`: a list of string, destined for human consumption, with an unspecified format,
  * `processing_stage`: a number representing the stage where the request stopped being processed:
     * 0: initialization, should never happen,
@@ -77,9 +79,9 @@ This is an object representing the security configuration when the request was m
  * `revision`: string, the revision, from the manifest file,
  * `acl_active`: boolean, true if ACL is enabled,
  * `cf_active`: boolean, true if content filters are enabled,
- * `cf_rules`: amount of content filter rules that were matched against the request,
- * `rate_limit_rules`: amount of rate limit rules,
- * `global_filters_active`: amount of global filters.
+ * `cf_rules`: number of content filter rules that were matched against the request,
+ * `rl_rules`: number of "Active" rate limit rules included with the session processing (global or path mathced)
+ * `gf_rules`: number of global filters included with the session processing
 
 ## Trigger lists
 
@@ -87,18 +89,20 @@ The fields named `TYPE_triggers` are lists of objects, representing the filter e
 Each of these objects contain information about the part of the request that triggered, as well as information
 specific to the type of trigger.
 
-The `active` key is also always present, and is `false` for decisions that did trigger an actual response
-(monitor decisions), and `true` otherwise.
+* `trigger_id`
+* `trigger_name`
+* `action`: string representing 
 
 ### Location data
 
-The following entries are all optional:
-
- * `request_element`, can be `ip`, `uri`, `referer_path`
- * `section`, can be `attributes`, `path`, `body`, `headers`, `body` or `plugins`;
+The following entries are **all optional**:
+ * `section`, can be `attributes [ip/uri/referer_path/etc.]`, `path`, `headers`, `body` or `plugins`;
+	 * *SAMPLES*:
+		 * 
  * `part`, indicate a "path part". Path parts are elements separated by slashes;
  * `name`, name of the argument, header or cookie that triggered the response;
  * `value`, actual value that triggered the response.
+
 
 ### Trigger specific entries
 
@@ -106,80 +110,39 @@ The following triggers are defined:
 
 #### ACL triggers
 
-There usual trigger has the following keys:
-
-  * `tags`, the list of tags that matched the ACL column,
-  * `stage`, the ACL column.
-
-Another possibility is:
-
-  * `type`, can be `phase1` or `phase2`, representing the stage where the grasshopper plug-in failed,
-  * `details`, an optional entry describing the issue.
+Contains:
+  * `tags`, list of strings, the list of tags that matched the ACL column
+  * `acl_action`, a string, the ACL column
 
 #### Rate limit triggers
 
-There is one kind of trigger, with the following keys:
-
-  * `id`, representing the rate limit id,
-  * `name`, representing the rate limit name,
-  * `threshold`, a number representing the limit threshold,
-  * `counter`, representing the actual number of requests (will always be equal to `threshold` + 1).
-
-#### Flow control triggers
-
-There is one kind of trigger, with the following keys:
-
-  * `id`, representing the flow control id,
-  * `name`, representing the flow control name.
+Contains:
+  * `threshold`, a number, representing the limit threshold
 
 #### Global filter triggers
 
-There is one kind of trigger, with the following keys:
+no specific fileds for global filter
 
-  * `id`, representing the global filter entry id,
-  * `name`, representing the global filter entry name.
+#### Content filter rules triggers
 
-#### Content filter triggers
+Contains:
 
-There are several entries, that can be distinguished with the `type` entry:
+  * `ruleid`, a string, the id of the matching rule,
+  * `risk_level`, a number, the risk level of the matching rule.
 
-When `type` is `signature`, it represents a content filter match, with the following entries:
+#### Content filter restriction triggers
 
-  * `ruleid`, the id of the matching rule,
-  * `risk_level`, the risk level of the matching rule.
+Contains:
 
-When `type` is `body_missing`, it means that the body was expected, but was missing.
-
-When `type` is `body_malformed`, it means that the body was expected to be of a specific type (such as Json),
-but was malformed. There is no extra information.
-
-When `type` is `body_too_deep`, it means that the body was parsed as a recursive data format (such as Json),
-but was deeper than expected. The following entries are present:
-
-  * `expected`, the maximum depth, as defined by the security policy,
-  * `actual`, the actual depth where the processing stopped. This is usually `expected` + 1.
-
-When `type` is `sqli`, it represents a *libinjection* SQLI match, with the `fp` entry that holds details.
-
-When `type` is `xss`, it represents a *libinjection* XSS match, with no additional data.
-
-When `type` is `restricted`, it means that some part of the request was marked as restricted and did not
-match the corresponding regular expression.
-
-When `type` is `too_many_entries`, it means that there were too many entries in a section, with the following entries:
-
-   * `expected`, maximum amount of entries, as described in the security policy,
-   * `actual`, actual amount of entries.
-
-When `type` is `entry_too_large`, it means that a section entry was too large, with the following entries:
-
-   * `expected`, maximum size of entries, as described in the security policy,
-   * `actual`, actual size of the offending entry.
+  * `type`, a string, can be `too deep`, `too large`, `missing body`, `malformed body`, `too many`, `too large`, `restricted`
+  * `actual`, a string
+  * `expected`, a string
 
 # Sample log
 
 ```json
 {
+  "action": "custom",
   "acl_triggers": [],
   "arguments": [
     {
@@ -191,12 +154,12 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
   "biometric": {},
   "content_filter_triggers": [
     {
+      "id": "dqssdqs",
       "active": true,
       "name": "lapin",
       "risk_level": 5,
       "ruleid": "100016",
       "section": "uri",
-      "type": "signature",
       "value": "xp_cmdshell"
     }
   ],
@@ -278,14 +241,7 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
   "reason": null,
   "request_id": null,
   "response_code": 503,
-  "security_config": {
-    "acl_active": false,
-    "cf_active": false,
-    "cf_rules": 188,
-    "global_filters_active": 1,
-    "rate_limit_rules": 0,
-    "revision": "216e288ba637dbaacec03d97cbb94b183d8b1c1f"
-  },
+
   "tags": [
     "flowc",
     "cf-rule-subcategory:built-in-function-invocation",
@@ -319,15 +275,19 @@ When `type` is `entry_too_large`, it means that a section entry was too large, w
     "status-class:5xx"
   ],
   "timestamp": "2022-10-03T09:58:41.951745024Z",
+  "security_config": {
+    "acl_active": false,
+    "cf_active": false,
+    "cf_rules": 188,
+    "global_filters_active": 1,
+    "rate_limit_rules": 0,
+    "revision": "216e288ba637dbaacec03d97cbb94b183d8b1c1f"
+  },  
   "trigger_counters": {
     "acl": 0,
-    "acl_active": 0,
     "content_filters": 1,
-    "content_filters_active": 0,
     "global_filters": 1,
-    "global_filters_active": 0,
-    "rate_limit": 1,
-    "rate_limit_active": 0
+    "rate_limit": 1
   },
   "uri": "/login?lapin=xp_cmdshell"
 }
