@@ -126,12 +126,27 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     bjson.push("json");
 
     let mut files_to_reload = HashSet::new();
-    for filename in filenames.iter() {
-        if let Some(deps) = CONFIG_DEPENDENCIES.get(filename.as_str()) {
-            files_to_reload.extend(deps.clone());
+    if filenames.is_empty() {
+        // if not filename was provided, reload all config files
+        files_to_reload.extend(vec![
+            "actions.json".to_string(),
+            "acl-profiles.json".to_string(),
+            "contentfilter-profiles.json".to_string(),
+            "contentfilter-rules.json".to_string(),
+            "globalfilter-lists.json".to_string(),
+            "limits.json".to_string(),
+            "securitypolicy.json".to_string(),
+            "flow-control.json".to_string(),
+            "virtual-tags.json".to_string(),
+        ]);
+    } else {
+        for filename in filenames.iter() {
+            if let Some(deps) = CONFIG_DEPENDENCIES.get(filename.as_str()) {
+                files_to_reload.extend(deps.clone());
+            }
         }
+        files_to_reload.extend(filenames);
     }
-    files_to_reload.extend(filenames);
 
     let mut config = match CONFIG.read() {
         Ok(cfg) => cfg.clone(),
