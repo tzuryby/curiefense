@@ -13,8 +13,8 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::PoisonError;
 use std::sync::RwLock;
-use std::time::SystemTime;
 
 use crate::config::limit::Limit;
 use crate::interface::SimpleAction;
@@ -33,8 +33,14 @@ use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
 lazy_static! {
-    pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::empty());
-    pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = RwLock::new(HashMap::new());
+    pub static ref CONFIG: RwLock<Config> = {
+        let config = Config::load(Logs::default(), "/cf-config/current/config");
+        RwLock::new(config)
+    };
+    pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = {
+        let hsdb = load_hsdb(&mut Logs::default(), "/cf-config/current/config").unwrap_or_default();
+        RwLock::new(hsdb)
+    };
     static ref CONFIG_DEPENDENCIES: HashMap<&'static str, Vec<String>> = {
         let mut map = HashMap::new();
 
@@ -63,53 +69,25 @@ lazy_static! {
     };
 }
 
-fn config_logs(cur: &mut Logs, cfg: &Config) {
-    cur.debug("CFGLOAD logs start");
-    cur.extend(cfg.logs.clone());
-    cur.debug("CFGLOAD logs end");
-}
-
 fn container_name() -> Option<String> {
     std::fs::read_to_string("/etc/hostname")
         .ok()
         .map(|s| s.trim().to_string())
 }
 
-pub fn with_config<R, F>(basepath: &str, logs: &mut Logs, f: F) -> Option<R>
+pub fn with_config<R, F>(_basepath: &str, logs: &mut Logs, f: F) -> Option<R>
 where
     F: FnOnce(&mut Logs, &Config) -> R,
 {
-    let (initial_config, initial_hsdb) = match CONFIG.read() {
-        Ok(cfg) => {
-            if cfg.last_mod != SystemTime::UNIX_EPOCH {
-                config_logs(logs, &cfg);
-                return Some(f(logs, &cfg));
-            }
-            // first time reading configuration
-            else {
-                let config_logs = Logs::default();
-                let last_mod = SystemTime::now();
-                Config::load(config_logs, basepath, last_mod)
-            }
-        }
+    match CONFIG.read() {
+        Ok(cfg) => Some(f(logs, &cfg)),
         Err(rr) =>
         // read failed :(
         {
             logs.error(|| rr.to_string());
-            return None;
+            None
         }
-    };
-    config_logs(logs, &initial_config);
-    let r = f(logs, &initial_config);
-    match CONFIG.write() {
-        Ok(mut w) => *w = initial_config,
-        Err(rr) => logs.error(|| rr.to_string()),
-    };
-    match HSDB.write() {
-        Ok(mut dbw) => *dbw = initial_hsdb,
-        Err(rr) => logs.error(|| rr.to_string()),
-    };
-    Some(r)
+    }
 }
 
 pub fn with_config_default_path<R, F>(logs: &mut Logs, f: F) -> Option<R>
@@ -222,7 +200,6 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         config.virtual_tags = virtual_tags;
     }
 
-    config.last_mod = SystemTime::now();
     match CONFIG.write() {
         Ok(mut w) => *w = config,
         Err(rr) => logs.error(|| rr.to_string()),
@@ -242,7 +219,6 @@ pub struct Config {
     pub securitypolicies: Vec<Matching<HostMap>>,
     pub globalfilters: Vec<GlobalFilterSection>,
     pub default: Option<HostMap>,
-    pub last_mod: SystemTime,
     pub container_name: Option<String>,
     pub flows: FlowMap,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
@@ -360,7 +336,6 @@ impl Config {
     fn resolve(
         logs: Logs,
         revision: String,
-        last_mod: SystemTime,
         actions: HashMap<String, SimpleAction>,
         rawmaps: Vec<RawHostMap>,
         rawlimits: Vec<RawLimit>,
@@ -401,7 +376,6 @@ impl Config {
             securitypolicies,
             globalfilters,
             default,
-            last_mod,
             container_name,
             flows,
             content_filter_profiles,
@@ -445,8 +419,7 @@ impl Config {
         out
     }
 
-    pub fn load(logs: Logs, basepath: &str, last_mod: SystemTime) -> (Config, HashMap<String, ContentFilterRules>) {
-        let mut logs = logs;
+    pub fn load(mut logs: Logs, basepath: &str) -> Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
@@ -476,7 +449,6 @@ impl Config {
         let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
         let acls = Config::load_config_file(&mut logs, &bjson, "acl-profiles.json");
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
-        let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
         let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
 
@@ -485,12 +457,9 @@ impl Config {
         let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
         let content_filter_profiles = ContentFilterProfile::resolve(&mut logs, &actions, rawcontentfilterprofiles);
 
-        let hsdb = resolve_rules(&mut logs, &content_filter_profiles, contentfilterrules);
-
-        let config = Config::resolve(
+        Config::resolve(
             logs,
             revision,
-            last_mod,
             actions,
             securitypolicy,
             limits,
@@ -500,9 +469,7 @@ impl Config {
             container_name,
             flows,
             virtualtags,
-        );
-
-        (config, hsdb)
+        )
     }
 
     pub fn empty() -> Config {
@@ -511,7 +478,6 @@ impl Config {
             securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
-            last_mod: SystemTime::UNIX_EPOCH,
             default: None,
             container_name: container_name(),
             flows: HashMap::new(),
@@ -525,6 +491,19 @@ impl Config {
             acls: HashMap::new(),
         }
     }
+}
+
+pub fn load_hsdb(
+    logs: &mut Logs,
+    configpath: &str,
+) -> Result<HashMap<String, ContentFilterRules>, PoisonError<std::sync::RwLockReadGuard<'static, Config>>> {
+    let mut bjson = PathBuf::from(configpath);
+    bjson.push("json");
+
+    CONFIG.read().map(|cfg| {
+        let contentfilterrules = Config::load_config_file(logs, &bjson, "contentfilter-rules.json");
+        resolve_rules(logs, &cfg.content_filter_profiles, contentfilterrules)
+    })
 }
 
 // securitypolicies_map, securitypolicies, default

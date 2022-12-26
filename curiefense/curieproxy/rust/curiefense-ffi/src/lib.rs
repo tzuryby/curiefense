@@ -407,8 +407,9 @@ pub unsafe extern "C" fn curiefense_stream_config_init(
         _ => return std::ptr::null_mut(),
     };
     let configpath = CStr::from_ptr(raw_configpath).to_string_lossy().to_string();
-    let now = std::time::SystemTime::now();
-    let (config, content_filter_rules) = curiefense::config::Config::load(Logs::new(lloglevel), &configpath, now);
+    let config = curiefense::config::Config::load(Logs::new(lloglevel), &configpath);
+    let content_filter_rules =
+        curiefense::config::load_hsdb(&mut Logs::new(lloglevel), &configpath).unwrap_or_default();
     Box::into_raw(Box::new(CFStreamConfig {
         loglevel: lloglevel,
         config: Arc::new(config),
