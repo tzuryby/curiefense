@@ -278,7 +278,7 @@ mod test {
         hostmap::{HostMap, PolicyId},
         raw::AclProfile,
     };
-    use std::time::SystemTime;
+    use std::{collections::HashSet, time::SystemTime};
 
     use super::*;
 
@@ -316,6 +316,11 @@ mod test {
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
             virtual_tags: Arc::new(HashMap::new()),
+            actions: HashMap::new(),
+            limits: HashMap::new(),
+            global_limits: Vec::new(),
+            inactive_limits: HashSet::new(),
+            acls: HashMap::new(),
         }
     }
 
