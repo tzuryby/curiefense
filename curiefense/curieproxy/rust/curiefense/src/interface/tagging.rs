@@ -10,7 +10,6 @@ pub enum Location {
     Attributes,
     Ip,
     Uri,
-    Path,
     Pathpart(usize),
     PathpartValue(usize, String),
     RefererPath,
@@ -42,7 +41,6 @@ impl std::fmt::Display for Location {
             Attributes => write!(f, "attributes"),
             Ip => write!(f, "ip"),
             Uri => write!(f, "uri"),
-            Path => write!(f, "path"),
             Pathpart(p) => write!(f, "path part {}", p),
             PathpartValue(p, v) => write!(f, "path part {}={}", p, v),
             UriArgument(a) => write!(f, "URI argument {}", a),
@@ -79,16 +77,21 @@ impl Serialize for Location {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum ParentMode {
+    AllParents,
+    LoggingOnly,
+}
+
 impl Location {
-    pub fn parent(&self) -> Option<Self> {
+    pub fn parent(&self, mode: ParentMode) -> Option<Self> {
         use Location::*;
         match self {
             Request => None,
             Attributes => Some(Request),
             Ip => Some(Attributes),
             Uri => Some(Request),
-            Path => Some(Uri),
-            Pathpart(_) => Some(Path),
+            Pathpart(_) => Some(Uri),
             PathpartValue(k, _) => Some(Pathpart(*k)),
             UriArgument(_) => Some(Uri),
             UriArgumentValue(n, _) => Some(UriArgument(n.clone())),
@@ -98,12 +101,18 @@ impl Location {
             Headers => Some(Request),
             Header(_) => Some(Headers),
             HeaderValue(n, _) => Some(Header(n.clone())),
-            Cookies => Some(Request),
+            Cookies => Some(match mode {
+                ParentMode::AllParents => Header("cookie".to_string()),
+                ParentMode::LoggingOnly => Request,
+            }),
             Cookie(_) => Some(Cookies),
             CookieValue(n, _) => Some(Cookie(n.clone())),
-            RefererArgument(_) => Some(Header("referer".to_string())),
+            RefererArgument(_) => Some(RefererPath),
             RefererArgumentValue(n, _) => Some(RefererArgument(n.clone())),
-            RefererPath => Some(Header("referer".to_string())),
+            RefererPath => Some(match mode {
+                ParentMode::AllParents => Header("referer".to_string()),
+                ParentMode::LoggingOnly => Request,
+            }),
             RefererPathpart(_) => Some(RefererPath),
             RefererPathpartValue(k, _) => Some(RefererPathpart(*k)),
             Plugins => Some(Request),
@@ -112,10 +121,10 @@ impl Location {
         }
     }
 
-    pub fn get_locations(&self) -> HashSet<Self> {
+    pub fn get_locations(&self, mode: ParentMode) -> HashSet<Self> {
         let mut out = HashSet::new();
         let mut start = self.clone();
-        while let Some(p) = start.parent() {
+        while let Some(p) = start.parent(mode) {
             out.insert(start);
             start = p;
         }
@@ -127,7 +136,7 @@ impl Location {
         match idx {
             SectionIdx::Headers => Location::HeaderValue(name.to_string(), value.to_string()),
             SectionIdx::Cookies => Location::CookieValue(name.to_string(), value.to_string()),
-            SectionIdx::Path => Location::Path,
+            SectionIdx::Path => Location::Uri,
             // TODO: track body / uri args
             SectionIdx::Args => Location::UriArgumentValue(name.to_string(), value.to_string()),
             SectionIdx::Plugins => Location::PluginValue(name.to_string(), value.to_string()),
@@ -137,7 +146,7 @@ impl Location {
         match idx {
             SectionIdx::Headers => Location::Header(name.to_string()),
             SectionIdx::Cookies => Location::Cookie(name.to_string()),
-            SectionIdx::Path => Location::Path,
+            SectionIdx::Path => Location::Uri,
             // TODO: track body / uri args
             SectionIdx::Args => Location::UriArgument(name.to_string()),
             SectionIdx::Plugins => Location::Plugin(name.to_string()),
@@ -147,7 +156,7 @@ impl Location {
         match idx {
             SectionIdx::Headers => Location::Headers,
             SectionIdx::Cookies => Location::Cookies,
-            SectionIdx::Path => Location::Path,
+            SectionIdx::Path => Location::Uri,
             // TODO: track body / uri args
             SectionIdx::Args => Location::Uri,
             SectionIdx::Plugins => Location::Plugins,
@@ -163,22 +172,19 @@ impl Location {
                 map.serialize_entry("section", "attributes")?;
             }
             Location::Ip => {
-                map.serialize_entry("request_element", "ip")?;
+                map.serialize_entry("name", "ip")?;
             }
             Location::Uri => {
-                map.serialize_entry("request_element", "uri")?;
+                map.serialize_entry("section", "uri")?;
             }
             Location::RefererPath => {
-                map.serialize_entry("request_element", "referer_path")?;
+                map.serialize_entry("section", "referer")?;
             }
             Location::RefererPathpart(part) => {
-                map.serialize_entry("part", part)?;
+                map.serialize_entry("name", part)?;
             }
             Location::RefererPathpartValue(_, value) => {
                 map.serialize_entry("value", value)?;
-            }
-            Location::Path => {
-                map.serialize_entry("section", "path")?;
             }
             Location::Pathpart(part) => {
                 map.serialize_entry("part", part)?;
@@ -193,10 +199,10 @@ impl Location {
                 map.serialize_entry("value", value)?;
             }
             Location::RefererArgument(name) => {
-                map.serialize_entry("ref_name", name)?;
+                map.serialize_entry("name", name)?;
             }
             Location::RefererArgumentValue(_, value) => {
-                map.serialize_entry("ref_value", value)?;
+                map.serialize_entry("value", value)?;
             }
             Location::Body => {
                 map.serialize_entry("section", "body")?;
@@ -235,7 +241,7 @@ impl Location {
                 map.serialize_entry("value", value)?;
             }
         }
-        if let Some(p) = self.parent() {
+        if let Some(p) = self.parent(ParentMode::LoggingOnly) {
             p.serialize_with_parent::<S>(map)?;
         }
         Ok(())
@@ -243,11 +249,11 @@ impl Location {
 }
 
 /// computes all parents
-pub fn all_parents(locs: HashSet<Location>) -> HashSet<Location> {
+pub fn all_parents(locs: HashSet<Location>, mode: ParentMode) -> HashSet<Location> {
     let mut out = locs.clone();
     let mut to_compute = locs;
     loop {
-        let to_compute_prime = to_compute.iter().filter_map(|l| l.parent()).collect::<HashSet<_>>();
+        let to_compute_prime = to_compute.iter().filter_map(|l| l.parent(mode)).collect::<HashSet<_>>();
         let diff = to_compute_prime.difference(&out).cloned().collect::<HashSet<_>>();
         if diff.is_empty() {
             break;
@@ -555,7 +561,6 @@ mod test {
             Attributes,
             Ip,
             Uri,
-            Path,
             Pathpart(5),
             RefererPath,
             RefererPathpart(5),

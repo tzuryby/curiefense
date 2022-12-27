@@ -49,10 +49,10 @@ fn logging_empty(c: &mut Criterion) {
     let stats =
         StatsCollect::new(std::time::Instant::now(), "QSDQSDQSD".into()).secpol(SecpolStats::build(&secpolicy, 0));
     let reqinfo = map_request(&mut logs, secpolicy, None, &raw, None, HashMap::new());
-    let (itags, _, stats) = tag_request(stats, false, &[], &reqinfo, &VirtualTags::default());
+    let (itags, globalfilter_dec, stats) = tag_request(stats, false, &[], &reqinfo, &VirtualTags::default());
     let p0 = APhase0 {
         flows: HashMap::new(),
-        globalfilter_dec: SimpleDecision::Pass,
+        globalfilter_dec,
         is_human: false,
         itags,
         reqinfo,

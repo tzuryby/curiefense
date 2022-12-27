@@ -232,13 +232,23 @@ pub struct RawAction {
     pub params: RawActionParams,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum RawActionType {
     Skip,
     Monitor,
     Custom,
     Challenge,
+}
+
+impl RawActionType {
+    pub fn is_final(&self) -> bool {
+        *self != RawActionType::Monitor
+    }
+
+    pub fn inactive(&mut self) {
+        *self = RawActionType::Monitor
+    }
 }
 
 impl std::default::Default for RawActionType {

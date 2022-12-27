@@ -22,7 +22,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use analyze::{APhase0, CfRulesArg};
-use body::body_too_large;
 use config::virtualtags::VirtualTags;
 use config::with_config;
 use grasshopper::Grasshopper;
@@ -35,6 +34,7 @@ use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
 use crate::config::hostmap::SecurityPolicy;
+use crate::interface::SimpleAction;
 
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
     if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
@@ -108,7 +108,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     #[allow(clippy::large_enum_variant)]
     enum RequestMappingResult<A> {
         NoSecurityPolicy,
-        BodyTooLarge((Action, BlockReason), RequestInfo),
+        BodyTooLarge((SimpleAction, BlockReason), RequestInfo),
         Res(A),
     }
 
@@ -128,10 +128,15 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                     if body.len() > secpolicy.content_filter_profile.max_body_size
                         && !secpolicy.content_filter_profile.ignore_body
                     {
-                        Some(body_too_large(
-                            secpolicy.content_filter_profile.id.clone(),
-                            secpolicy.content_filter_profile.max_body_size,
-                            body.len(),
+                        Some((
+                            secpolicy.content_filter_profile.action.clone(),
+                            BlockReason::body_too_large(
+                                secpolicy.content_filter_profile.id.clone(),
+                                secpolicy.content_filter_profile.name.clone(),
+                                secpolicy.content_filter_profile.action.atype.to_raw(),
+                                body.len(),
+                                secpolicy.content_filter_profile.max_body_size,
+                            ),
                         ))
                     } else {
                         None
@@ -173,8 +178,10 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     }) {
         Some(RequestMappingResult::Res(x)) => x,
         Some(RequestMappingResult::BodyTooLarge((action, br), rinfo)) => {
+            let mut tags = tags;
+            let decision = action.to_decision(false, mgh, &rinfo, &mut tags, vec![br]);
             return Err(AnalyzeResult {
-                decision: Decision::action(action, vec![br]),
+                decision,
                 tags,
                 rinfo,
                 stats: Stats::new(logs.start, "unknown".into()),

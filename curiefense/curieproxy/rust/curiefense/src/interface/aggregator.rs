@@ -7,9 +7,10 @@ use serde_json::Value;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::hash::Hash;
 
+use crate::config::raw::RawActionType;
 use crate::utils::RequestInfo;
 
-use super::{BDecision, Decision, Location, Tags};
+use super::{Decision, Location, Tags};
 
 lazy_static! {
     static ref AGGREGATED: Mutex<HashMap<AggregationKey, BTreeMap<i64, AggregatedCounters>>> =
@@ -517,28 +518,26 @@ impl AggregatedCounters {
         let mut cf_report = false;
         for r in &dec.reasons {
             use super::Initiator::*;
-            let this_blocked = match r.decision {
-                BDecision::Skip => {
+            let this_blocked = match r.action {
+                RawActionType::Skip => {
                     skipped = true;
                     false
                 }
-                BDecision::Monitor => false,
-                BDecision::AlterRequest => false,
-                BDecision::InitiatorInactive => false,
-                BDecision::Blocking => {
+                RawActionType::Monitor => false,
+                RawActionType::Custom | RawActionType::Challenge => {
                     blocked = true;
                     true
                 }
             };
             match &r.initiator {
-                GlobalFilter { id: _, name: _ } => {
+                GlobalFilter => {
                     if this_blocked {
                         self.requests_triggered_globalfilter_active += 1;
                     } else {
                         self.requests_triggered_globalfilter_report += 1;
                     }
                 }
-                Acl { id: _, tags: _, stage } => {
+                Acl { tags: _, stage } => {
                     if this_blocked {
                         acl_blocked = true;
                         self.requests_triggered_acl_active += 1;
@@ -559,11 +558,7 @@ impl AggregatedCounters {
                     }
                     self.challenge += 1;
                 }
-                Limit {
-                    id: _,
-                    name: _,
-                    threshold: _,
-                } => {
+                Limit { threshold: _ } => {
                     if this_blocked {
                         self.requests_triggered_ratelimit_active += 1;
                     } else {
@@ -571,7 +566,7 @@ impl AggregatedCounters {
                     }
                 }
 
-                ContentFilter { id, risk_level } => {
+                ContentFilter { ruleid, risk_level } => {
                     let cursor = if this_blocked {
                         cf_blocked = true;
                         self.requests_triggered_cf_active += 1;
@@ -581,7 +576,7 @@ impl AggregatedCounters {
                         self.requests_triggered_cf_report += 1;
                         ArpCursor::Report
                     };
-                    self.ruleid.get_mut(cursor).inc(id.clone());
+                    self.ruleid.get_mut(cursor).inc(ruleid.clone());
                     self.risk_level.get_mut(cursor).inc(*risk_level);
                 }
                 Restriction { .. } => {
@@ -611,7 +606,7 @@ impl AggregatedCounters {
                     | Location::UriArgument(_) => aggloc.args += 1,
                     Location::Request => (),
                     Location::Ip => aggloc.attrs += 1,
-                    Location::Path | Location::Pathpart(_) | Location::PathpartValue(_, _) => aggloc.uri += 1,
+                    Location::Pathpart(_) | Location::PathpartValue(_, _) => aggloc.uri += 1,
                     Location::Header(_)
                     | Location::HeaderValue(_, _)
                     | Location::RefererPath

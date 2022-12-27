@@ -96,6 +96,28 @@
     "name": "Add header to forwarded request"
   },
   {
+    "params": {
+      "headers": {
+        "header1": "value_1"
+      }
+    },
+    "type": "monitor",
+    "id": "header1",
+    "tags": [],
+    "name": "Add header to forwarded request"
+  },
+  {
+    "params": {
+      "headers": {
+        "header2": "value_2"
+      }
+    },
+    "type": "monitor",
+    "id": "header2",
+    "tags": [],
+    "name": "Add header to forwarded request"
+  },
+  {
     "type": "monitor",
     "id": "monitor",
     "tags": [],

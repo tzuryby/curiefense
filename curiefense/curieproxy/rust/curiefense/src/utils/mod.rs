@@ -100,10 +100,28 @@ fn parse_query_params(rf: &mut RequestField, query: &str, mode: ParseUriMode) {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BodyProblem {
+    TooDeep,
+    DecodingError(String, Option<String>),
+}
+
+impl std::fmt::Display for BodyProblem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BodyProblem::TooDeep => "too deep".fmt(f),
+            BodyProblem::DecodingError(actual, expected) => match expected {
+                Some(e) => write!(f, "actual:{} expected:{}", actual, e),
+                None => actual.fmt(f),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BodyDecodingResult {
     NoBody,
     ProperlyDecoded,
-    DecodingFailed(String),
+    DecodingFailed(BodyProblem),
 }
 
 fn parse_uri(
@@ -111,19 +129,20 @@ fn parse_uri(
     path_as_map: &mut RequestField,
     path: &str,
     mode: ParseUriMode,
-) -> (String, String) {
+) -> (String, Option<String>) {
     let prefix = mode.prefix();
     let (qpath, query) = match path.splitn(2, '?').collect_tuple() {
         Some((qpath, query)) => {
             parse_query_params(args, query, mode);
-            (qpath.to_string(), query.to_string())
+            let nquery = "?".to_string() + query;
+            (qpath.to_string(), Some(nquery))
         }
-        None => (path.to_string(), String::new()),
+        None => (path.to_string(), None),
     };
     path_as_map.add(
         format!("{}path", prefix),
         match mode {
-            ParseUriMode::Uri => Location::Path,
+            ParseUriMode::Uri => Location::Uri,
             ParseUriMode::Referer => Location::Header("referer".to_string()),
         },
         qpath.clone(),
@@ -196,7 +215,7 @@ pub struct QueryInfo {
     /// the "path" portion of the raw query path
     pub qpath: String,
     /// the "query" portion of the raw query path
-    pub query: String,
+    pub query: Option<String>,
     /// URL decoded path, if decoding worked
     pub uri: String,
     pub args: RequestField,
@@ -369,7 +388,7 @@ impl RequestInfo {
         let mut attrs: HashMap<String, Option<String>> = [
             ("uri", Some(self.rinfo.qinfo.uri)),
             ("path", Some(self.rinfo.qinfo.qpath)),
-            ("query", Some(self.rinfo.qinfo.query)),
+            ("query", self.rinfo.qinfo.query),
             ("ip", Some(self.rinfo.geoip.ipstr)),
             ("authority", Some(self.rinfo.host)),
             ("method", Some(self.rinfo.meta.method)),
@@ -769,15 +788,7 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Network => reqinfo.rinfo.geoip.network.as_ref().map(Selected::Str),
         RequestSelector::Uri => Some(&reqinfo.rinfo.qinfo.uri).map(Selected::Str),
         RequestSelector::Path => Some(&reqinfo.rinfo.qinfo.qpath).map(Selected::Str),
-        RequestSelector::Query => {
-            let q = &reqinfo.rinfo.qinfo.query;
-            // an empty query string is considered missing
-            if q.is_empty() {
-                None
-            } else {
-                Some(Selected::Str(q))
-            }
-        }
+        RequestSelector::Query => reqinfo.rinfo.qinfo.query.as_ref().map(Selected::Str),
         RequestSelector::Method => Some(&reqinfo.rinfo.meta.method).map(Selected::Str),
         RequestSelector::Country => reqinfo.rinfo.geoip.country_iso.as_ref().map(Selected::Str),
         RequestSelector::Authority => Some(Selected::Str(&reqinfo.rinfo.host)),
@@ -850,7 +861,10 @@ mod tests {
 
         assert_eq!(qinfo.qpath, "/a/b/%20c");
         assert_eq!(qinfo.uri, "/a/b/ c?xa =12&bbbb=12(&cccc&b64=YXJndW1lbnQ=");
-        assert_eq!(qinfo.query, "xa%20=12&bbbb=12%28&cccc&b64=YXJndW1lbnQ%3D");
+        assert_eq!(
+            qinfo.query,
+            Some("?xa%20=12&bbbb=12%28&cccc&b64=YXJndW1lbnQ%3D".to_string())
+        );
 
         let expected_args: RequestField = RequestField::from_iterator(
             &[],
@@ -895,7 +909,7 @@ mod tests {
 
         assert_eq!(qinfo.qpath, "/a/b");
         assert_eq!(qinfo.uri, "/a/b");
-        assert_eq!(qinfo.query, "");
+        assert_eq!(qinfo.query, None);
 
         assert_eq!(qinfo.args, RequestField::new(&[]));
     }
@@ -933,7 +947,7 @@ mod tests {
         for (k, v) in &[("arg1", "x"), ("arg2", "y"), ("ref:arg1", "a"), ("ref:arg2", "b")] {
             expected_args.add(k.to_string(), p(k, v), v.to_string());
         }
-        expected_path.add("path".to_string(), Location::Path, "/this/is/the/path".to_string());
+        expected_path.add("path".to_string(), Location::Uri, "/this/is/the/path".to_string());
         for (p, v) in &[(1, "this"), (2, "is"), (3, "the"), (4, "path")] {
             expected_path.add(
                 format!("part{}", p),
