@@ -20,18 +20,18 @@ fn build_key(reqinfo: &RequestInfo, tags: &Tags, limit: &Limit) -> Option<String
 fn limit_pure_react(tags: &mut Tags, limit: &Limit, threshold: &LimitThreshold) -> SimpleDecision {
     tags.insert_qualified("limit-id", &limit.id, Location::Request);
     tags.insert_qualified("limit-name", &limit.name, Location::Request);
-    let action = threshold.action.clone();
-    let decision = action.atype.to_bdecision();
+    let saction = threshold.action.clone();
+    let action = saction.atype.to_raw();
     for t in &limit.tags {
         tags.insert(t, Location::Request);
     }
     SimpleDecision::Action(
-        action,
+        saction,
         vec![BlockReason::limit(
             limit.id.clone(),
             limit.name.clone(),
             threshold.limit,
-            decision,
+            action,
         )],
     )
 }
