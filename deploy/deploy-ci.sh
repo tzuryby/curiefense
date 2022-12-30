@@ -65,7 +65,7 @@ INGRESS_HOST=$(minikube ip)
 INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
 URL=$INGRESS_HOST:$INGRESS_PORT
 
-while ! curl -fsS "http://$URL/productpage" | grep -q "command=GET";
+while ! curl -fsS "http://$URL/productpage" | grep "GET /productpage";
 do
     if [[ $(date -u +%s) -ge $endtime ]];
     then
