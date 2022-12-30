@@ -21,7 +21,7 @@ spec:
         app: echoserver
     spec:
       containers:
-      - image: gcr.io/google_containers/echoserver:1.0
+      - image: jmalloc/echo-server
         imagePullPolicy: IfNotPresent
         name: echoserver
         ports:
