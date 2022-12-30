@@ -40,6 +40,7 @@ nohup minikube tunnel > "$LOGS_DIR/minikube-tunnel.log" &
 pushd deploy/istio-helm || exit
 ./deploy.sh -f charts/use-local-bucket.yaml -f charts/values-istio-ci.yaml
 sleep 10
+kubectl apply -f set-xff-2-hops.yaml
 popd || exit
 
 PARAMS=()
