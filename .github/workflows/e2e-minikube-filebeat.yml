@@ -57,12 +57,11 @@ jobs:
             echo "-- Run e2e tests --"
             pushd e2e
 
-            # TODO(flaper87): Work on enabling full e2e
-            # tests.
             export IP=$(minikube ip)
             export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
             export IPPORT=$IP:$INGRESS_PORT
-            pytest --log-level INFO --base-protected-url http://$IPPORT --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:30200/ --junit-xml pytest.xml --luatests-path ../curiefense/curieproxy/rust/luatests
+            # TODO logging tests -- disabled because ES is no longer part of the helm charts
+            pytest -k 'not logging' --log-level INFO --base-protected-url http://$IPPORT --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:30200/ --junit-xml pytest.xml --luatests-path ../curiefense/curieproxy/rust/luatests
 
       - name: Dump logs
         if: ${{ failure() }}
