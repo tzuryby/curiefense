@@ -90,7 +90,8 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
     --   * path : the full request uri
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
-    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
+    --   * scheme: http / https
+    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil, scheme=handle.var.scheme }
     local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content,
             ip=handle.var.remote_addr, hops=HOPS, plugins=plugins}
 
