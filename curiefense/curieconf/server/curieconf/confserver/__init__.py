@@ -16,7 +16,9 @@ app = Flask(__name__)
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.register_blueprint(api_v3.api_bp, url_prefix=os.environ.get("SWAGGER_BASE_PATH", "/api/v3"))
+app.register_blueprint(
+    api_v3.api_bp, url_prefix=os.environ.get("SWAGGER_BASE_PATH", "/api/v3")
+)
 
 
 def drop_into_pdb(app, exception):

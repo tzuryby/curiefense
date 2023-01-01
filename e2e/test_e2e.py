@@ -7,10 +7,12 @@
 #
 # To run this with minikube (does not support IPv6):
 #
-# pytest --base-protected-url http://$(minikube ip):30081 --base-conf-url http://$(minikube ip):30000/api/v3/ --base-ui-url http://$(minikube ip):30080 --elasticsearch-url http://$IP:30200 .      # pylint: disable=line-too-long
+# export IP=$(minikube ip)
+# pytest --base-protected-url http://$IP:30081 --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:30200 --luatests-path ../curiefense/curieproxy/rust/luatests .      # pylint: disable=line-too-long
 #
 # To run this with docker-compose:
-# pytest --base-protected-url http://localhost:30081/ --base-conf-url http://localhost:30000/api/v3/ --base-ui-url http://localhost:30080 --elasticsearch-url http://localhost:9200 .      # pylint: disable=line-too-long
+# export IP=localhost
+# pytest --base-protected-url http://$IP:30081/ --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:9200 --luatests-path ../curiefense/curieproxy/rust/luatests .      # pylint: disable=line-too-long
 
 from typing import Any, Dict, List, Optional
 import reqflip

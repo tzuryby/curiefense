@@ -472,8 +472,8 @@
             },
             {
                 "match": "^/limits/include",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits include",
+                "id": "limits include",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -496,8 +496,8 @@
             },
             {
                 "match": "^/limits/method",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits method",
+                "id": "limits method",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -508,8 +508,8 @@
             },
             {
                 "match": "^/limits/exclude",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits exclude",
+                "id": "limits exclude",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
