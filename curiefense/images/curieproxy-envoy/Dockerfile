@@ -1,10 +1,10 @@
 ARG RUSTBIN_TAG=latest
-FROM curiefense/curiefense-rustbuild-bionic:${RUSTBIN_TAG} AS rustbin
-FROM envoyproxy/envoy:v1.23.1
+FROM curiefense/curiefense-rustbuild-focal:${RUSTBIN_TAG} AS rustbin
+FROM envoyproxy/envoy:v1.24.1
 
 RUN apt-get update && \
     apt-get -qq -y --no-install-recommends install jq luarocks libpcre2-dev libgeoip-dev \
-    python gcc g++ make unzip libhyperscan4 libhyperscan-dev curl && \
+    python gcc g++ make unzip libhyperscan5 libhyperscan-dev curl && \
     luarocks install lrexlib-pcre2 && \
     luarocks install lua-cjson && \
     luarocks install lua-resty-string && \
