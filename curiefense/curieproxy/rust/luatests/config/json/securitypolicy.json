@@ -531,6 +531,30 @@
                 ]
             },
             {
+                "match": "^/limits/thresholdskip",
+                "name": "skipping threshold",
+                "id": "skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "skipthreshold"
+                ]
+            },
+            {
+                "match": "^/limits/thresholdnoskip",
+                "name": "no skipping threshold",
+                "id": "no skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "noskipthreshold"
+                ]
+            },
+            {
                 "match": "^/limits/multilimits",
                 "name": "multiple limits same location",
                 "id": "multiple limits same location",
