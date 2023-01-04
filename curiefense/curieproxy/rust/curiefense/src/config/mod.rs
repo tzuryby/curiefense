@@ -75,12 +75,21 @@ fn container_name() -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
-pub fn with_config<R, F>(_basepath: &str, logs: &mut Logs, f: F) -> Option<R>
+fn config_logs(cur: &mut Logs, cfg: &Config) {
+    cur.debug("CFGLOAD logs start");
+    cur.extend(cfg.logs.clone());
+    cur.debug("CFGLOAD logs end");
+}
+
+pub fn with_config<R, F>(logs: &mut Logs, f: F) -> Option<R>
 where
     F: FnOnce(&mut Logs, &Config) -> R,
 {
     match CONFIG.read() {
-        Ok(cfg) => Some(f(logs, &cfg)),
+        Ok(cfg) => {
+            config_logs(logs, &cfg);
+            Some(f(logs, &cfg))
+        }
         Err(rr) =>
         // read failed :(
         {
@@ -88,13 +97,6 @@ where
             None
         }
     }
-}
-
-pub fn with_config_default_path<R, F>(logs: &mut Logs, f: F) -> Option<R>
-where
-    F: FnOnce(&mut Logs, &Config) -> R,
-{
-    with_config("/cf-config/current/config", logs, f)
 }
 
 pub fn reload_config(basepath: &str, filenames: Vec<String>) {
@@ -199,6 +201,8 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         let virtual_tags = vtags_resolve(&mut logs, raw_virtual_tags);
         config.virtual_tags = virtual_tags;
     }
+
+    config.logs = logs.clone();
 
     match CONFIG.write() {
         Ok(mut w) => *w = config,
@@ -419,7 +423,7 @@ impl Config {
         out
     }
 
-    pub fn load(mut logs: Logs, basepath: &str) -> Config {
+    fn load(mut logs: Logs, basepath: &str) -> Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
@@ -588,11 +592,4 @@ fn sec_pol_resolve(
     securitypolicies.sort_by_key(|b| std::cmp::Reverse(b.matcher_len()));
 
     (securitypolicies_map, securitypolicies, default)
-}
-
-pub fn init_config() -> (bool, Vec<String>) {
-    let mut logs = Logs::default();
-    with_config_default_path(&mut logs, |_, _| {});
-    let is_ok = logs.logs.is_empty();
-    (is_ok, logs.to_stringvec())
 }
