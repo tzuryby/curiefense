@@ -162,7 +162,11 @@ global:
   hub: docker.io/istio
 
   # Default tag for Istio images.
-  tag: 1.13.2
+  tag: 1.16.1
+
+  # Variant of the image to use.
+  # Currently supported are: [debug, distroless]
+  variant: ""
 
   # Specify image pull policy if default behavior isn't desired.
   # Default behavior: latest images will be Always else IfNotPresent.
