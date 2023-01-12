@@ -32,6 +32,19 @@ use self::matchers::RequestSelector;
 use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
+static ALL_CONFIG_FILES: [&str; 10] = [
+    "actions.json",
+    "acl-profiles.json",
+    "contentfilter-profiles.json",
+    "contentfilter-rules.json",
+    "globalfilter-lists.json",
+    "limits.json",
+    "manifest.json",
+    "securitypolicy.json",
+    "flow-control.json",
+    "virtual-tags.json",
+];
+
 lazy_static! {
     pub static ref CONFIG: RwLock<Config> = {
         let config = Config::load(Logs::default(), "/cf-config/current/config");
@@ -53,6 +66,7 @@ lazy_static! {
                 "globalfilter-lists.json".to_string(),
                 "limits.json".to_string(),
                 "securitypolicy.json".to_string(),
+                "manifest.json".to_string(),
             ],
         );
         map.insert(
@@ -60,10 +74,24 @@ lazy_static! {
             vec![
                 "contentfilter-rules.json".to_string(),
                 "securitypolicy.json".to_string(),
+                "manifest.json".to_string(),
             ],
         );
-        map.insert("limits.json", vec!["securitypolicy.json".to_string()]);
-        map.insert("acl-profiles.json", vec!["securitypolicy.json".to_string()]);
+        map.insert(
+            "limits.json",
+            vec!["securitypolicy.json".to_string(), "manifest.json".to_string()],
+        );
+        map.insert(
+            "acl-profiles.json",
+            vec!["securitypolicy.json".to_string(), "manifest.json".to_string()],
+        );
+
+        // add generic dependency to the manifest
+        for f in ALL_CONFIG_FILES {
+            if !map.contains_key(f) && f != "manifest.json" {
+                map.insert(f, vec!["manifest.json".to_string()]);
+            }
+        }
 
         map
     };
@@ -108,17 +136,7 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     let mut files_to_reload = HashSet::new();
     if filenames.is_empty() {
         // if not filename was provided, reload all config files
-        files_to_reload.extend(vec![
-            "actions.json".to_string(),
-            "acl-profiles.json".to_string(),
-            "contentfilter-profiles.json".to_string(),
-            "contentfilter-rules.json".to_string(),
-            "globalfilter-lists.json".to_string(),
-            "limits.json".to_string(),
-            "securitypolicy.json".to_string(),
-            "flow-control.json".to_string(),
-            "virtual-tags.json".to_string(),
-        ]);
+        files_to_reload.extend(ALL_CONFIG_FILES.iter().map(|s| s.to_string()));
     } else {
         for filename in filenames.iter() {
             if let Some(deps) = CONFIG_DEPENDENCIES.get(filename.as_str()) {
@@ -137,6 +155,26 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     };
     let mut hsdb: Option<_> = None;
 
+    if files_to_reload.contains("manifest.json") {
+        let mmanifest: Result<RawManifest, String> = PathBuf::from(basepath)
+            .parent()
+            .ok_or_else(|| "could not get parent directory?".to_string())
+            .and_then(|x| {
+                let mut pth = x.to_owned();
+                pth.push("manifest.json");
+                std::fs::File::open(pth).map_err(|rr| rr.to_string())
+            })
+            .and_then(|file| serde_json::from_reader(file).map_err(|rr| rr.to_string()));
+
+        let revision = match mmanifest {
+            Err(rr) => {
+                logs.error(move || format!("When loading manifest.json: {}", rr));
+                "unknown".to_string()
+            }
+            Ok(manifest) => manifest.meta.version,
+        };
+        config.revision = revision;
+    }
     if files_to_reload.contains("actions.json") {
         let rawactions = Config::load_config_file(&mut logs, &bjson, "actions.json");
         let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
