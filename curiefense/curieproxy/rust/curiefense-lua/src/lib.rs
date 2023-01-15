@@ -9,6 +9,7 @@ use curiefense::analyze::APhase2O;
 use curiefense::analyze::APhase3;
 use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
+use curiefense::config::reload_config;
 use curiefense::grasshopper::DynGrasshopper;
 use curiefense::grasshopper::Grasshopper;
 use curiefense::inspect_generic_request_map;
@@ -39,7 +40,6 @@ struct LuaArgs<'l> {
     loglevel: LogLevel,
     secpolid: Option<String>,
     humanity: Option<bool>,
-    configpath: String,
     plugins: HashMap<String, String>,
 }
 
@@ -69,7 +69,6 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         .get("secpolid")
         .map_err(|_| "Missing log level argument".to_string())?;
     let vhumanity = args.get("human").map_err(|_| "Missing human argument".to_string())?;
-    let vconfigpath = args.get("configpath").map_err(|_| "Missing config path".to_string())?;
     let loglevel = match String::from_lua(vloglevel, lua) {
         Err(rr) => return Err(format!("Could not convert the loglevel argument: {}", rr)),
         Ok(m) => match m.as_str() {
@@ -112,10 +111,6 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         Err(rr) => return Err(format!("Could not convert the humanity argument: {}", rr)),
         Ok(h) => h,
     };
-    let configpath: Option<String> = match FromLua::from_lua(vconfigpath, lua) {
-        Err(rr) => return Err(format!("Could not convert the config path argument: {}", rr)),
-        Ok(p) => p,
-    };
     let mplugins: Option<HashMap<String, HashMap<String, String>>> = match FromLua::from_lua(vplugins, lua) {
         Err(rr) => return Err(format!("Could not convert the plugins argument: {}", rr)),
         Ok(p) => p,
@@ -128,7 +123,6 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         loglevel,
         secpolid,
         humanity,
-        configpath: configpath.unwrap_or_else(|| "/cf-config/current/config".to_string()),
         plugins: mplugins
             .unwrap_or_default()
             .into_iter()
@@ -147,7 +141,6 @@ fn lua_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectionResu
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
             let res = inspect_request(
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -171,7 +164,6 @@ fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult<APhase1>
             let grasshopper = &DynGrasshopper {};
             let res = inspect_init(
                 lua_args.loglevel,
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -235,6 +227,38 @@ fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LuaIn
     Ok(LuaInspectionResult(Ok(InspectionResult::from_analyze(logs, res))))
 }
 
+fn lua_reload_conf(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<Option<String>> {
+    let (lfilename, lconfigpath) = args;
+
+    let raw_files: Option<String> = match FromLua::from_lua(lfilename, lua) {
+        Err(rr) => return Ok(Some(format!("Could not convert the files arguments: {}", rr))),
+        Ok(raw) => raw,
+    };
+
+    let files: Vec<String> = match raw_files {
+        None => vec![],
+        Some(raw_files) => match serde_json::from_str(&raw_files) {
+            Err(rr) => {
+                return Ok(Some(format!(
+                    "Could not parse the files argument as valid json array: {}",
+                    rr
+                )))
+            }
+            Ok(files) => files,
+        },
+    };
+    let configpath: String = match lconfigpath {
+        LuaNil => String::from("/cf-config/current/config"),
+        v => match FromLua::from_lua(v, lua) {
+            Err(rr) => return Ok(Some(format!("Could not parse configpath argument to string: {}", rr))),
+            Ok(path) => path,
+        },
+    };
+
+    reload_config(&configpath, files);
+    Ok(None)
+}
+
 struct DummyGrasshopper {
     humanity: bool,
 }
@@ -268,7 +292,6 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
                 humanity: lua_args.humanity.unwrap_or(false),
             };
             let res = inspect_request(
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -286,7 +309,6 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
 /// Rust-native inspection top level function
 #[allow(clippy::too_many_arguments)]
 fn inspect_request<GH: Grasshopper>(
-    configpath: &str,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
@@ -305,14 +327,7 @@ fn inspect_request<GH: Grasshopper>(
         headers,
         mbody,
     };
-    let dec = inspect_generic_request_map(
-        configpath,
-        grasshopper,
-        raw,
-        &mut logs,
-        selected_secpol.as_deref(),
-        plugins,
-    );
+    let dec = inspect_generic_request_map(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins);
 
     Ok(InspectionResult::from_analyze(logs, dec))
 }
@@ -320,7 +335,6 @@ fn inspect_request<GH: Grasshopper>(
 #[allow(clippy::too_many_arguments)]
 fn inspect_init<GH: Grasshopper>(
     loglevel: LogLevel,
-    configpath: &str,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
@@ -340,14 +354,7 @@ fn inspect_init<GH: Grasshopper>(
         mbody,
     };
 
-    let p0 = match inspect_generic_request_map_init(
-        configpath,
-        grasshopper,
-        raw,
-        &mut logs,
-        selected_secpol.as_deref(),
-        plugins,
-    ) {
+    let p0 = match inspect_generic_request_map_init(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins) {
         Err(res) => return Ok((InitResult::Res(res), logs)),
         Ok(p0) => p0,
     };
@@ -371,6 +378,7 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
         "aggregated_values",
         lua.create_function(|_, ()| Ok(aggregated_values_block()))?,
     )?;
+    exports.set("lua_reload_conf", lua.create_function(lua_reload_conf)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
 
@@ -385,14 +393,15 @@ mod tests {
     #[test]
     fn config_load() {
         let mut logs = Logs::default();
-        let cfg = with_config("../../cf-config", &mut logs, |_, c| c.clone());
+        reload_config("../../cf-config/", Vec::new());
+
+        let cfg = with_config(&mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                5 => {
+                3 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[2].message.to_string().contains("manifest.json"));
-                    assert!(logs.logs[3].message.to_string().contains("Loaded profile"));
-                    assert!(logs.logs[4].message.to_string().contains("CFGLOAD logs end"));
+                    assert!(logs.logs[1].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[2].message.to_string().contains("CFGLOAD logs end"));
                 }
                 13 => {
                     assert!(logs.logs[2]

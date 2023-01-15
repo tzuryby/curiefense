@@ -36,7 +36,7 @@ local function custom_response(handle, action_params)
         handle.status = status
     end
 
-    handle.log(handle.ERR, cjson.encode(action_params))
+    handle.log(handle.DEBUG, cjson.encode(action_params))
 
     if block_mode then
         if action_params["content"] then handle.say(action_params["content"]) end
