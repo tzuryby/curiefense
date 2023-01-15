@@ -5,6 +5,7 @@ use pdatastructs::hyperloglog::HyperLogLog;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
+use std::hash::Hash;
 
 use crate::utils::RequestInfo;
 
@@ -20,7 +21,7 @@ lazy_static! {
     static ref SAMPLE_DURATION: i64 = std::env::var("SAMPLE_DURATION")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(60);
     static ref TOP_AMOUNT: usize = std::env::var("AGGREGATED_TOP")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -81,6 +82,54 @@ impl<T: Serialize> Arp<T> {
     }
 }
 
+/// Helper structure to display both the Autonomous System number and name in
+/// aggregated data.
+///
+/// It is just a wrapper around a u32, with an additional string description.
+#[derive(Debug, Default, Clone)]
+struct AutonomousSystem {
+    number: u32,
+    company_name: Option<String>,
+}
+
+impl PartialEq for AutonomousSystem {
+    fn eq(&self, other: &Self) -> bool {
+        self.number == other.number
+    }
+}
+impl Eq for AutonomousSystem {}
+
+impl PartialOrd for AutonomousSystem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.number.partial_cmp(&other.number)
+    }
+}
+
+impl Ord for AutonomousSystem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.number.cmp(&other.number)
+    }
+}
+
+impl Hash for AutonomousSystem {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.number.hash(state);
+    }
+}
+
+impl Serialize for AutonomousSystem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(company_name) = &self.company_name {
+            serializer.serialize_str(&format!("{} ({})", self.number, company_name))
+        } else {
+            serializer.serialize_str(self.number.to_string().as_str())
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct AggregatedCounters {
     status: Bag<u32>,
@@ -95,14 +144,15 @@ struct AggregatedCounters {
     requests_triggered_globalfilter_report: usize,
     requests_triggered_cf_active: usize,
     requests_triggered_cf_report: usize,
+    requests_triggered_restriction_active: usize,
+    requests_triggered_restriction_report: usize,
     requests_triggered_acl_active: usize,
     requests_triggered_acl_report: usize,
     requests_triggered_ratelimit_active: usize,
     requests_triggered_ratelimit_report: usize,
 
+    authority: Arp<TopN<String>>,
     aclid: Arp<TopN<String>>,
-    secpolid: Arp<TopN<String>>,
-    secpolentryid: Arp<TopN<String>>,
     cfid: Arp<TopN<String>>,
 
     location: Arp<AggSection>,
@@ -111,6 +161,7 @@ struct AggregatedCounters {
     top_tags: Arp<TopN<String>>,
     top_country_human: TopN<String>,
     top_country_bot: TopN<String>,
+    top_rtc: Arp<TopN<String>>,
 
     bot: usize,
     human: usize,
@@ -124,7 +175,7 @@ struct AggregatedCounters {
     uri: Metric<String>,
     user_agent: Metric<String>,
     country: Metric<String>,
-    asn: Metric<u32>,
+    asn: Metric<AutonomousSystem>,
     headers_amount: Bag<usize>,
     cookies_amount: Bag<usize>,
     args_amount: Bag<usize>,
@@ -297,27 +348,27 @@ impl<T: Eq + Clone + std::hash::Hash + Serialize> Metric<T> {
             Value::Number(serde_json::Number::from(self.unique.count())),
         );
         mp.insert(
-            format!("unique_active_{}", tp),
+            format!("unique_{}_active", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Active).count())),
         );
         mp.insert(
-            format!("unique_reported_{}", tp),
+            format!("unique_{}_reported", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Report).count())),
         );
         mp.insert(
-            format!("unique_passed_{}", tp),
+            format!("unique_{}_passed", tp),
             Value::Number(serde_json::Number::from(self.unique_b.get(ArpCursor::Pass).count())),
         );
         mp.insert(
-            format!("top_active_{}", tp),
+            format!("top_{}_active", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
         );
         mp.insert(
-            format!("top_reported_{}", tp),
+            format!("top_{}_reported", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
         );
         mp.insert(
-            format!("top_passed_{}", tp),
+            format!("top_{}_passed", tp),
             serde_json::to_value(&self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
         );
     }
@@ -410,6 +461,41 @@ pub struct AggSection {
     args: usize,
     body: usize,
     attrs: usize,
+    plugins: usize,
+}
+
+fn is_autotag_prefix(s: &str) -> bool {
+    matches!(
+        s,
+        "securitypolicy"
+            | "securitypolicy-entry"
+            | "aclid"
+            | "aclname"
+            | "contentfilterid"
+            | "contentfiltername"
+            | "cf-rule-id"
+            | "cf-rule-category"
+            | "cf-rule-subcategory"
+            | "cf-rule-risk"
+            | "fc-id"
+            | "fc-name"
+            | "limit-id"
+            | "limit-name"
+            | "headers"
+            | "cookies"
+            | "args"
+            | "host"
+            | "ip"
+            | "geo-continent-name"
+            | "geo-continent-code"
+            | "geo-city"
+            | "geo-org"
+            | "geo-country"
+            | "geo-region"
+            | "network"
+            | "geo-subregion"
+            | "geo-asn"
+    )
 }
 
 impl AggregatedCounters {
@@ -452,7 +538,7 @@ impl AggregatedCounters {
                         self.requests_triggered_globalfilter_report += 1;
                     }
                 }
-                Acl { tags: _, stage } => {
+                Acl { id: _, tags: _, stage } => {
                     if this_blocked {
                         acl_blocked = true;
                         self.requests_triggered_acl_active += 1;
@@ -485,7 +571,7 @@ impl AggregatedCounters {
                     }
                 }
 
-                ContentFilter { ruleid, risk_level } => {
+                ContentFilter { id, risk_level } => {
                     let cursor = if this_blocked {
                         cf_blocked = true;
                         self.requests_triggered_cf_active += 1;
@@ -495,25 +581,18 @@ impl AggregatedCounters {
                         self.requests_triggered_cf_report += 1;
                         ArpCursor::Report
                     };
-                    self.ruleid.get_mut(cursor).inc(ruleid.clone());
+                    self.ruleid.get_mut(cursor).inc(id.clone());
                     self.risk_level.get_mut(cursor).inc(*risk_level);
                 }
-                BodyTooDeep { actual: _, expected: _ }
-                | BodyMissing
-                | BodyMalformed(_)
-                | Sqli(_)
-                | Xss
-                | Restricted
-                | TooManyEntries { actual: _, expected: _ }
-                | EntryTooLarge { actual: _, expected: _ } => {
+                Restriction { .. } => {
                     if this_blocked {
-                        self.requests_triggered_cf_active += 1;
+                        self.requests_triggered_restriction_active += 1;
                     } else {
-                        self.requests_triggered_cf_report += 1;
+                        self.requests_triggered_restriction_report += 1;
                     }
                 }
             }
-            for loc in &r.location {
+            for loc in std::iter::once(&r.location).chain(r.extra_locations.iter()) {
                 let aggloc = if this_blocked {
                     self.location.get_mut(ArpCursor::Active)
                 } else {
@@ -539,6 +618,7 @@ impl AggregatedCounters {
                     | Location::RefererPathpart(_)
                     | Location::RefererPathpartValue(_, _) => aggloc.headers += 1,
                     Location::Cookies | Location::Cookie(_) | Location::CookieValue(_, _) => aggloc.headers += 1,
+                    Location::Plugins | Location::Plugin(_) | Location::PluginValue(_, _) => aggloc.plugins += 1,
                 }
             }
         }
@@ -578,12 +658,7 @@ impl AggregatedCounters {
             .get_mut(cf_cursor)
             .inc(rinfo.rinfo.secpolicy.content_filter_profile.id.to_string());
         *self.requests.get_mut(cursor) += 1;
-        self.secpolid
-            .get_mut(cursor)
-            .inc(rinfo.rinfo.secpolicy.policy.id.to_string());
-        self.secpolentryid
-            .get_mut(cursor)
-            .inc(rinfo.rinfo.secpolicy.entry.id.to_string());
+        self.authority.get_mut(cursor).inc(rinfo.rinfo.host.to_string());
         let top_tags = self.top_tags.get_mut(cursor);
 
         let mut human = false;
@@ -595,11 +670,15 @@ impl AggregatedCounters {
                     human = true;
                     self.human += 1
                 }
-                tg => {
-                    if !tg.contains(':') {
-                        top_tags.inc(tg.to_string())
+                tg => match tg.split_once(':') {
+                    None => top_tags.inc(tg.to_string()),
+                    Some(("rtc", rtc)) => self.top_rtc.get_mut(cursor).inc(rtc.to_string()),
+                    Some((prefix, _)) => {
+                        if !is_autotag_prefix(prefix) {
+                            top_tags.inc(tg.to_string())
+                        }
                     }
-                }
+                },
             }
         }
 
@@ -632,7 +711,13 @@ impl AggregatedCounters {
             }
         }
         if let Some(asn) = &rinfo.rinfo.geoip.asn {
-            self.asn.inc(asn, cursor);
+            self.asn.inc(
+                &AutonomousSystem {
+                    number: *asn,
+                    company_name: rinfo.rinfo.geoip.company.clone(),
+                },
+                cursor,
+            );
         }
 
         self.args_amount.inc(rinfo.rinfo.qinfo.args.len());
@@ -670,9 +755,9 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
 
     e.location.serialize(&mut content, "section_");
     e.ruleid.serialize(&mut content, "top_ruleid_");
+    e.top_rtc.serialize(&mut content, "top_rtc_");
     e.aclid.serialize(&mut content, "top_aclid_");
-    e.secpolid.serialize(&mut content, "top_secpolid_");
-    e.secpolentryid.serialize(&mut content, "top_secpolentryid_");
+    e.authority.serialize(&mut content, "top_authority_");
     content.insert(
         "risk_level_active".into(),
         serde_json::to_value(e.risk_level.get(ArpCursor::Active)).unwrap_or(Value::Null),
@@ -688,6 +773,14 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     content.insert(
         "requests_triggered_globalfilter_report".into(),
         Value::Number(serde_json::Number::from(e.requests_triggered_globalfilter_report)),
+    );
+    content.insert(
+        "requests_triggered_restriction_active".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_active)),
+    );
+    content.insert(
+        "requests_triggered_restriction_report".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_report)),
     );
     content.insert(
         "requests_triggered_cf_active".into(),

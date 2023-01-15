@@ -233,14 +233,9 @@ pub unsafe extern "C" fn curiefense_str_free(ptr: *mut c_char) {
 }
 
 /// Simple wrapper to return the reqinfo data
-pub async fn inspect_wrapper<GH: Grasshopper>(
-    logs: Logs,
-    configpath: String,
-    raw: RawRequest<'_>,
-    mgh: Option<&GH>,
-) -> CFDecision {
+pub async fn inspect_wrapper<GH: Grasshopper>(logs: Logs, raw: RawRequest<'_>, mgh: Option<&GH>) -> CFDecision {
     let mut mlogs = logs;
-    let result = inspect_generic_request_map_async(&configpath, mgh, raw, &mut mlogs, None).await;
+    let result = inspect_generic_request_map_async(mgh, raw, &mut mlogs, None, HashMap::new()).await;
     CFDecision { result, logs: mlogs }
 }
 
@@ -287,6 +282,7 @@ pub unsafe extern "C" fn curiefense_async_init(
         _ => return std::ptr::null_mut(),
     };
     // convert the strings and loglevel
+    // TODO: properly reload the configuration
     let configpath = CStr::from_ptr(raw_configpath).to_string_lossy().to_string();
     let ip = CStr::from_ptr(raw_ip).to_string_lossy().to_string();
 
@@ -319,11 +315,7 @@ pub unsafe extern "C" fn curiefense_async_init(
         mbody,
     };
     let (executor, spawner) = new_executor_and_spawner::<TaskCB<CFDecision>>();
-    spawner.spawn_cb(
-        inspect_wrapper(logs, configpath, raw_request, Some(&DummyGrasshopper {})),
-        cb,
-        data,
-    );
+    spawner.spawn_cb(inspect_wrapper(logs, raw_request, Some(&DummyGrasshopper {})), cb, data);
     drop(spawner);
     Box::into_raw(Box::new(CFExec { inner: executor }))
 }
@@ -406,9 +398,13 @@ pub unsafe extern "C" fn curiefense_stream_config_init(
         3 => LogLevel::Error,
         _ => return std::ptr::null_mut(),
     };
-    let configpath = CStr::from_ptr(raw_configpath).to_string_lossy().to_string();
-    let now = std::time::SystemTime::now();
-    let (config, content_filter_rules) = curiefense::config::Config::load(Logs::new(lloglevel), &configpath, now);
+    // TODO: fix this by properly reloading the configuration
+    let config = Config::empty();
+    let content_filter_rules = HashMap::new();
+    // let configpath = CStr::from_ptr(raw_configpath).to_string_lossy().to_string();
+    // let config = curiefense::config::Config::load(Logs::new(lloglevel), &configpath);
+    // let content_filter_rules =
+    //     curiefense::config::load_hsdb(&mut Logs::new(lloglevel), &configpath).unwrap_or_default();
     Box::into_raw(Box::new(CFStreamConfig {
         loglevel: lloglevel,
         config: Arc::new(config),
@@ -475,7 +471,15 @@ pub unsafe extern "C" fn curiefense_stream_start(
         },
     };
     // create the requestinfo structure
-    let init_result = inspect_init(&iconfig.config, iconfig.loglevel, meta, IPInfo::Ip(ip), None, None);
+    let init_result = inspect_init(
+        &iconfig.config,
+        iconfig.loglevel,
+        meta,
+        IPInfo::Ip(ip),
+        None,
+        None,
+        HashMap::new(),
+    );
     Box::into_raw(Box::new(match init_result {
         Ok(inner) => {
             *success = CFStreamStatus::CFSMore;

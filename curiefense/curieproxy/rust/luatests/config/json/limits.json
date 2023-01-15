@@ -207,7 +207,7 @@
     "include": [],
     "key": [
       {
-        "headers": "h1"
+        "headers": "H1"
       }
     ],
     "name": "Multilimit test A",
@@ -231,7 +231,7 @@
     "include": [],
     "key": [
       {
-        "headers": "h2"
+        "headers": "H2"
       }
     ],
     "name": "Multilimit test B",
@@ -284,7 +284,7 @@
     ],
     "name": "Limit per header",
     "pairwith": {
-      "headers": "limitheader"
+      "headers": "Limitheader"
     },
     "thresholds": [
       {
@@ -554,5 +554,61 @@
     "global": false,
     "active": true,
     "timeframe": 3
+  },
+  {
+    "description": "rate limit skip threshold",
+    "exclude": [],
+    "id": "skipthreshold",
+    "include": [],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "rate limit skip threshold",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "default",
+        "limit": 1
+      },
+      {
+        "action": "monitor",
+        "limit": 2
+      }
+    ],
+    "global": false,
+    "active": true,
+    "timeframe": 60
+  },
+  {
+    "description": "rate limit no skip threshold",
+    "exclude": [],
+    "id": "noskipthreshold",
+    "include": [],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "rate limit skip threshold",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "monitor",
+        "limit": 1
+      },
+      {
+        "action": "default",
+        "limit": 2
+      }
+    ],
+    "global": false,
+    "active": true,
+    "timeframe": 60
   }
 ]

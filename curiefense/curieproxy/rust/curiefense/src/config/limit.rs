@@ -32,7 +32,7 @@ pub struct LimitThreshold {
 pub fn resolve_selectors(rawsel: RawLimitSelector) -> anyhow::Result<Vec<RequestSelectorCondition>> {
     let mk_selectors = |tp: SelectorType, mp: HashMap<String, String>| {
         mp.into_iter()
-            .map(move |(v, cond)| decode_request_selector_condition(tp, &v, &cond))
+            .map(move |(v, cond)| decode_request_selector_condition(tp.clone(), &v, &cond))
     };
     mk_selectors(SelectorType::Args, rawsel.args)
         .chain(mk_selectors(SelectorType::Cookies, rawsel.cookies))
@@ -46,7 +46,7 @@ impl Limit {
     fn convert(
         logs: &mut Logs,
         actions: &HashMap<String, SimpleAction>,
-        rawlimit: RawLimit,
+        mut rawlimit: RawLimit,
     ) -> anyhow::Result<(Limit, bool)> {
         let mkey: anyhow::Result<Vec<RequestSelector>> = rawlimit
             .key
@@ -57,18 +57,33 @@ impl Limit {
         let pairwith = RequestSelector::resolve_selector_map(rawlimit.pairwith).ok();
         let mut thresholds: Vec<LimitThreshold> = Vec::new();
         let id = rawlimit.id;
+
+        rawlimit.thresholds.sort_by(|a, b| a.limit.inner.cmp(&b.limit.inner));
+
+        let mut max_priority = 0;
         for thr in rawlimit.thresholds {
             let action = actions.get(&thr.action).cloned().unwrap_or_else(|| {
                 logs.error(|| format!("Could not resolve action {} in limit {}", thr.action, id));
                 SimpleAction::default()
             });
 
-            thresholds.push(LimitThreshold {
-                limit: thr.limit.inner,
-                action,
-            })
+            let action_priority = action.atype.rate_limit_priority();
+            if action_priority >= max_priority {
+                max_priority = action_priority;
+                thresholds.push(LimitThreshold {
+                    limit: thr.limit.inner,
+                    action,
+                })
+            } else {
+                logs.warning(|| {
+                    format!(
+                        "Limit {}: skipping threshold {:?}: lower priority but higher threshold value than other threshold",
+                        id, thr
+                    )
+                });
+            }
         }
-        thresholds.sort_unstable_by(limit_order);
+
         Ok((
             Limit {
                 id,

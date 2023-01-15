@@ -26,11 +26,12 @@ from utils.prometheus_counters_dict import (
     name_changes,
 )
 
+ENABLE_EXPORT_T2 = os.getenv("ENABLE_EXPORT_T2", "True").lower() in ("true", "1", "on")
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
 
-METRICS_PULL_INTERVAL = 5
+METRICS_PULL_INTERVAL = int(os.getenv("METRICS_PULL_INTERVAL", 60))
 
 http_methods = [
     "GET",
@@ -101,6 +102,7 @@ def switch_hyphens(name):
 
 
 def _get_sleep_interval(start_time):
+    logger.info("start_time %s" % start_time)
     sleep = METRICS_PULL_INTERVAL - (time.time() - start_time)
     return 0 if sleep < 0 else sleep
 
@@ -202,7 +204,8 @@ def export_t3():
         acc_avg = {}
         five_sec_string = q.get()
         five_sec_json = json.loads(five_sec_string)
-        export_t2(five_sec_json)
+        if ENABLE_EXPORT_T2:
+            export_t2(five_sec_json)
         for agg_sec in five_sec_json:
             start_time = time.time()
             update_t3_counters(agg_sec, acc_avg)
@@ -210,18 +213,27 @@ def export_t3():
 
 def get_t2():
     config = get_config("t2_source")
+    logger.info("entering the while True")
     while True:
         start_time = time.time()
-        time.time() - start_time
+        logger.info("start time %s" % start_time)
+        # time.time() - start_time
         try:
-            five_sec_t2 = requests.get(
-                config["url"], headers=config["headers"]
-            ).content.decode()
-            q.put(five_sec_t2)
+            logger.info("url: %s" % config["url"])
+            logger.info("headers: %s" % config["headers"])
+
+            t2_data = requests.get(config["url"], headers=config["headers"])
+            t2_data = t2_data.content.decode()
+
+            q.put(t2_data)
+            logger.info("done iteration: %s" % start_time)
+
         except Exception as e:
             logger.exception(e)
 
-        time.sleep(_get_sleep_interval(start_time))
+        sleep_interval = _get_sleep_interval(start_time)
+        logger.info("sleeping for %s" % sleep_interval)
+        time.sleep(sleep_interval)
 
 
 if __name__ == "__main__":

@@ -60,8 +60,18 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
         };
 
         let mut logs = Logs::new(loglevel);
-        let midata = with_config(configpath, &mut logs, |_, cfg| {
-            inspect_init(cfg, loglevel, meta, IPInfo::Hops(trustedhops as usize), None, None).map(|o| {
+        // TODO: change this to reload the configuration
+        let midata = with_config(&mut logs, |_, cfg| {
+            inspect_init(
+                cfg,
+                loglevel,
+                meta,
+                IPInfo::Hops(trustedhops as usize),
+                None,
+                None,
+                HashMap::new(),
+            )
+            .map(|o| {
                 // we have to clone all this data here :(
                 // that would not be necessary if we could avoid the autoreloading feature, but had a system for reloading the server when the configuration changes
                 let gf = cfg.globalfilters.clone();
@@ -458,7 +468,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     // initial configuration loading
     let mut logs = Logs::new(loglevel);
-    with_config(&opt.configpath, &mut logs, |_, _| {});
+    with_config(&mut logs, |_, _| {});
     show_logs(logs);
 
     if opt.syslog {

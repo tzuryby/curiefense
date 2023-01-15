@@ -19,10 +19,14 @@ use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
+use crate::geo::{
+    get_ipinfo_asn, get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn,
+    get_maxmind_city, get_maxmind_country, ipinfo_country_in_eu, ipinfo_resolve_continent, ipinfo_resolve_country_name,
+    USE_IPINFO,
+};
 use crate::interface::stats::Stats;
 use crate::interface::{AnalyzeResult, Decision, Location, Tags};
 use crate::logs::Logs;
-use crate::maxmind::{get_asn, get_city, get_country};
 use crate::requestfields::RequestField;
 use crate::utils::decoders::{parse_urlencoded_params, urldecode_str, DecodingResult};
 
@@ -202,22 +206,49 @@ pub struct QueryInfo {
 
 #[derive(Debug, Clone)]
 pub struct GeoIp {
+    // IP informations
     pub ipstr: String,
     pub ip: Option<IpAddr>,
+    pub network: Option<String>,
+
+    // Localisation informations
     pub location: Option<(f64, f64)>, // (lat, lon)
-    pub in_eu: Option<bool>,
-    pub city_name: Option<String>,
-    pub country_iso: Option<String>,
-    pub country_name: Option<String>,
     pub continent_name: Option<String>,
     pub continent_code: Option<String>,
-    pub asn: Option<u32>,
-    pub company: Option<String>,
+    pub country_iso: Option<String>,
+    pub country_name: Option<String>,
+    pub in_eu: Option<bool>,
     pub region: Option<String>,
     pub subregion: Option<String>,
-    pub network: Option<String>,
-    pub is_anonymous_proxy: Option<bool>,
-    pub is_satellite_provider: Option<bool>,
+    pub city_name: Option<String>,
+
+    // Company informations
+    pub company: Option<String>,
+    pub company_country: Option<String>,
+    pub company_domain: Option<String>,
+    pub company_type: Option<String>,
+
+    /// Autonomous System informations
+    pub asn: Option<u32>,
+    pub as_name: Option<String>,
+    pub as_domain: Option<String>,
+    pub as_type: Option<String>,
+
+    // Mobile informations
+    pub is_mobile: Option<bool>,
+    pub mobile_carrier_name: Option<String>,
+    pub mobile_country: Option<String>,
+    pub mobile_mcc: Option<u32>,
+    pub mobile_mnc: Option<u32>,
+
+    // Privacy informations
+    pub is_proxy: Option<bool>,
+    pub is_satellite: Option<bool>,
+    pub is_vpn: Option<bool>,
+    pub is_tor: Option<bool>,
+    pub is_relay: Option<bool>,
+    pub is_hosting: Option<bool>,
+    pub privacy_service: Option<String>,
 }
 
 impl GeoIp {
@@ -265,8 +296,8 @@ impl GeoIp {
         out.insert("company", json!(self.company));
         out.insert("region", json!(self.region));
         out.insert("subregion", json!(self.subregion));
-        out.insert("is_anon", json!(self.is_anonymous_proxy));
-        out.insert("is_sat", json!(self.is_satellite_provider));
+        out.insert("is_anon", json!(self.is_proxy));
+        out.insert("is_sat", json!(self.is_satellite));
 
         out
     }
@@ -318,6 +349,7 @@ pub struct RequestInfo {
     pub rinfo: RInfo,
     pub session: String,
     pub session_ids: HashMap<String, String>,
+    pub plugins: RequestField,
 }
 
 impl RequestInfo {
@@ -402,40 +434,12 @@ impl InspectionResult {
     }
 }
 
-pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
-    let pip = ipstr.parse();
-    let mut geoip = GeoIp {
-        ipstr,
-        ip: None,
-        location: None,
-        in_eu: None,
-        city_name: None,
-        country_iso: None,
-        country_name: None,
-        continent_name: None,
-        continent_code: None,
-        asn: None,
-        company: None,
-        region: None,
-        subregion: None,
-        network: None,
-        is_anonymous_proxy: None,
-        is_satellite_provider: None,
-    };
-
-    let ip = match pip {
-        Ok(x) => x,
-        Err(rr) => {
-            logs.error(|| format!("When parsing ip {}", rr));
-            return geoip;
-        }
-    };
-
+pub fn find_geoip_maxmind(logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
     let get_name = |mmap: &Option<std::collections::BTreeMap<&str, &str>>| {
         mmap.as_ref().and_then(|mp| mp.get("en")).map(|s| s.to_lowercase())
     };
 
-    if let Ok((asninfo, _)) = get_asn(ip) {
+    if let Ok((asninfo, _)) = get_maxmind_asn(ip) {
         geoip.asn = asninfo.autonomous_system_number;
         geoip.company = asninfo.autonomous_system_organization.map(|s| s.to_string());
     }
@@ -456,27 +460,25 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
     };
 
     let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
-    let extract_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
+    let extract_mm_traits = |g: &mut GeoIp, mcnt: Option<country::Traits>| {
         if let Some(traits) = mcnt {
-            g.is_anonymous_proxy = traits.is_anonymous_proxy;
-            g.is_satellite_provider = traits.is_satellite_provider;
+            g.is_proxy = traits.is_anonymous_proxy;
+            g.is_satellite = traits.is_satellite_provider;
         }
     };
 
-    // first put country data in the geoip
-    if let Ok((cnty, network)) = get_country(ip) {
-        extract_continent(&mut geoip, cnty.continent);
-        extract_country(&mut geoip, cnty.country);
-        extract_network(&mut geoip, network);
-        extract_traits(&mut geoip, cnty.traits);
+    if let Ok((cnty, network)) = get_maxmind_country(ip) {
+        extract_continent(geoip, cnty.continent);
+        extract_country(geoip, cnty.country);
+        extract_network(geoip, network);
+        extract_mm_traits(geoip, cnty.traits);
     }
 
-    // potentially overwrite some with the city data
-    if let Ok((cty, network)) = get_city(ip) {
-        extract_continent(&mut geoip, cty.continent);
-        extract_country(&mut geoip, cty.country);
-        extract_network(&mut geoip, network);
-        extract_traits(&mut geoip, cty.traits);
+    if let Ok((cty, network)) = get_maxmind_city(ip) {
+        extract_continent(geoip, cty.continent);
+        extract_country(geoip, cty.country);
+        extract_network(geoip, network);
+        extract_mm_traits(geoip, cty.traits);
         geoip.location = cty
             .location
             .as_ref()
@@ -494,8 +496,139 @@ pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
         }
         geoip.city_name = cty.city.as_ref().and_then(|c| get_name(&c.names));
     }
+}
+
+// Network field priority: ASN > Carrier > Company > Location
+pub fn find_geoip_ipinfo(_logs: &mut Logs, geoip: &mut GeoIp, ip: IpAddr) {
+    let extract_string = |s: String| {
+        if !s.is_empty() {
+            Some(s)
+        } else {
+            None
+        }
+    };
+
+    let extract_network = |g: &mut GeoIp, network: Option<IpNet>| g.network = network.map(|n| format!("{}", n.trunc()));
+
+    if let Ok((loc, network)) = get_ipinfo_location(ip) {
+        extract_network(geoip, network);
+        geoip.city_name = Some(loc.city);
+        geoip.country_name = ipinfo_resolve_country_name(loc.country.as_str());
+        geoip.in_eu = Some(ipinfo_country_in_eu(loc.country.as_str()));
+        if let Some(continent) = ipinfo_resolve_continent(loc.country.as_str()) {
+            geoip.continent_code = Some(continent.code.to_string());
+            geoip.continent_name = Some(continent.name.to_string());
+        }
+        geoip.country_iso = Some(loc.country);
+        geoip.region = Some(loc.region);
+        geoip.subregion = loc.postal_code; // TODO: this is not the exact same behaviour as maxmind
+        if let (Ok(lat), Ok(lng)) = (loc.lat.parse(), loc.lng.parse()) {
+            geoip.location = Some((lat, lng))
+        };
+    }
+
+    if let Ok((privacy, _)) = get_ipinfo_privacy(ip) {
+        geoip.is_vpn = privacy.vpn.parse().ok();
+        geoip.is_proxy = privacy.proxy.parse().ok();
+        geoip.is_tor = privacy.tor.parse().ok();
+        geoip.is_relay = privacy.relay.parse().ok();
+        geoip.is_hosting = privacy.hosting.parse().ok();
+        geoip.privacy_service = extract_string(privacy.service)
+    } else {
+        geoip.is_vpn = Some(false);
+        geoip.is_proxy = Some(false);
+        geoip.is_tor = Some(false);
+        geoip.is_relay = Some(false);
+        geoip.is_hosting = Some(false);
+    }
+
+    if let Ok((company, network)) = get_ipinfo_company(ip) {
+        extract_network(geoip, network);
+        geoip.company = extract_string(company.name);
+        geoip.company_country = extract_string(company.country);
+        geoip.company_domain = extract_string(company.domain);
+        geoip.company_type = extract_string(company.company_type);
+
+        geoip.asn = company.asn.strip_prefix("AS").and_then(|asn| asn.parse().ok());
+        geoip.as_name = extract_string(company.as_name);
+        geoip.as_domain = extract_string(company.as_domain);
+        geoip.as_type = extract_string(company.as_type);
+    }
+
+    if let Ok((carrier, _)) = get_ipinfo_carrier(ip) {
+        geoip.is_mobile = Some(true);
+        geoip.mobile_carrier_name = extract_string(carrier.carrier);
+        geoip.mobile_country = extract_string(carrier.country_code);
+        geoip.mobile_mcc = carrier.mcc.parse().ok();
+        geoip.mobile_mnc = carrier.mnc.parse().ok();
+        // do not re parse network using `extract_network` as it is already
+        // well formatted.
+        geoip.network = Some(carrier.network)
+    }
+
+    if let Ok((asn, _)) = get_ipinfo_asn(ip) {
+        // TODO: always get Err here, should be fixed
+        geoip.network = Some(asn.route);
+        geoip.asn = asn.asn.parse().ok();
+        geoip.as_name = Some(asn.name);
+        geoip.as_domain = Some(asn.domain);
+        geoip.as_type = Some(asn.asn_type);
+    }
+}
+
+pub fn find_geoip(logs: &mut Logs, ipstr: String) -> GeoIp {
+    let pip = ipstr.trim().parse();
+    let mut geoip = GeoIp {
+        ipstr,
+        ip: None,
+        location: None,
+        in_eu: None,
+        city_name: None,
+        country_iso: None,
+        country_name: None,
+        continent_name: None,
+        continent_code: None,
+        region: None,
+        subregion: None,
+        network: None,
+        company: None,
+        company_country: None,
+        company_domain: None,
+        company_type: None,
+        asn: None,
+        as_domain: None,
+        as_name: None,
+        as_type: None,
+        is_proxy: None,
+        is_satellite: None,
+        is_hosting: None,
+        is_relay: None,
+        is_tor: None,
+        is_vpn: None,
+        privacy_service: None,
+        is_mobile: None,
+        mobile_carrier_name: None,
+        mobile_country: None,
+        mobile_mcc: None,
+        mobile_mnc: None,
+    };
+
+    let ip = match pip {
+        Ok(x) => x,
+        Err(rr) => {
+            logs.error(|| format!("When parsing ip {}", rr));
+            return geoip;
+        }
+    };
 
     geoip.ip = Some(ip);
+
+    if *USE_IPINFO {
+        find_geoip_ipinfo(logs, &mut geoip, ip);
+    } else {
+        find_geoip_maxmind(logs, &mut geoip, ip);
+    }
+
     geoip
 }
 
@@ -521,6 +654,7 @@ pub fn map_request(
     container_name: Option<String>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
+    plugins: HashMap<String, String>,
 ) -> RequestInfo {
     let host = raw.get_host();
 
@@ -563,6 +697,12 @@ pub fn map_request(
         container_name,
     };
 
+    let mut plugins_field = RequestField::new(&[]);
+    for (k, v) in plugins {
+        let l = Location::PluginValue(k.clone(), v.clone());
+        plugins_field.add(k, l, v);
+    }
+
     let dummy_reqinfo = RequestInfo {
         timestamp: ts.unwrap_or_else(Utc::now),
         cookies,
@@ -570,6 +710,7 @@ pub fn map_request(
         rinfo,
         session: String::new(),
         session_ids: HashMap::new(),
+        plugins: plugins_field,
     };
 
     let raw_session = (if secpolicy.session.is_empty() {
@@ -591,12 +732,11 @@ pub fn map_request(
     };
 
     let session = session_string(&raw_session);
-    let session_ids =
-        std::iter::once(("sessionid".into(), session.clone()))
-            .chain(secpolicy.session_ids.iter().filter_map(|s| {
-                select_string(&dummy_reqinfo, s, None).map(|str| (s.to_string(), session_string(&str)))
-            }))
-            .collect();
+    let session_ids = secpolicy
+        .session_ids
+        .iter()
+        .filter_map(|s| select_string(&dummy_reqinfo, s, None).map(|str| (s.to_string(), session_string(&str))))
+        .collect();
 
     RequestInfo {
         timestamp: dummy_reqinfo.timestamp,
@@ -605,6 +745,7 @@ pub fn map_request(
         rinfo: dummy_reqinfo.rinfo,
         session,
         session_ids,
+        plugins: dummy_reqinfo.plugins,
     }
 }
 
@@ -623,6 +764,7 @@ pub fn selector<'a>(reqinfo: &'a RequestInfo, sel: &RequestSelector, tags: Optio
         RequestSelector::Args(k) => reqinfo.rinfo.qinfo.args.get(k).map(Selected::Str),
         RequestSelector::Header(k) => reqinfo.headers.get(k).map(Selected::Str),
         RequestSelector::Cookie(k) => reqinfo.cookies.get(k).map(Selected::Str),
+        RequestSelector::Plugins(k) => reqinfo.plugins.get(k).map(Selected::Str),
         RequestSelector::Ip => Some(&reqinfo.rinfo.geoip.ipstr).map(Selected::Str),
         RequestSelector::Network => reqinfo.rinfo.geoip.network.as_ref().map(Selected::Str),
         RequestSelector::Uri => Some(&reqinfo.rinfo.qinfo.uri).map(Selected::Str),
@@ -779,7 +921,7 @@ mod tests {
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
         let mut secpol = SecurityPolicy::empty();
         secpol.content_filter_profile.referer_as_uri = true;
-        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None);
+        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None, HashMap::new());
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

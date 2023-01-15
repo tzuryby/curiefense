@@ -1,4 +1,4 @@
-FROM python:3.8.12-slim-buster
+FROM python:3.9.15-slim-bullseye
 EXPOSE 8911
 
 RUN pip install --upgrade pip

@@ -13,8 +13,8 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::PoisonError;
 use std::sync::RwLock;
-use std::time::SystemTime;
 
 use crate::config::limit::Limit;
 use crate::interface::SimpleAction;
@@ -33,14 +33,40 @@ use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
 lazy_static! {
-    pub static ref CONFIG: RwLock<Config> = RwLock::new(Config::empty());
-    pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = RwLock::new(HashMap::new());
-}
+    pub static ref CONFIG: RwLock<Config> = {
+        let config = Config::load(Logs::default(), "/cf-config/current/config");
+        RwLock::new(config)
+    };
+    pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = {
+        let hsdb = load_hsdb(&mut Logs::default(), "/cf-config/current/config").unwrap_or_default();
+        RwLock::new(hsdb)
+    };
+    static ref CONFIG_DEPENDENCIES: HashMap<&'static str, Vec<String>> = {
+        let mut map = HashMap::new();
 
-fn config_logs(cur: &mut Logs, cfg: &Config) {
-    cur.debug("CFGLOAD logs start");
-    cur.extend(cfg.logs.clone());
-    cur.debug("CFGLOAD logs end");
+        map.insert(
+            "actions.json",
+            vec![
+                "acl-profiles.json".to_string(),
+                "contentfilter-profiles.json".to_string(),
+                "contentfilter-rules.json".to_string(),
+                "globalfilter-lists.json".to_string(),
+                "limits.json".to_string(),
+                "securitypolicy.json".to_string(),
+            ],
+        );
+        map.insert(
+            "contentfilter-profiles.json",
+            vec![
+                "contentfilter-rules.json".to_string(),
+                "securitypolicy.json".to_string(),
+            ],
+        );
+        map.insert("limits.json", vec!["securitypolicy.json".to_string()]);
+        map.insert("acl-profiles.json", vec!["securitypolicy.json".to_string()]);
+
+        map
+    };
 }
 
 fn container_name() -> Option<String> {
@@ -49,43 +75,145 @@ fn container_name() -> Option<String> {
         .map(|s| s.trim().to_string())
 }
 
-pub fn with_config<R, F>(basepath: &str, logs: &mut Logs, f: F) -> Option<R>
+fn config_logs(cur: &mut Logs, cfg: &Config) {
+    cur.debug("CFGLOAD logs start");
+    cur.extend(cfg.logs.clone());
+    cur.debug("CFGLOAD logs end");
+}
+
+pub fn with_config<R, F>(logs: &mut Logs, f: F) -> Option<R>
 where
     F: FnOnce(&mut Logs, &Config) -> R,
 {
-    let (newconfig, newhsdb) = match CONFIG.read() {
-        Ok(cfg) => match cfg.reload(basepath) {
-            None => {
-                config_logs(logs, &cfg);
-                return Some(f(logs, &cfg));
-            }
-            Some(cfginfo) => cfginfo,
-        },
+    match CONFIG.read() {
+        Ok(cfg) => {
+            config_logs(logs, &cfg);
+            Some(f(logs, &cfg))
+        }
         Err(rr) =>
         // read failed :(
         {
             logs.error(|| rr.to_string());
-            return None;
+            None
         }
-    };
-    config_logs(logs, &newconfig);
-    let r = f(logs, &newconfig);
-    match CONFIG.write() {
-        Ok(mut w) => *w = newconfig,
-        Err(rr) => logs.error(|| rr.to_string()),
-    };
-    match HSDB.write() {
-        Ok(mut dbw) => *dbw = newhsdb,
-        Err(rr) => logs.error(|| rr.to_string()),
-    };
-    Some(r)
+    }
 }
 
-pub fn with_config_default_path<R, F>(logs: &mut Logs, f: F) -> Option<R>
-where
-    F: FnOnce(&mut Logs, &Config) -> R,
-{
-    with_config("/cf-config/current/config", logs, f)
+pub fn reload_config(basepath: &str, filenames: Vec<String>) {
+    let mut logs = Logs::default();
+
+    let mut bjson = PathBuf::from(basepath);
+    bjson.push("json");
+
+    let mut files_to_reload = HashSet::new();
+    if filenames.is_empty() {
+        // if not filename was provided, reload all config files
+        files_to_reload.extend(vec![
+            "actions.json".to_string(),
+            "acl-profiles.json".to_string(),
+            "contentfilter-profiles.json".to_string(),
+            "contentfilter-rules.json".to_string(),
+            "globalfilter-lists.json".to_string(),
+            "limits.json".to_string(),
+            "securitypolicy.json".to_string(),
+            "flow-control.json".to_string(),
+            "virtual-tags.json".to_string(),
+        ]);
+    } else {
+        for filename in filenames.iter() {
+            if let Some(deps) = CONFIG_DEPENDENCIES.get(filename.as_str()) {
+                files_to_reload.extend(deps.clone());
+            }
+        }
+        files_to_reload.extend(filenames);
+    }
+
+    let mut config = match CONFIG.read() {
+        Ok(cfg) => cfg.clone(),
+        Err(rr) => {
+            logs.error(|| rr.to_string());
+            return;
+        }
+    };
+    let mut hsdb: Option<_> = None;
+
+    if files_to_reload.contains("actions.json") {
+        let rawactions = Config::load_config_file(&mut logs, &bjson, "actions.json");
+        let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
+        config.actions = actions;
+    }
+    if files_to_reload.contains("acl-profiles.json") {
+        let raw_acls: Vec<RawAclProfile> = Config::load_config_file(&mut logs, &bjson, "acl-profiles.json");
+        let acls = raw_acls
+            .into_iter()
+            .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, &config.actions, a)))
+            .collect();
+        config.acls = acls;
+    }
+    if files_to_reload.contains("contentfilter-profiles.json") {
+        let raw_content_filter_profiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
+        let content_filter_profiles =
+            ContentFilterProfile::resolve(&mut logs, &config.actions, raw_content_filter_profiles);
+        config.content_filter_profiles = content_filter_profiles;
+    }
+    if files_to_reload.contains("contentfilter-rules.json") {
+        let raw_content_filter_rules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
+        hsdb = Some(resolve_rules(
+            &mut logs,
+            &config.content_filter_profiles,
+            raw_content_filter_rules,
+        ));
+    }
+    if files_to_reload.contains("globalfilter-lists.json") {
+        let raw_global_filters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
+        let globalfilters = GlobalFilterSection::resolve(&mut logs, &config.actions, raw_global_filters);
+        config.globalfilters = globalfilters;
+    }
+    if files_to_reload.contains("limits.json") {
+        let raw_limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
+        let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, &config.actions, raw_limits);
+        config.limits = limits;
+        config.global_limits = global_limits;
+        config.inactive_limits = inactive_limits;
+    }
+    if files_to_reload.contains("securitypolicy.json") {
+        let raw_sec_pol = Config::load_config_file(&mut logs, &bjson, "securitypolicy.json");
+        let (securitypolicies_map, securitypolicies, default) = sec_pol_resolve(
+            &mut logs,
+            raw_sec_pol,
+            &config.limits,
+            &config.global_limits,
+            &config.inactive_limits,
+            &config.acls,
+            &config.content_filter_profiles,
+        );
+        config.securitypolicies_map = securitypolicies_map;
+        config.securitypolicies = securitypolicies;
+        config.default = default;
+    }
+    if files_to_reload.contains("flow-control.json") {
+        let raw_flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
+        let flows = flow_resolve(&mut logs, raw_flows);
+        config.flows = flows;
+    }
+    if files_to_reload.contains("virtual-tags.json") {
+        let raw_virtual_tags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
+        let virtual_tags = vtags_resolve(&mut logs, raw_virtual_tags);
+        config.virtual_tags = virtual_tags;
+    }
+
+    config.logs = logs.clone();
+
+    match CONFIG.write() {
+        Ok(mut w) => *w = config,
+        Err(rr) => logs.error(|| rr.to_string()),
+    };
+    if let Some(hsdb) = hsdb {
+        match HSDB.write() {
+            Ok(mut dbw) => *dbw = hsdb,
+            Err(rr) => logs.error(|| rr.to_string()),
+        };
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,12 +223,18 @@ pub struct Config {
     pub securitypolicies: Vec<Matching<HostMap>>,
     pub globalfilters: Vec<GlobalFilterSection>,
     pub default: Option<HostMap>,
-    pub last_mod: SystemTime,
     pub container_name: Option<String>,
     pub flows: FlowMap,
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
     pub virtual_tags: VirtualTags,
     pub logs: Logs,
+
+    // Not used when processing request, but to optimize reloading config
+    pub actions: HashMap<String, SimpleAction>,
+    pub limits: HashMap<String, Limit>,
+    pub global_limits: Vec<Limit>,
+    pub inactive_limits: HashSet<String>,
+    pub acls: HashMap<String, AclProfile>,
 }
 
 fn from_map<V: Clone>(mp: &HashMap<String, V>, k: &str) -> Result<V, String> {
@@ -206,8 +340,7 @@ impl Config {
     fn resolve(
         logs: Logs,
         revision: String,
-        last_mod: SystemTime,
-        actions: &HashMap<String, SimpleAction>,
+        actions: HashMap<String, SimpleAction>,
         rawmaps: Vec<RawHostMap>,
         rawlimits: Vec<RawLimit>,
         rawglobalfilters: Vec<RawGlobalFilterSection>,
@@ -217,85 +350,25 @@ impl Config {
         rawflows: Vec<RawFlowEntry>,
         rawvirtualtags: Vec<RawVirtualTag>,
     ) -> Config {
-        let mut default: Option<HostMap> = None;
-        let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
-        let mut securitypolicies_map = HashMap::new();
         let mut logs = logs;
 
-        let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, actions, rawlimits);
+        let (limits, global_limits, inactive_limits) = Limit::resolve(&mut logs, &actions, rawlimits);
         let acls = rawacls
             .into_iter()
-            .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, actions, a)))
+            .map(|a| (a.id.clone(), AclProfile::resolve(&mut logs, &actions, a)))
             .collect();
 
-        // build the entries while looking for the default entry
-        for rawmap in rawmaps {
-            let mapname = rawmap.name.clone();
-            let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
-                Ok(Vec::new())
-            } else {
-                rawmap
-                    .session
-                    .into_iter()
-                    .map(RequestSelector::resolve_selector_map)
-                    .collect()
-            };
-            let msession_ids: anyhow::Result<Vec<RequestSelector>> = rawmap
-                .session_ids
-                .into_iter()
-                .map(RequestSelector::resolve_selector_map)
-                .collect();
-            let session = msession.unwrap_or_else(|rr| {
-                logs.error(|| format!("error when decoding session in {}, {}", &mapname, rr));
-                Vec::new()
-            });
+        let (securitypolicies_map, securitypolicies, default) = sec_pol_resolve(
+            &mut logs,
+            rawmaps,
+            &limits,
+            &global_limits,
+            &inactive_limits,
+            &acls,
+            &content_filter_profiles,
+        );
 
-            let session_ids = msession_ids.unwrap_or_else(|rr| {
-                logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
-                Vec::new()
-            });
-            let (entries, default_entry) = Config::resolve_security_policies(
-                &mut logs,
-                &rawmap.id,
-                &rawmap.name,
-                rawmap.map,
-                rawmap.tags,
-                &limits,
-                &global_limits,
-                &inactive_limits,
-                &acls,
-                &content_filter_profiles,
-                session,
-                session_ids,
-            );
-            if default_entry.is_none() {
-                logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
-            }
-            let hostmap = HostMap {
-                name: rawmap.name,
-                entries,
-                default: default_entry,
-            };
-            securitypolicies_map.insert(rawmap.id, hostmap.clone());
-            if rawmap.match_ == "__default__" {
-                if default.is_some() {
-                    logs.error(|| format!("HostMap entry '{}' has several default entries", hostmap.name));
-                }
-                default = Some(hostmap);
-            } else {
-                match Matching::from_str(&rawmap.match_, hostmap) {
-                    Err(rr) => {
-                        logs.error(format!("Invalid regex {} in entry {}: {}", &rawmap.match_, mapname, rr).as_str())
-                    }
-                    Ok(matcher) => securitypolicies.push(matcher),
-                }
-            }
-        }
-
-        // order by decreasing matcher length, so that more specific rules are matched first
-        securitypolicies.sort_by_key(|b| std::cmp::Reverse(b.matcher_len()));
-
-        let globalfilters = GlobalFilterSection::resolve(&mut logs, actions, rawglobalfilters);
+        let globalfilters = GlobalFilterSection::resolve(&mut logs, &actions, rawglobalfilters);
 
         let flows = flow_resolve(&mut logs, rawflows);
 
@@ -307,12 +380,16 @@ impl Config {
             securitypolicies,
             globalfilters,
             default,
-            last_mod,
             container_name,
             flows,
             content_filter_profiles,
             logs,
             virtual_tags,
+            actions,
+            limits,
+            global_limits,
+            inactive_limits,
+            acls,
         }
     }
 
@@ -346,8 +423,7 @@ impl Config {
         out
     }
 
-    pub fn load(logs: Logs, basepath: &str, last_mod: SystemTime) -> (Config, HashMap<String, ContentFilterRules>) {
-        let mut logs = logs;
+    fn load(mut logs: Logs, basepath: &str) -> Config {
         let mut bjson = PathBuf::from(basepath);
         bjson.push("json");
 
@@ -377,7 +453,6 @@ impl Config {
         let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
         let acls = Config::load_config_file(&mut logs, &bjson, "acl-profiles.json");
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
-        let contentfilterrules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
         let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
 
@@ -386,13 +461,10 @@ impl Config {
         let actions = SimpleAction::resolve_actions(&mut logs, rawactions);
         let content_filter_profiles = ContentFilterProfile::resolve(&mut logs, &actions, rawcontentfilterprofiles);
 
-        let hsdb = resolve_rules(&mut logs, &content_filter_profiles, contentfilterrules);
-
-        let config = Config::resolve(
+        Config::resolve(
             logs,
             revision,
-            last_mod,
-            &actions,
+            actions,
             securitypolicy,
             limits,
             globalfilters,
@@ -401,24 +473,7 @@ impl Config {
             container_name,
             flows,
             virtualtags,
-        );
-
-        (config, hsdb)
-    }
-
-    pub fn reload(&self, basepath: &str) -> Option<(Config, HashMap<String, ContentFilterRules>)> {
-        let mut logs = Logs::default();
-        let last_mod = std::fs::metadata(basepath)
-            .and_then(|x| x.modified())
-            .unwrap_or_else(|rr| {
-                logs.error(|| format!("Could not get last modified time for {}: {}", basepath, rr));
-                SystemTime::now()
-            });
-        if self.last_mod == last_mod {
-            return None;
-        }
-
-        Some(Config::load(logs, basepath, last_mod))
+        )
     }
 
     pub fn empty() -> Config {
@@ -427,20 +482,114 @@ impl Config {
             securitypolicies_map: HashMap::new(),
             securitypolicies: Vec::new(),
             globalfilters: Vec::new(),
-            last_mod: SystemTime::UNIX_EPOCH,
             default: None,
             container_name: container_name(),
             flows: HashMap::new(),
             content_filter_profiles: HashMap::new(),
             logs: Logs::default(),
             virtual_tags: Arc::new(HashMap::new()),
+            actions: HashMap::new(),
+            limits: HashMap::new(),
+            global_limits: Vec::new(),
+            inactive_limits: HashSet::new(),
+            acls: HashMap::new(),
         }
     }
 }
 
-pub fn init_config() -> (bool, Vec<String>) {
-    let mut logs = Logs::default();
-    with_config_default_path(&mut logs, |_, _| {});
-    let is_ok = logs.logs.is_empty();
-    (is_ok, logs.to_stringvec())
+pub fn load_hsdb(
+    logs: &mut Logs,
+    configpath: &str,
+) -> Result<HashMap<String, ContentFilterRules>, PoisonError<std::sync::RwLockReadGuard<'static, Config>>> {
+    let mut bjson = PathBuf::from(configpath);
+    bjson.push("json");
+
+    CONFIG.read().map(|cfg| {
+        let contentfilterrules = Config::load_config_file(logs, &bjson, "contentfilter-rules.json");
+        resolve_rules(logs, &cfg.content_filter_profiles, contentfilterrules)
+    })
+}
+
+// securitypolicies_map, securitypolicies, default
+fn sec_pol_resolve(
+    logs: &mut Logs,
+    rawmaps: Vec<RawHostMap>,
+    limits: &HashMap<String, Limit>,
+    global_limits: &[Limit],
+    inactive_limits: &HashSet<String>,
+    acls: &HashMap<String, AclProfile>,
+    content_filter_profiles: &HashMap<String, ContentFilterProfile>,
+) -> (HashMap<String, HostMap>, Vec<Matching<HostMap>>, Option<HostMap>) {
+    let mut default: Option<HostMap> = None;
+    let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
+    let mut securitypolicies_map = HashMap::new();
+
+    // build the entries while looking for the default entry
+    for rawmap in rawmaps {
+        let mapname = rawmap.name.clone();
+        let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
+            Ok(Vec::new())
+        } else {
+            rawmap
+                .session
+                .into_iter()
+                .map(RequestSelector::resolve_selector_map)
+                .collect()
+        };
+        let msession_ids: anyhow::Result<Vec<RequestSelector>> = rawmap
+            .session_ids
+            .into_iter()
+            .map(RequestSelector::resolve_selector_map)
+            .collect();
+        let session = msession.unwrap_or_else(|rr| {
+            logs.error(|| format!("error when decoding session in {}, {}", &mapname, rr));
+            Vec::new()
+        });
+
+        let session_ids = msession_ids.unwrap_or_else(|rr| {
+            logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
+            Vec::new()
+        });
+        let (entries, default_entry) = Config::resolve_security_policies(
+            logs,
+            &rawmap.id,
+            &rawmap.name,
+            rawmap.map,
+            rawmap.tags,
+            limits,
+            global_limits,
+            inactive_limits,
+            acls,
+            content_filter_profiles,
+            session,
+            session_ids,
+        );
+        if default_entry.is_none() {
+            logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
+        }
+        let hostmap = HostMap {
+            name: rawmap.name,
+            entries,
+            default: default_entry,
+        };
+        securitypolicies_map.insert(rawmap.id, hostmap.clone());
+        if rawmap.match_ == "__default__" {
+            if default.is_some() {
+                logs.error(|| format!("HostMap entry '{}' has several default entries", hostmap.name));
+            }
+            default = Some(hostmap);
+        } else {
+            match Matching::from_str(&rawmap.match_, hostmap) {
+                Err(rr) => {
+                    logs.error(format!("Invalid regex {} in entry {}: {}", &rawmap.match_, mapname, rr).as_str())
+                }
+                Ok(matcher) => securitypolicies.push(matcher),
+            }
+        }
+    }
+
+    // order by decreasing matcher length, so that more specific rules are matched first
+    securitypolicies.sort_by_key(|b| std::cmp::Reverse(b.matcher_len()));
+
+    (securitypolicies_map, securitypolicies, default)
 }

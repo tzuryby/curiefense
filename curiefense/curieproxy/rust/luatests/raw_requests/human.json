@@ -22,7 +22,8 @@
             "denybot"
           ],
           "name": "denybot",
-          "type": "deny_bot"
+          "stage": "deny_bot",
+          "id":"FROMTAGS"
         }
       ],
       "tags": [
@@ -72,7 +73,8 @@
             "deny"
           ],
           "name": "deny",
-          "type": "deny"
+          "stage": "deny",
+          "id":"FROMTAGS"
         }
       ],
       "tags": [

@@ -1,3 +1,4 @@
+use curiefense::config::reload_config;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
@@ -9,14 +10,20 @@ use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
 
 #[pyfunction]
+#[pyo3(name = "reload_config")]
+fn py_reload_config(configpath: String, files: Vec<String>) {
+    reload_config(&configpath, files);
+}
+
+#[pyfunction]
 #[pyo3(name = "inspect_request")]
 fn py_inspect_request(
     loglevel: String,
-    configpath: String,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
     ip: String,
+    plugins: Option<HashMap<String, String>>,
 ) -> PyResult<(String, Vec<u8>)> {
     let real_loglevel = match loglevel.as_str() {
         "debug" => LogLevel::Debug,
@@ -37,7 +44,7 @@ fn py_inspect_request(
     };
 
     let grasshopper = DynGrasshopper {};
-    let dec = inspect_generic_request_map(&configpath, Some(&grasshopper), raw, &mut logs, None);
+    let dec = inspect_generic_request_map(Some(&grasshopper), raw, &mut logs, None, plugins.unwrap_or_default());
     let res = InspectionResult {
         decision: dec.decision,
         tags: Some(dec.tags),
@@ -66,7 +73,10 @@ struct MatchResult {
 
 #[pyfunction]
 fn rust_match(pattern: String, mmatch: Option<&str>) -> PyResult<Vec<MatchResult>> {
-    let re = regex::Regex::new(&pattern).map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
+    let re = regex::RegexBuilder::new(&pattern)
+        .case_insensitive(true)
+        .build()
+        .map_err(|rr| PyTypeError::new_err(rr.to_string()))?;
     if let Some(to_match) = mmatch {
         Ok(re
             .find_iter(to_match)

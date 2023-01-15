@@ -124,6 +124,19 @@ function session_rust_envoy.inspect(handle)
         if response_table["action"] == "custom_response" then
             custom_response(handle, response_table["response"])
         end
+        if response_table["action"] == "pass" then
+            local analyser_response = response_table["response"]
+
+            handle:logDebug("altering the request")
+            local headers_handle = handle:headers()
+            if type(analyser_response) == "table" then
+                if type(analyser_response.headers) == "table" then
+                    for k, v in pairs(analyser_response.headers) do
+                        headers_handle:replace(k, v)
+                    end
+                end
+            end
+        end
     end
 end
 

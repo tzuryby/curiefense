@@ -106,10 +106,12 @@ rules:
   - namespaces
   - pods
   - pods/proxy
+  - pods/portforward
   - persistentvolumeclaims
   - secrets
   - services
   - serviceaccounts
+  - resourcequotas
   verbs:
   - '*'
 ---

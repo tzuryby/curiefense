@@ -5,7 +5,7 @@ use crate::grasshopper::{challenge_phase01, Grasshopper};
 use crate::logs::Logs;
 use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
-use crate::utils::{selector, RequestInfo, Selected};
+use crate::utils::{selector, GeoIp, RequestInfo, Selected};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
@@ -39,6 +39,50 @@ pub fn stronger_decision(d1: SimpleDecision, d2: SimpleDecision) -> SimpleDecisi
     }
 }
 
+/// Merge two decisions together.
+///
+/// If the two decisions have differents priorities, returns the one with
+/// the highest one.
+/// If the two decisions have the same priority and have action of type
+/// Monitor, returns the first one, with headers merged from the two
+/// decisions
+/// If the two decisions have the same priority, but not actions of type
+/// Monitor, retunrs the first decision.
+///
+/// In all cases, block reasons are always merged.
+///
+/// Priorities of actions are: Skip > Block > Monitor > None
+pub fn merge_decisions(d1: Decision, d2: Decision) -> Decision {
+    // Choose which decision to keep, and which decision to throw away
+    let (mut kept, thrown) = {
+        match (&d1.maction, &d2.maction) {
+            (Some(a1), Some(a2)) => {
+                if a1.atype.priority() >= a2.atype.priority() {
+                    (d1, d2)
+                } else {
+                    (d2, d1)
+                }
+            }
+            (None, Some(_)) => (d2, d1),
+            (Some(_), None) | (None, None) => (d1, d2),
+        }
+    };
+
+    // Merge headers if kept action is monitor
+    if let Some(action) = &mut kept.maction {
+        if action.atype == ActionType::Monitor {
+            if let Some(headers) = &mut action.headers {
+                let throw_headers = thrown.maction.and_then(|action| action.headers).unwrap_or_default();
+                headers.extend(throw_headers)
+            }
+        }
+    }
+
+    kept.reasons.extend(thrown.reasons);
+
+    kept
+}
+
 #[derive(Debug)]
 pub struct AnalyzeResult {
     pub decision: Decision,
@@ -54,13 +98,15 @@ pub struct Decision {
 }
 
 impl Decision {
-    pub fn skip(initiator: Initiator, location: HashSet<Location>) -> Self {
+    pub fn skip(initiator: Initiator, location: Location) -> Self {
         Decision {
             maction: None,
             reasons: vec![BlockReason {
                 initiator,
                 location,
                 decision: BDecision::Skip,
+                extra_locations: Vec::new(),
+                extra: serde_json::Value::Null,
             }],
         }
     }
@@ -88,10 +134,7 @@ impl Decision {
     }
 
     pub fn response_json(&self) -> String {
-        let action_desc = match self.maction {
-            None => "pass",
-            Some(_) => "custom_response",
-        };
+        let action_desc = if self.is_blocking() { "custom_response" } else { "pass" };
         let response =
             serde_json::to_value(&self.maction).unwrap_or_else(|rr| serde_json::Value::String(rr.to_string()));
         let j = serde_json::json!({
@@ -156,7 +199,7 @@ pub async fn jsonlog(
 pub fn jsonlog_rinfo(
     dec: &Decision,
     rinfo: &RequestInfo,
-    rcode: Option<u32>,
+    mut rcode: Option<u32>,
     tags: &Tags,
     stats: &Stats,
     logs: &Logs,
@@ -171,7 +214,7 @@ pub fn jsonlog_rinfo(
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
-    map_ser.serialize_entry("@timestamp", now)?;
+    //     map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
@@ -182,16 +225,21 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("authority", &rinfo.rinfo.host)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
+    if !rinfo.plugins.is_empty() {
+        map_ser.serialize_entry("plugins", &rinfo.plugins)?;
+    }
     map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
     map_ser.serialize_entry("response_code", &rcode)?;
     map_ser.serialize_entry("logs", logs)?;
     map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
+
     map_ser.serialize_entry("acl_triggers", get_trigger(&InitiatorKind::Acl))?;
     map_ser.serialize_entry("rate_limit_triggers", get_trigger(&InitiatorKind::RateLimit))?;
     map_ser.serialize_entry("global_filter_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
     map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
+    map_ser.serialize_entry("restriction_triggers", get_trigger(&InitiatorKind::Restriction))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
 
     // it's too bad one can't directly write the recursive structures from just the serializer object
@@ -219,6 +267,18 @@ pub fn jsonlog_rinfo(
             )
         }
     }
+
+    // If we have a monitor action, remove the return code to prevent tag
+    // addition. This could be fixed with a better Action structure, but
+    // requires more changes.
+    if let Some(Action {
+        atype: ActionType::Monitor,
+        ..
+    }) = &dec.maction
+    {
+        rcode = None;
+    }
+
     map_ser.serialize_entry(
         "tags",
         &LogTags {
@@ -230,7 +290,7 @@ pub fn jsonlog_rinfo(
 
     struct LogProxy<'t> {
         p: &'t HashMap<String, String>,
-        l: &'t Option<(f64, f64)>,
+        geo: &'t GeoIp,
         n: &'t Option<String>,
     }
     impl<'t> Serialize for LogProxy<'t> {
@@ -244,11 +304,51 @@ pub fn jsonlog_rinfo(
             }
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "geo_long",
-                value: self.l.as_ref().map(|x| x.0),
+                value: self.geo.location.as_ref().map(|x| x.0),
             })?;
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "geo_lat",
-                value: self.l.as_ref().map(|x| x.1),
+                value: self.geo.location.as_ref().map(|x| x.1),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_name",
+                value: self.geo.as_name.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_domain",
+                value: self.geo.as_domain.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_type",
+                value: self.geo.as_type.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_country",
+                value: self.geo.company_country.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_domain",
+                value: self.geo.company_domain.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_type",
+                value: self.geo.company_type.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_carrier",
+                value: self.geo.mobile_carrier_name.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_country",
+                value: self.geo.mobile_country.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_mcc",
+                value: self.geo.mobile_mcc.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_mnc",
+                value: self.geo.mobile_mnc.as_ref(),
             })?;
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "container",
@@ -261,7 +361,7 @@ pub fn jsonlog_rinfo(
         "proxy",
         &LogProxy {
             p: &proxy,
-            l: &rinfo.rinfo.geoip.location,
+            geo: &rinfo.rinfo.geoip,
             n: &rinfo.rinfo.container_name,
         },
     )?;
@@ -298,7 +398,7 @@ pub fn jsonlog_rinfo(
             };
             let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
             let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
-            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::GlobalFilter);
+            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::RateLimit);
             let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
 
             let mut mp = serializer.serialize_map(None)?;
@@ -325,6 +425,7 @@ pub fn jsonlog_rinfo(
             mp.end()
         }
     }
+    map_ser.serialize_entry("profiling", &stats.timing)?;
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
 }
@@ -369,6 +470,17 @@ impl SimpleActionT {
             Challenge => 6,
             Monitor => 1,
             Skip => 9,
+        }
+    }
+
+    pub fn rate_limit_priority(&self) -> u32 {
+        use SimpleActionT::*;
+        match self {
+            Custom { content: _ } => 8,
+            Challenge => 6,
+            Monitor => 1,
+            // skip action should be ignored when using with rate limit
+            Skip => 0,
         }
     }
 
@@ -430,6 +542,14 @@ impl ActionType {
     /// is the action final (no further processing)
     pub fn is_final(&self) -> bool {
         !matches!(self, ActionType::Monitor)
+    }
+
+    pub fn priority(&self) -> u32 {
+        match self {
+            ActionType::Block => 6,
+            ActionType::Monitor => 1,
+            ActionType::Skip => 9,
+        }
     }
 }
 
@@ -528,14 +648,14 @@ impl SimpleAction {
         tags: &mut Tags,
         reason: Vec<BlockReason>,
     ) -> Decision {
+        for t in self.extra_tags.iter().flat_map(|s| s.iter()) {
+            tags.insert(t, Location::Request);
+        }
         if self.atype == SimpleActionT::Skip {
             return Decision {
                 maction: None,
                 reasons: reason,
             };
-        }
-        for t in self.extra_tags.iter().flat_map(|s| s.iter()) {
-            tags.insert(t, Location::Request);
         }
         let action = match self.to_action(rinfo, tags, is_human) {
             None => match (mgh, rinfo.headers.get("user-agent")) {

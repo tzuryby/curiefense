@@ -18,6 +18,44 @@
         ]
     },
     {
+        "match": "jwt-test.com",
+        "id": "jwt-test",
+        "name": "test for the jwt plugin",
+        "tags": [],
+        "map": [
+            {
+                "match": "/jwt/cf",
+                "name": "default",
+                "id": "default",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "cf_jwt",
+                "content_filter_active": true,
+                "limit_ids": []
+            },
+            {
+                "match": "/jwt/acl",
+                "name": "default",
+                "id": "default",
+                "acl_profile": "jwt-acl",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": []
+            },
+            {
+                "match": "/",
+                "name": "default",
+                "id": "default",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": []
+            }
+        ]
+    },
+    {
         "match": "limitt1.com",
         "id": "limitt1",
         "name": "limit test1",
@@ -201,7 +239,10 @@
         "match": "secpoltags.com",
         "id": "secpoltags",
         "name": "test tagging for security policy",
-        "tags": ["secpoltag1", "secpoltag2"],
+        "tags": [
+            "secpoltag1",
+            "secpoltag2"
+        ],
         "map": [
             {
                 "match": "/",
@@ -229,7 +270,9 @@
                 "acl_active": false,
                 "content_filter_profile": "__default__",
                 "content_filter_active": false,
-                "limit_ids": ["ablock"]
+                "limit_ids": [
+                    "ablock"
+                ]
             },
             {
                 "match": "/acl/deny-all-inactive",
@@ -429,8 +472,8 @@
             },
             {
                 "match": "^/limits/include",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits include",
+                "id": "limits include",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -453,8 +496,8 @@
             },
             {
                 "match": "^/limits/method",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits method",
+                "id": "limits method",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -465,8 +508,8 @@
             },
             {
                 "match": "^/limits/exclude",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits exclude",
+                "id": "limits exclude",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -485,6 +528,30 @@
                 "content_filter_active": false,
                 "limit_ids": [
                     "limitmultithreshold"
+                ]
+            },
+            {
+                "match": "^/limits/thresholdskip",
+                "name": "skipping threshold",
+                "id": "skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "skipthreshold"
+                ]
+            },
+            {
+                "match": "^/limits/thresholdnoskip",
+                "name": "no skipping threshold",
+                "id": "no skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "noskipthreshold"
                 ]
             },
             {

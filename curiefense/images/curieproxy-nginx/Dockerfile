@@ -1,9 +1,13 @@
 ARG RUSTBIN_TAG=latest
 FROM curiefense/curiefense-rustbuild-bionic:${RUSTBIN_TAG} AS rustbin
-FROM docker.io/openresty/openresty:1.19.9.1-1-bionic
+FROM docker.io/curiefense/openresty:1.21.4.1-bionic
+
 COPY conf.d /etc/nginx/conf.d
 COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY curieproxy/lua /lua
+
+RUN ln -sf /etc/nginx/conf.d/lua/customcode.lua /lua/customcode.lua
+
 COPY curieproxy/lua/shared-objects/*.so /usr/local/lib/lua/5.1/
 COPY --from=rustbin /root/curiefense.so /usr/local/lib/lua/5.1/
 
@@ -17,6 +21,8 @@ RUN openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 -subj "/C=fr/O=cur
 RUN mkfifo /nginx-accesslogs
 
 COPY start.sh /usr/bin/
+COPY nginx-conf-reload.sh nginx-conf-watch.sh /usr/local/bin/
+RUN chmod +x /usr/bin/start.sh /usr/local/bin/nginx-conf-watch.sh /usr/local/bin/nginx-conf-reload.sh
 
 RUN curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.17.6-amd64.deb && dpkg -i filebeat-7.17.6-amd64.deb && rm filebeat-7.17.6-amd64.deb
 COPY filebeat/filebeat-nginx.yml /etc/filebeat.yml

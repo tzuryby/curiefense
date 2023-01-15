@@ -4,10 +4,10 @@ use crate::config::globalfilter::{
 use crate::config::raw::Relation;
 use crate::config::virtualtags::VirtualTags;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
-use crate::interface::{stronger_decision, BlockReason, Location, SimpleDecision, Tags};
+use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 
 struct MatchResult {
@@ -128,6 +128,9 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Header(hdr) => check_pair(hdr, &rinfo.headers, |h| {
             Location::HeaderValue(hdr.key.clone(), h.to_string())
         }),
+        GlobalFilterEntryE::Plugins(arg) => check_pair(arg, &rinfo.plugins, |a| {
+            Location::PluginValue(arg.key.clone(), a.to_string())
+        }),
         GlobalFilterEntryE::Args(arg) => check_pair(arg, &rinfo.rinfo.qinfo.args, |a| {
             Location::UriArgumentValue(arg.key.clone(), a.to_string())
         }),
@@ -238,15 +241,29 @@ pub fn tag_request(
         rinfo.rinfo.geoip.network.as_deref().unwrap_or("nil"),
         Location::Ip,
     );
-    if let Some(is_anonymous_proxy) = rinfo.rinfo.geoip.is_anonymous_proxy {
-        if is_anonymous_proxy {
-            tags.insert("mm-anon", Location::Ip)
-        }
+    if rinfo.rinfo.geoip.is_proxy.unwrap_or(false) {
+        tags.insert("geo-anon", Location::Ip)
     }
-    if let Some(is_satellite_provider) = rinfo.rinfo.geoip.is_satellite_provider {
-        if is_satellite_provider {
-            tags.insert("mm-sat", Location::Ip)
-        }
+    if rinfo.rinfo.geoip.is_satellite.unwrap_or(false) {
+        tags.insert("geo-sat", Location::Ip)
+    }
+    if rinfo.rinfo.geoip.is_vpn.unwrap_or(false) {
+        tags.insert("geo-vpn", Location::Ip)
+    }
+    if rinfo.rinfo.geoip.is_tor.unwrap_or(false) {
+        tags.insert("geo-tor", Location::Ip)
+    }
+    if rinfo.rinfo.geoip.is_relay.unwrap_or(false) {
+        tags.insert("geo-relay", Location::Ip)
+    }
+    if rinfo.rinfo.geoip.is_hosting.unwrap_or(false) {
+        tags.insert("geo-hosting", Location::Ip)
+    }
+    if let Some(privacy_service) = rinfo.rinfo.geoip.privacy_service.as_deref() {
+        tags.insert_qualified("geo-privacy-service", privacy_service, Location::Ip)
+    }
+    if rinfo.rinfo.geoip.is_mobile.unwrap_or(false) {
+        tags.insert("geo-mobile", Location::Ip);
     }
 
     for tag in rinfo.rinfo.secpolicy.tags.iter() {
@@ -255,6 +272,7 @@ pub fn tag_request(
 
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
+    let mut monitor_headers = HashMap::new();
     for psection in globalfilters {
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
@@ -264,18 +282,35 @@ pub fn tag_request(
                 .with_raw_tags_locs(psection.tags.clone(), &mtch.matched);
             tags.extend(rtags);
             if let Some(a) = &psection.action {
+                // merge headers from Monitor decision
+                if a.atype == SimpleActionT::Monitor {
+                    monitor_headers.extend(a.headers.clone().unwrap_or_default());
+                }
                 let curdec = SimpleDecision::Action(
                     a.clone(),
                     vec![BlockReason::global_filter(
                         psection.id.clone(),
                         psection.name.clone(),
                         a.atype.to_bdecision(),
+                        &mtch.matched,
                     )],
                 );
+
                 decision = stronger_decision(decision, curdec);
             }
         }
     }
+
+    // if the final decision is a monitor, use cumulated monitor headers as headers
+    decision = if let SimpleDecision::Action(mut action, block_reasons) = decision {
+        if action.atype == SimpleActionT::Monitor {
+            action.headers = Some(monitor_headers);
+        }
+        SimpleDecision::Action(action, block_reasons)
+    } else {
+        decision
+    };
+
     (tags, decision, stats.mapped(globalfilters.len(), matched))
 }
 
@@ -289,7 +324,7 @@ mod tests {
     use crate::utils::map_request;
     use crate::utils::RawRequest;
     use crate::utils::RequestMeta;
-    use regex::Regex;
+    use regex::RegexBuilder;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -333,6 +368,7 @@ mod tests {
                 mbody: None,
             },
             None,
+            HashMap::new(),
         )
     }
 
@@ -347,7 +383,7 @@ mod tests {
     fn single_re(input: &str) -> SingleEntry {
         SingleEntry {
             exact: input.to_string(),
-            re: Regex::new(input).ok(),
+            re: RegexBuilder::new(input).case_insensitive(true).build().ok(),
         }
     }
 
@@ -355,7 +391,7 @@ mod tests {
         PairEntry {
             key: key.to_string(),
             exact: input.to_string(),
-            re: Regex::new(input).ok(),
+            re: RegexBuilder::new(input).case_insensitive(true).build().ok(),
         }
     }
 
@@ -441,12 +477,6 @@ mod tests {
             }
             GlobalFilterRule::Entry(e) => GlobalFilterRule::Entry(e.clone()),
         }
-        /*
-        GlobalFilterSection {
-            relation: ss.relation,
-            entries: optimize_ipranges(ss.relation, ss.entries.clone()),
-        }
-        */
     }
 
     fn check_iprange(rel: Relation, input: &[&str], samples: &[(&str, bool)]) {

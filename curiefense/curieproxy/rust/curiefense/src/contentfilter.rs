@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config::contentfilter::{
     rule_tags, ContentFilterEntryMatch, ContentFilterProfile, ContentFilterRules, ContentFilterSection, Section,
-    SectionIdx,
+    SectionIdx, ALL_SECTION_IDX, ALL_SECTION_IDX_NO_PLUGINS,
 };
 use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
 use crate::interface::{BDecision, BlockReason, Initiator, Location, Tags};
@@ -47,6 +47,7 @@ fn get_section(idx: SectionIdx, rinfo: &RequestInfo) -> &RequestField {
         Cookies => &rinfo.cookies,
         Args => &rinfo.rinfo.qinfo.args,
         Path => &rinfo.rinfo.qinfo.path_as_map,
+        Plugins => &rinfo.plugins,
     }
 }
 
@@ -54,6 +55,7 @@ fn is_blocking(reasons: &[BlockReason]) -> bool {
     reasons.iter().any(|r| r.decision >= BDecision::Blocking)
 }
 
+#[derive(Debug)]
 pub struct CfBlock {
     pub blocking: bool,
     pub reasons: Vec<BlockReason>,
@@ -69,7 +71,6 @@ pub fn content_filter_check(
     profile: &ContentFilterProfile,
     mhsdb: Option<&ContentFilterRules>,
 ) -> (Result<(), CfBlock>, StatsCollect<BStageContentFilter>) {
-    use SectionIdx::*;
     let mut omit = Default::default();
 
     // directly exit if omitted profile
@@ -79,9 +80,10 @@ pub fn content_filter_check(
     }
 
     // check section profiles
-    for idx in &[Path, Headers, Cookies, Args] {
+    for idx in &ALL_SECTION_IDX {
         if let Err(reason) = section_check(
             logs,
+            &profile.id,
             tags,
             *idx,
             profile.sections.get(*idx),
@@ -108,7 +110,7 @@ pub fn content_filter_check(
     let mut hca_keys: HashMap<String, (SectionIdx, String)> = HashMap::new();
 
     // list of non whitelisted entries
-    for idx in &[Path, Headers, Cookies, Args] {
+    for idx in &ALL_SECTION_IDX_NO_PLUGINS {
         let section_content = get_section(*idx, rinfo)
             .iter()
             .filter(|(name, _)| !omit.entries.get(*idx).contains(*name))
@@ -180,6 +182,7 @@ pub fn content_filter_check(
 /// checks a section (headers, args, cookies) against the policy
 fn section_check(
     logs: &mut Logs,
+    cfid: &str,
     tags: &Tags,
     idx: SectionIdx,
     section: &ContentFilterSection,
@@ -189,7 +192,12 @@ fn section_check(
 ) -> Result<(), BlockReason> {
     if idx != SectionIdx::Path && params.len() > section.max_count {
         if section.max_count > 0 {
-            return Err(BlockReason::too_many_entries(idx, params.len(), section.max_count));
+            return Err(BlockReason::too_many_entries(
+                cfid.to_string(),
+                idx,
+                params.len(),
+                section.max_count,
+            ));
         } else {
             logs.warning(|| format!("In section {:?}, param_count = 0", idx));
         }
@@ -199,7 +207,13 @@ fn section_check(
         // skip decoded parameters for length checks
         if !name.ends_with(":decoded") && value.len() > section.max_length {
             if section.max_length > 0 {
-                return Err(BlockReason::entry_too_large(idx, name, value.len(), section.max_length));
+                return Err(BlockReason::entry_too_large(
+                    cfid.to_string(),
+                    idx,
+                    name,
+                    value.len(),
+                    section.max_length,
+                ));
             } else {
                 logs.warning(|| format!("In section {:?}, max_length = 0", idx));
             }
@@ -213,15 +227,20 @@ fn section_check(
 
         // logic for checking an entry
         let mut check_entry = |name_entry: &ContentFilterEntryMatch| {
-            let matched = if let Some(re) = &name_entry.reg {
-                re.matches(value)
+            let (matched, mre) = if let Some(re) = &name_entry.reg {
+                (re.matches(value), Some(re.inner.as_str()))
             } else {
-                false
+                (false, None)
             };
             if matched {
                 omit.entries.at(idx).insert(name.to_string());
             } else if name_entry.restrict {
-                return Err(BlockReason::restricted(Location::from_value(idx, name, value)));
+                return Err(BlockReason::restricted(
+                    cfid.to_string(),
+                    Location::from_value(idx, name, value),
+                    value.to_string(),
+                    mre.unwrap_or_default().to_string(),
+                ));
             } else if tags.has_intersection(&name_entry.exclusions) {
                 omit.entries.at(idx).insert(name.to_string());
             } else if !name_entry.exclusions.is_empty() {
@@ -387,11 +406,13 @@ fn hyperscan(
             .into_iter()
             .map(|(sigid, location, decision, risk_level)| BlockReason {
                 initiator: Initiator::ContentFilter {
-                    ruleid: sigid.to_string(),
+                    id: sigid.to_string(),
                     risk_level,
                 },
-                location: std::iter::once(location).collect(),
+                location,
                 decision,
+                extra_locations: Vec::new(),
+                extra: serde_json::Value::Null,
             })
             .collect()),
         stats.cf_matches(sigs.ids.len(), matches, nactive),
@@ -497,7 +518,7 @@ mod test {
         };
         let mut secpol = SecurityPolicy::empty();
         secpol.content_filter_profile = profile;
-        map_request(&mut logs, Arc::new(secpol), None, &raw_request, None)
+        map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, HashMap::new())
     }
 
     #[test]
@@ -566,7 +587,7 @@ mod test {
             Some(&masked),
             None,
             &Tags::new(&VirtualTags::default()),
-            &Stats::default(),
+            &Stats::new(std::time::Instant::now(), "test".to_string()),
             &Logs::default(),
             HashMap::new(),
         ));
@@ -702,7 +723,7 @@ mod test {
         hsection.regex = vec![(regex::Regex::new("^h.*").unwrap(), masksecret())];
         let csection = secpol.content_filter_profile.sections.at(SectionIdx::Cookies);
         csection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
-        let rinfo = map_request(&mut logs, Arc::new(secpol), None, &raw_request, None);
+        let rinfo = map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, HashMap::new());
 
         let masked = masking(rinfo);
 
@@ -711,7 +732,7 @@ mod test {
             Some(&masked),
             None,
             &Tags::new(&VirtualTags::default()),
-            &Stats::default(),
+            &Stats::new(std::time::Instant::now(), "test".to_string()),
             &Logs::default(),
             HashMap::new(),
         ));
