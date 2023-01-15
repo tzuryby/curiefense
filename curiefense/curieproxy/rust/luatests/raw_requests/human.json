@@ -15,15 +15,16 @@
       "block_mode": true,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny_bot",
           "value": "denybot",
           "tags": [
             "denybot"
           ],
+          "action": "challenge",
           "name": "denybot",
-          "stage": "deny_bot",
-          "id":"FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -66,15 +67,16 @@
       "block_mode": true,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
           "tags": [
             "deny"
           ],
+          "action": "custom",
           "name": "deny",
-          "stage": "deny",
-          "id":"FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [

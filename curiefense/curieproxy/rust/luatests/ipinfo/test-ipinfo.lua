@@ -396,9 +396,10 @@ local function test_raw_request(request_path, mode)
 
     local triggers = {
       "acl_triggers",
-      "rate_limit_triggers",
-      "global_filter_triggers",
-      "content_filter_triggers"
+      "rl_triggers",
+      "gf_triggers",
+      "cf_triggers"
+      "cf_restrict_triggers"
     }
     for _, trigger_name in pairs(triggers) do
       good = test_trigger(expected, request_map, trigger_name) or good

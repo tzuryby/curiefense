@@ -9,13 +9,12 @@ use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query,
 use crate::grasshopper::{challenge_phase01, challenge_phase02, Grasshopper};
 use crate::interface::stats::{BStageMapped, StatsCollect};
 use crate::interface::{
-    merge_decisions, AclStage, AnalyzeResult, BDecision, BStageFlow, BlockReason, Decision, Location, SimpleDecision,
-    Tags,
+    merge_decisions, AclStage, AnalyzeResult, BStageFlow, BlockReason, Decision, Location, SimpleDecision, Tags,
 };
 use crate::limit::{limit_build_query, limit_info, limit_process, limit_resolve_query, LimitCheck, LimitResult};
 use crate::logs::Logs;
 use crate::redis::redis_async_conn;
-use crate::utils::{eat_errors, BodyDecodingResult, RequestInfo};
+use crate::utils::{eat_errors, BodyDecodingResult, BodyProblem, RequestInfo};
 
 /*
 
@@ -117,7 +116,21 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
     if !securitypolicy.content_filter_profile.content_type.is_empty() {
         // note that having no body is perfectly OK
         if let BodyDecodingResult::DecodingFailed(rr) = &reqinfo.rinfo.qinfo.body_decoding {
-            let reason = BlockReason::body_malformed(securitypolicy.content_filter_profile.id.clone(), rr);
+            let reason = match rr {
+                BodyProblem::DecodingError(actual, expected) => BlockReason::body_malformed(
+                    securitypolicy.content_filter_profile.id.clone(),
+                    securitypolicy.content_filter_profile.name.clone(),
+                    securitypolicy.content_filter_profile.action.atype.to_raw(),
+                    actual,
+                    expected.as_deref(),
+                ),
+                BodyProblem::TooDeep => BlockReason::body_too_deep(
+                    securitypolicy.content_filter_profile.id.clone(),
+                    securitypolicy.content_filter_profile.name.clone(),
+                    securitypolicy.content_filter_profile.action.atype.to_raw(),
+                    securitypolicy.content_filter_profile.max_body_depth,
+                ),
+            };
             // we expect the body to be properly decoded
             let decision = securitypolicy.content_filter_profile.action.to_decision(
                 is_human,
@@ -340,13 +353,14 @@ pub fn analyze_finish<GH: Grasshopper>(
         let bypass = decision.stage == AclStage::Bypass;
         let mut br = BlockReason::acl(
             reqinfo.rinfo.secpolicy.acl_profile.id.clone(),
+            reqinfo.rinfo.secpolicy.acl_profile.name.clone(),
             decision.tags,
             decision.stage,
         );
         if !secpol.acl_active {
-            br.decision.inactive();
+            br.action.inactive();
         }
-        let blocking = br.decision == BDecision::Blocking;
+        let is_final = br.action.is_final();
 
         let acl_decision = Decision::pass(vec![br]);
         cumulated_decision = merge_decisions(cumulated_decision, acl_decision);
@@ -405,7 +419,7 @@ pub fn analyze_finish<GH: Grasshopper>(
             };
         }
 
-        if blocking {
+        if is_final {
             let decision = acl_block(&mut tags);
             cumulated_decision = merge_decisions(cumulated_decision, decision);
             return AnalyzeResult {
@@ -452,7 +466,7 @@ pub fn analyze_finish<GH: Grasshopper>(
                 .into_iter()
                 .map(|mut reason| {
                     if !secpol.content_filter_active {
-                        reason.decision.inactive();
+                        reason.action.inactive();
                     }
                     reason
                 })

@@ -16,15 +16,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
           "tags": [
             "deny"
           ],
+          "action": "custom",
           "name": "deny",
-          "stage": "deny",
-          "id": "FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -63,14 +64,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect json",
           "section": "body",
-          "id": "expectjson",
+          "trigger_id": "expectjson",
           "type": "malformed body",
-          "actual": "Invalid content type=None, accepted types=[Json]",
-          "expected": "well-formed"
+          "actual": "no content type specified",
+          "expected": "[Json]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -110,14 +112,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect json",
           "section": "body",
-          "id": "expectjson",
+          "trigger_id": "expectjson",
           "type": "malformed body",
-          "actual": "Invalid content type=Some(\"text\/xml\"), accepted types=[Json]",
-          "expected": "well-formed"
+          "actual": "content type is text\/xml",
+          "expected": "[Json]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -159,15 +162,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
           "tags": [
             "deny"
           ],
+          "action": "custom",
           "name": "deny1",
-          "stage": "deny",
-          "id": "FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -207,14 +211,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "id": "expectxml",
+          "trigger_id": "expectxml",
           "type": "malformed body",
-          "actual": "XML parsing error: invalid attribute at 1:6 cause expected '=' not '<' at 1:11",
-          "expected": "well-formed"
+          "actual": "invalid attribute at 1:6 cause expected '=' not '<' at 1:11",
+          "expected": "well-formed",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -252,14 +257,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "id": "expectxml",
+          "trigger_id": "expectxml",
           "type": "malformed body",
-          "actual": "Invalid content type=None, accepted types=[Xml]",
-          "expected": "well-formed"
+          "actual": "no content type specified",
+          "expected": "[Xml]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -298,14 +304,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "id": "expectxml",
+          "trigger_id": "expectxml",
           "type": "malformed body",
-          "actual": "Invalid content type=Some(\"application\/json\"), accepted types=[Xml]",
-          "expected": "well-formed"
+          "actual": "content type is application\/json",
+          "expected": "[Xml]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -344,14 +351,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "restriction_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect all",
           "section": "body",
-          "id": "expectall",
+          "trigger_id": "expectall",
           "type": "malformed body",
-          "actual": "Invalid JSON body: expected value at line 1 column 1",
-          "expected": "well-formed"
+          "actual": "expected value at line 1 column 1",
+          "expected": "well-formed",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -392,15 +400,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
           "tags": [
             "deny"
           ],
+          "action": "custom",
           "name": "deny",
-          "stage": "deny",
-          "id": "FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -442,15 +451,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "request_element": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
           "tags": [
             "deny"
           ],
+          "action": "custom",
           "name": "deny1",
-          "stage": "deny",
-          "id": "FROMTAGS"
+          "section": "uri"
         }
       ],
       "tags": [
