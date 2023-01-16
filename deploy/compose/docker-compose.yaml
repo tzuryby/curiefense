@@ -124,6 +124,7 @@ services:
     environment:
       - CURIE_BUCKET_LINK
       - RUN_MODE=${RUN_MODE:-PERIODIC_SYNC}
+      - CONFIGCHANGE=/init/configchange-docker.sh
     networks:
       - curiemesh
     secrets:
