@@ -364,6 +364,7 @@ fn hyperscan(
     // TODO: use `intersperse` when this stabilizes
     let to_scan = hca_keys.keys().cloned().collect::<Vec<_>>().join("\n");
     let mut found = false;
+    #[allow(clippy::needless_borrow)]
     if let Err(rr) = sigs.db.scan(&[to_scan], &scratch, |_, _, _, _| {
         found = true;
         Matching::Continue
@@ -383,6 +384,7 @@ fn hyperscan(
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
         // for some reason, from is always set to 0 in my tests, so we can't accurately capture substrings
+        #[allow(clippy::needless_borrow)]
         let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, from, to, _flags| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),

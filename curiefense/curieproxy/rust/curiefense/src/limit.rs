@@ -144,7 +144,7 @@ pub async fn limit_resolve_query<I: Iterator<Item = Option<i64>>>(
         };
         logs.debug(|| format!("limit {} curcount={} expire={}", check.limit.id, curcount, expire));
         if expire < 0 {
-            pipe.cmd("EXPIRE").arg(&check.key).arg(&check.limit.timeframe);
+            pipe.cmd("EXPIRE").arg(&check.key).arg(check.limit.timeframe);
         }
         pipe.query_async(redis).await?;
         out.push(LimitResult {

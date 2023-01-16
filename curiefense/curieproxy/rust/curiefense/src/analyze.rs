@@ -348,7 +348,7 @@ pub fn analyze_finish<GH: Grasshopper>(
     logs.debug(|| format!("ACL result: {}", acl_result));
 
     let acl_decision = acl_result.decision(is_human);
-    let stats = stats.acl(if acl_decision.is_some() { 1 } else { 0 });
+    let stats = stats.acl(usize::from(acl_decision.is_some()));
     if let Some(decision) = acl_decision {
         let bypass = decision.stage == AclStage::Bypass;
         let mut br = BlockReason::acl(

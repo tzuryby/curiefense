@@ -5,7 +5,7 @@ use curiefense::config::hostmap::{PolicyId, SecurityPolicy};
 use curiefense::config::raw::AclProfile;
 use curiefense::config::virtualtags::VirtualTags;
 use curiefense::grasshopper::DummyGrasshopper;
-use curiefense::interface::{SecpolStats, SimpleDecision, StatsCollect};
+use curiefense::interface::{SecpolStats, StatsCollect};
 use curiefense::logs::{LogLevel, Logs};
 use curiefense::tagging::tag_request;
 use curiefense::utils::{map_request, RawRequest, RequestMeta};
