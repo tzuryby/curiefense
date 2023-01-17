@@ -931,7 +931,7 @@ mod tests {
                 method: "GET".to_string(),
                 path: "/this/is/the/path?arg1=x&arg2=y".to_string(),
                 requestid: None,
-                protocol: "https".to_string(),
+                protocol: None,
                 extra: HashMap::new(),
             },
             mbody: None,

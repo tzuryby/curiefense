@@ -380,6 +380,7 @@ mod test {
             RequestMeta {
                 authority: Some("authority".to_string()),
                 method: "GET".to_string(),
+                protocol: None,
                 path: "/path/to/somewhere".to_string(),
                 extra: HashMap::default(),
                 requestid: None,

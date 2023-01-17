@@ -535,6 +535,7 @@ mod test {
             path: "/foo?arg1=avalue1&arg2=a%20value2".to_string(),
             extra: HashMap::default(),
             requestid: None,
+            protocol: None,
         };
         let mut logs = Logs::default();
         let headers = [("h1", "value1"), ("h2", "value2")]
@@ -726,6 +727,7 @@ mod test {
         let meta = RequestMeta {
             authority: Some("myhost".to_string()),
             method: "GET".to_string(),
+            protocol: None,
             path: "/foo/pth/ddd?arg1=SECRETa1&arg2=U0VDUkVUYTI%3D".to_string(),
             extra: HashMap::default(),
             requestid: None,

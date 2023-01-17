@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::interface::BlockReason;
 use crate::logs::Logs;
-use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
 use crate::{Action, ActionType, Decision};
 use std::collections::HashMap;
