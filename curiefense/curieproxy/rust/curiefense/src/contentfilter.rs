@@ -364,6 +364,7 @@ fn hyperscan(
     // TODO: use `intersperse` when this stabilizes
     let to_scan = hca_keys.keys().cloned().collect::<Vec<_>>().join("\n");
     let mut found = false;
+    #[allow(clippy::needless_borrow)]
     if let Err(rr) = sigs.db.scan(&[to_scan], &scratch, |_, _, _, _| {
         found = true;
         Matching::Continue
@@ -383,6 +384,7 @@ fn hyperscan(
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
         // for some reason, from is always set to 0 in my tests, so we can't accurately capture substrings
+        #[allow(clippy::needless_borrow)]
         let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, from, to, _flags| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),
@@ -533,6 +535,7 @@ mod test {
             path: "/foo?arg1=avalue1&arg2=a%20value2".to_string(),
             extra: HashMap::default(),
             requestid: None,
+            protocol: None,
         };
         let mut logs = Logs::default();
         let headers = [("h1", "value1"), ("h2", "value2")]
@@ -724,6 +727,7 @@ mod test {
         let meta = RequestMeta {
             authority: Some("myhost".to_string()),
             method: "GET".to_string(),
+            protocol: None,
             path: "/foo/pth/ddd?arg1=SECRETa1&arg2=U0VDUkVUYTI%3D".to_string(),
             extra: HashMap::default(),
             requestid: None,

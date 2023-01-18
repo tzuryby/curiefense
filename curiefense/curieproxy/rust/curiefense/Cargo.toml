@@ -22,7 +22,6 @@ iprange = "0.6"
 anyhow = "1.0"
 md5 = "0.7"
 libinjection = "0.2"
-multipart = "0.18"
 xmlparser = "0.13"
 nom = "7.1"
 rand = "0.8"
@@ -34,6 +33,11 @@ async-graphql-parser = "3.0.38"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 arbitrary = { version = "1", features = ["derive"] }
 pdatastructs = "0.7"
+
+[dependencies.multipart]
+version = "0.18"
+default-features = false
+features = ["server"]
 
 [dependencies.hyperscan]
 version = "0.2"

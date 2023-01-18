@@ -3,6 +3,7 @@ use crate::config::globalfilter::{
 };
 use crate::config::raw::Relation;
 use crate::config::virtualtags::VirtualTags;
+use crate::grasshopper::PrecisionLevel;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
@@ -180,16 +181,33 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
 
 pub fn tag_request(
     stats: StatsCollect<BStageSecpol>,
-    is_human: bool,
+    precision_level: PrecisionLevel,
     globalfilters: &[GlobalFilterSection],
     rinfo: &RequestInfo,
     vtags: &VirtualTags,
 ) -> (Tags, SimpleDecision, StatsCollect<BStageMapped>) {
     let mut tags = Tags::new(vtags);
-    if is_human {
-        tags.insert("human", Location::Request);
-    } else {
-        tags.insert("bot", Location::Request);
+    use PrecisionLevel::*;
+    match precision_level {
+        Active | Passive => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l1", Location::Request);
+        }
+        Interactive => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l3", Location::Request);
+        }
+        MobileSdk => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l4", Location::Request);
+        }
+        Invalid => {
+            tags.insert("bot", Location::Request);
+        }
+        Emulator => {
+            tags.insert("mobile-sdk:emulator", Location::Request);
+            tags.insert("bot", Location::Request);
+        }
     }
     tags.insert_qualified("headers", &rinfo.headers.len().to_string(), Location::Headers);
     tags.insert_qualified("cookies", &rinfo.cookies.len().to_string(), Location::Cookies);

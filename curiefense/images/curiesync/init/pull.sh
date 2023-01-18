@@ -4,7 +4,7 @@ PERIOD=10
 
 echo "Run mode is [${RUN_MODE}]"
 QUIET="${CURIESYNC_QUIET:-false}"
-
+CONFIGCHANGE="${CONFIGCHANGE:-/init/configchange.sh}"
 
 info () {
     if [ "$QUIET" = "true" ]; then
@@ -43,11 +43,11 @@ if [ "$RUN_MODE" = "PERIODIC_SYNC" ] || [ -z "$RUN_MODE" ]; then
     info "Synchronizing conf every $PERIOD seconds"
     info "Initial configuration loading after $PERIOD seconds ..."
     sleep $PERIOD
-    /init/configchange.sh '[]'
+    $CONFIGCHANGE '[]'
     while :;
     do
         info "Pulling ${CURIE_BUCKET_LINK}"
-        curieconfctl sync pull "${CURIE_BUCKET_LINK}" /cf-config --on-conf-change /init/configchange.sh
+        curieconfctl sync pull "${CURIE_BUCKET_LINK}" /cf-config --on-conf-change "$CONFIGCHANGE"
         info "Sleeping"
         sleep $PERIOD
     done

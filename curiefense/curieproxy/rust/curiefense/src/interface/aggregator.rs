@@ -362,15 +362,15 @@ impl<T: Eq + Clone + std::hash::Hash + Serialize> Metric<T> {
         );
         mp.insert(
             format!("top_{}_active", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
         );
         mp.insert(
             format!("top_{}_reported", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
         );
         mp.insert(
             format!("top_{}_passed", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
         );
     }
 }
@@ -524,7 +524,7 @@ impl AggregatedCounters {
                     false
                 }
                 RawActionType::Monitor => false,
-                RawActionType::Custom | RawActionType::Challenge => {
+                RawActionType::Custom | RawActionType::Challenge | RawActionType::Ichallenge => {
                     blocked = true;
                     true
                 }
@@ -844,13 +844,14 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
 }
 
 fn serialize_entry(sample: i64, hdr: &AggregationKey, counters: &AggregatedCounters) -> Value {
-    let naive_dt = chrono::NaiveDateTime::from_timestamp(sample * *SAMPLE_DURATION, 0);
+    let naive_dt =
+        chrono::NaiveDateTime::from_timestamp_opt(sample * *SAMPLE_DURATION, 0).unwrap_or(chrono::NaiveDateTime::MIN);
     let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(naive_dt, chrono::Utc);
     let mut content = serde_json::Map::new();
 
     content.insert(
         "timestamp".into(),
-        serde_json::to_value(&timestamp).unwrap_or_else(|_| Value::String("??".into())),
+        serde_json::to_value(timestamp).unwrap_or_else(|_| Value::String("??".into())),
     );
     content.insert(
         "proxy".into(),
