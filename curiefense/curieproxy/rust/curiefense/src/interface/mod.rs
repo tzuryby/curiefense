@@ -512,8 +512,12 @@ impl SimpleActionT {
             SimpleActionT::Monitor => RawActionType::Monitor,
             SimpleActionT::Custom { .. } => RawActionType::Custom,
             SimpleActionT::Challenge { ch_level } => {
-                return if ch_level == &GHMode::Active { RawActionType::Challenge } else { RawActionType::Ichallenge }
-            },
+                return if ch_level == &GHMode::Active {
+                    RawActionType::Challenge
+                } else {
+                    RawActionType::Ichallenge
+                }
+            }
         }
     }
 }

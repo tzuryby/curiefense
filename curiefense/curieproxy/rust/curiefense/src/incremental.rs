@@ -291,13 +291,8 @@ pub async fn finalize<GH: Grasshopper>(
         PrecisionLevel::Invalid
     };
     // without grasshopper, default to being human
-    let (mut tags, globalfilter_dec, stats) = tag_request(
-        idata.stats,
-        precision_level,
-        globalfilters,
-        &reqinfo,
-        &vtags,
-    );
+    let (mut tags, globalfilter_dec, stats) =
+        tag_request(idata.stats, precision_level, globalfilters, &reqinfo, &vtags);
     tags.insert("all", Location::Request);
 
     let dec = analyze(
