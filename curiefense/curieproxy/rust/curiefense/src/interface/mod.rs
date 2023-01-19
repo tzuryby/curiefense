@@ -511,7 +511,9 @@ impl SimpleActionT {
             SimpleActionT::Skip => RawActionType::Skip,
             SimpleActionT::Monitor => RawActionType::Monitor,
             SimpleActionT::Custom { .. } => RawActionType::Custom,
-            SimpleActionT::Challenge { .. } => RawActionType::Challenge,
+            SimpleActionT::Challenge { ch_level } => {
+                return if ch_level == &GHMode::Active { RawActionType::Challenge } else { RawActionType::Ichallenge }
+            },
         }
     }
 }
