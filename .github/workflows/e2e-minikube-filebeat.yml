@@ -69,15 +69,15 @@ jobs:
             kubectl -n istio-system describe pods
             kubectl -n curiefense describe pods
             echo "--- Logs for istio ingressgateway ---"
-            kubectl -n istio-system logs --all-containers -l app=istio-ingressgateway --tail -1 --prefix -p --timestamps
+            kubectl -n istio-system logs --all-containers -l app=istio-ingressgateway --tail -1 --prefix --timestamps
             echo "--- Logs for istiod ---"
-            kubectl -n istio-system logs --all-containers -l app=istiod --tail -1 --prefix -p --timestamps
+            kubectl -n istio-system logs --all-containers -l app=istiod --tail -1 --prefix --timestamps
             echo "--- Logs for confserver ---"
-            kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=confserver --tail -1 --prefix -p --timestamps
+            kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=confserver --tail -1 --prefix --timestamps
             echo "--- Logs for redis ---"
-            kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=redis --tail -1 --prefix -p --timestamps
+            kubectl -n curiefense logs --all-containers -l app.kubernetes.io/name=redis --tail -1 --prefix --timestamps
             echo "--- Logs for echoserver ---"
-            kubectl -n echoserver logs --all-containers -l app=echoserver --tail -1 --prefix -p --timestamps
+            kubectl -n echoserver logs --all-containers -l app=echoserver --tail -1 --prefix --timestamps
 
 
       - name: Publish Unit Test Results
