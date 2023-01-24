@@ -295,8 +295,8 @@ pub struct AclProfile {
     pub tags: HashSet<String>,
 }
 
-impl AclProfile {
-    pub fn default() -> Self {
+impl Default for AclProfile {
+    fn default() -> Self {
         AclProfile {
             id: "__default__".to_string(),
             name: "default-acl".to_string(),
@@ -310,7 +310,9 @@ impl AclProfile {
             tags: HashSet::new(),
         }
     }
+}
 
+impl AclProfile {
     pub fn resolve(logs: &mut Logs, actions: &HashMap<String, SimpleAction>, acl: RawAclProfile) -> Self {
         let id = acl.id;
         let action = match acl.action {
