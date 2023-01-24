@@ -418,7 +418,8 @@ pub fn analyze_finish<GH: Grasshopper>(
             decision.tags,
             decision.stage,
         );
-        if !secpol.acl_active {
+        // make the block reason inactive, unless it's a challenge, in which case it's always active
+        if !secpol.acl_active && !decision.challenge {
             br.action.inactive();
         }
         let is_final = br.action.is_final();
