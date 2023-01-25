@@ -18,6 +18,12 @@
     "name": "5ktcoafw"
   },
   {
+    "type": "ichallenge",
+    "id": "ichallenge",
+    "tags": [],
+    "name": "ichallenge"
+  },
+  {
     "type": "custom",
     "id": "a7ge3v0l",
     "tags": [],
@@ -141,7 +147,9 @@
     "name": "ye8qyg0h"
   },
   {
-    "tags": ["myextratag"],
+    "tags": [
+      "myextratag"
+    ],
     "type": "custom",
     "params": {
       "status": 403,

@@ -644,7 +644,7 @@ impl SimpleAction {
     }
 
     /// returns None when it is a challenge, Some(action) otherwise
-    fn to_action(&self, rinfo: &RequestInfo, tags: &Tags, is_human: bool) -> Option<Action> {
+    fn to_action(&self, rinfo: &RequestInfo, tags: &Tags, precision_level: PrecisionLevel) -> Option<Action> {
         let mut action = Action::default();
         action.block_mode = action.atype.is_blocking();
         action.status = self.status;
@@ -661,11 +661,20 @@ impl SimpleAction {
                 action.content = content.clone();
             }
             SimpleActionT::Challenge { ch_level } => {
+                let is_human = match ch_level {
+                    GHMode::Passive => precision_level.is_human(),
+                    GHMode::Active => precision_level.is_human(),
+                    GHMode::Interactive => precision_level.is_interactive(),
+                };
                 if !is_human {
                     return None;
                 }
                 action.atype = ActionType::Monitor;
             }
+        }
+        if action.atype == ActionType::Monitor {
+            action.status = 200;
+            action.block_mode = false;
         }
         Some(action)
     }
@@ -688,19 +697,16 @@ impl SimpleAction {
                 reasons: reason,
             };
         }
-        //phase01 for challenge/ichallenge (active/interactive challenge)
-        let mut ch_mode: GHMode = GHMode::Active;
-        match &self.atype {
-            SimpleActionT::Challenge { ch_level } => {
-                ch_mode = *ch_level;
-            }
-            _ => (),
-        }
-        //for active/interactive challenge
-        let action = match self.to_action(rinfo, tags, precision_level.is_human()) {
+        let action = match self.to_action(rinfo, tags, precision_level) {
             None => match mgh {
                 //if None-must be one of the challenge actions
-                Some(gh) => return challenge_phase01(gh, logs, rinfo, reason, ch_mode),
+                Some(gh) => {
+                    let ch_mode = match &self.atype {
+                        SimpleActionT::Challenge { ch_level } => *ch_level,
+                        _ => GHMode::Active,
+                    };
+                    return challenge_phase01(gh, logs, rinfo, reason, ch_mode);
+                }
                 _ => Action::default(),
             },
             Some(a) => a,

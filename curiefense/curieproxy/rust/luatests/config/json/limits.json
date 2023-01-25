@@ -584,6 +584,54 @@
     "timeframe": 60
   },
   {
+    "description": "rate limit challenge",
+    "exclude": [],
+    "id": "alwayschallenge",
+    "include": [],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "rate limit always challenge",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "5ktcoafw",
+        "limit": 0
+      }
+    ],
+    "global": false,
+    "active": true,
+    "timeframe": 60
+  },
+  {
+    "description": "rate limit ichallenge",
+    "exclude": [],
+    "id": "alwaysichallenge",
+    "include": [],
+    "key": [
+      {
+        "attrs": "ip"
+      }
+    ],
+    "name": "rate limit always ichallenge",
+    "pairwith": {
+      "self": "self"
+    },
+    "thresholds": [
+      {
+        "action": "ichallenge",
+        "limit": 0
+      }
+    ],
+    "global": false,
+    "active": true,
+    "timeframe": 60
+  },
+  {
     "description": "rate limit no skip threshold",
     "exclude": [],
     "id": "noskipthreshold",

@@ -22,6 +22,10 @@ impl PrecisionLevel {
     pub fn is_human(&self) -> bool {
         (*self != PrecisionLevel::Invalid) && (*self != PrecisionLevel::Emulator)
     }
+
+    pub fn is_interactive(&self) -> bool {
+        (*self == PrecisionLevel::Interactive) || (*self == PrecisionLevel::MobileSdk)
+    }
 }
 
 #[repr(u8)]
