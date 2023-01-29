@@ -25,7 +25,7 @@ fi
 
 STOP_ON_FAIL=${STOP_ON_FAIL:-yes}
 
-IFS=' ' read -ra RUST_DISTROS <<< "${RUST_DISTROS:-bionic focal}"
+IFS=' ' read -ra RUST_DISTROS <<< "${RUST_DISTROS:-bionic focal jammy}"
 
 if [ -n "$TESTIMG" ]; then
     IMAGES=("$TESTIMG")
