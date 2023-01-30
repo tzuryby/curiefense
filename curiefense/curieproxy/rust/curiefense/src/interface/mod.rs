@@ -222,7 +222,11 @@ pub fn jsonlog_rinfo(
     proxy: HashMap<String, String>,
     now: &chrono::DateTime<chrono::Utc>,
 ) -> serde_json::Result<Vec<u8>> {
-    let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
+    let block_reason_desc = if dec.is_final() {
+        BlockReason::block_reason_desc(&dec.reasons)
+    } else {
+        None
+    };
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
 
@@ -643,9 +647,16 @@ impl SimpleAction {
         ))
     }
 
-    /// returns None when it is a challenge, Some(action) otherwise
-    fn to_action(&self, rinfo: &RequestInfo, tags: &Tags, precision_level: PrecisionLevel) -> Option<Action> {
+    /// returns Err(reasons) when it is a challenge, Ok(decision) otherwise
+    fn build_decision(
+        &self,
+        rinfo: &RequestInfo,
+        tags: &Tags,
+        precision_level: PrecisionLevel,
+        reason: Vec<BlockReason>,
+    ) -> Result<Decision, Vec<BlockReason>> {
         let mut action = Action::default();
+        let mut reason = reason;
         action.block_mode = action.atype.is_blocking();
         action.status = self.status;
         action.headers = self.headers.as_ref().map(|hm| {
@@ -667,16 +678,20 @@ impl SimpleAction {
                     GHMode::Interactive => precision_level.is_interactive(),
                 };
                 if !is_human {
-                    return None;
+                    return Err(reason);
                 }
                 action.atype = ActionType::Monitor;
+                // clean up challenge reasons
+                for r in reason.iter_mut() {
+                    r.action.inactive()
+                }
             }
         }
         if action.atype == ActionType::Monitor {
             action.status = 200;
             action.block_mode = false;
         }
-        Some(action)
+        Ok(Decision::action(action, reason))
     }
 
     pub fn to_decision<GH: Grasshopper>(
@@ -697,21 +712,20 @@ impl SimpleAction {
                 reasons: reason,
             };
         }
-        let action = match self.to_action(rinfo, tags, precision_level) {
-            None => match mgh {
+        match self.build_decision(rinfo, tags, precision_level, reason) {
+            Err(nreason) => match mgh {
                 //if None-must be one of the challenge actions
                 Some(gh) => {
                     let ch_mode = match &self.atype {
                         SimpleActionT::Challenge { ch_level } => *ch_level,
                         _ => GHMode::Active,
                     };
-                    return challenge_phase01(gh, logs, rinfo, reason, ch_mode);
+                    challenge_phase01(gh, logs, rinfo, nreason, ch_mode)
                 }
-                _ => Action::default(),
+                _ => Decision::action(Action::default(), nreason),
             },
-            Some(a) => a,
-        };
-        Decision::action(action, reason)
+            Ok(a) => a,
+        }
     }
 
     pub fn is_blocking(&self) -> bool {

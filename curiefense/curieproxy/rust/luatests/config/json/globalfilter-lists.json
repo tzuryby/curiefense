@@ -939,5 +939,36 @@
     },
     "mdate": "",
     "source": "self-managed"
+  },
+  {
+    "action": "5ktcoafw",
+    "active": true,
+    "description": "run the challenge with a global filter",
+    "entries_relation": "OR",
+    "id": "gfchallenge",
+    "mdate": "2020-05-23T00:04:41",
+    "name": "gf challenge",
+    "rule": {
+      "relation": "AND",
+      "entries": [
+        {
+          "entries": [
+            [
+              "headers",
+              [
+                "gfchallenge",
+                "true"
+              ],
+              "..."
+            ]
+          ],
+          "relation": "OR"
+        }
+      ]
+    },
+    "source": "self-managed",
+    "tags": [
+      "gfchallenge"
+    ]
   }
 ]
