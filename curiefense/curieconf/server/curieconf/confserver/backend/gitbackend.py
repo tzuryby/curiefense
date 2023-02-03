@@ -12,6 +12,7 @@ import jmespath
 import fasteners
 from typing import Dict, List
 import jsonpath_ng
+import pathlib
 
 
 CURIE_AUTHOR = git.Actor("Curiefense API", "curiefense@reblaze.com")
@@ -253,8 +254,15 @@ class GitBackend(CurieBackend):
                 git.Remote.remove(self.repo, r)
             # push to remote
             remote = git.Remote.create(self.repo, remotename, url)
-            remote.push(all=True)
-            remote.push(tags=True)
+            ssh_key_path = pathlib.Path(os.environ.get("CURIECONF_GIT_SSH_KEY_PATH"))
+            if ssh_key_path.is_file() and ssh_key_path.stat().st_size > 0:
+                ssh_cmd = "ssh -o StrictHostKeyChecking=no -i " + str(ssh_key_path)
+                with self.repo.git.custom_environment(GIT_SSH_COMMAND=ssh_cmd):
+                    remote.push(all=True)
+                    remote.push(tags=True)
+            else:
+                remote.push(all=True)
+                remote.push(tags=True)
             git.Remote.remove(self.repo, remotename)
 
     def gitfetch(self, url):
@@ -269,7 +277,15 @@ class GitBackend(CurieBackend):
                 git.Remote.remove(self.repo, r)
             # push to remote
             remote = git.Remote.create(self.repo, remotename, url)
-            remote.fetch()
+            ssh_key_path = pathlib.Path(os.environ.get("CURIECONF_GIT_SSH_KEY_PATH"))
+            # no code injection here: git is called using execve()
+            refspec = [f"{b.name}:{b.name}" for b in self.repo.branches]
+            if ssh_key_path.is_file() and ssh_key_path.stat().st_size > 0:
+                ssh_cmd = "ssh -o StrictHostKeyChecking=no -i " + str(ssh_key_path)
+                with self.repo.git.custom_environment(GIT_SSH_COMMAND=ssh_cmd):
+                    remote.fetch(refspec)
+            else:
+                remote.fetch(refspec)
             git.Remote.remove(self.repo, remotename)
 
     @staticmethod
