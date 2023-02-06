@@ -263,6 +263,18 @@
         "tags": [],
         "map": [
             {
+                "match": "/limits/always-skip",
+                "name": "alwaysskip",
+                "id": "alwaysskip",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwaysskip"
+                ]
+            },
+            {
                 "match": "/limits/always-ichallenge",
                 "name": "alwaysichallenge",
                 "id": "alwaysichallenge",
