@@ -31,6 +31,7 @@ lazy_static! {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(8);
+    static ref PLANET_NAME: String = std::env::var("CF_PLANET_NAME").ok().unwrap_or_default();
     static ref EMPTY_AGGREGATED_DATA: AggregatedCounters = AggregatedCounters::default();
 }
 
@@ -193,6 +194,7 @@ struct AggregationKey {
     proxy: Option<String>,
     secpolid: String,
     secpolentryid: String,
+    branch: String,
 }
 
 /// structure used for serialization
@@ -862,6 +864,8 @@ fn serialize_entry(sample: i64, hdr: &AggregationKey, counters: &AggregatedCount
     );
     content.insert("secpolid".into(), Value::String(hdr.secpolid.clone()));
     content.insert("secpolentryid".into(), Value::String(hdr.secpolentryid.clone()));
+    content.insert("branch".into(), Value::String(hdr.branch.clone()));
+    content.insert("planet_name".into(), Value::String(PLANET_NAME.clone()));
     content.insert("counters".into(), serialize_counters(counters));
     Value::Object(content)
 }
@@ -914,6 +918,7 @@ pub async fn aggregated_values() -> String {
                         proxy: proxy.clone(),
                         secpolid: "__default__".to_string(),
                         secpolentryid: "__default__".to_string(),
+                        branch: "-".to_string(),
                     },
                     &AggregatedCounters::default(),
                 )
@@ -941,10 +946,17 @@ pub async fn aggregate(
 ) {
     let seconds = rinfo.timestamp.timestamp();
     let sample = seconds / *SAMPLE_DURATION;
+    let branch_tag = tags
+        .inner()
+        .keys()
+        .filter_map(|t| t.strip_prefix("branch:"))
+        .next()
+        .unwrap_or("-");
     let key = AggregationKey {
         proxy: rinfo.rinfo.container_name.clone(),
         secpolid: rinfo.rinfo.secpolicy.policy.id.to_string(),
         secpolentryid: rinfo.rinfo.secpolicy.entry.id.to_string(),
+        branch: branch_tag.to_string(),
     };
     let mut guard = AGGREGATED.lock().await;
     prune_old_values(&mut guard, sample);
