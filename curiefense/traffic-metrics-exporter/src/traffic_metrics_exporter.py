@@ -132,6 +132,14 @@ def collect_values(acc, key, value):
     acc[key].append(value)
 
 
+def take_earliest(agg_list):
+    """each element of aggregated data contains list of entries - for the current
+    and part of the next minute. Take entry only of the earliest minute.
+    """
+    earliest_timestamp = min({agg["timestamp"] for agg in agg_list})
+    return filter(lambda agg: agg["timestamp"] == earliest_timestamp, agg_list)
+
+
 def flatten_object_properties(t2_dict: dict):
     t2 = deepcopy(t2_dict)
     for counter_name, counter_value in t2_dict.get("counters", {}).items():
@@ -203,7 +211,7 @@ def export_t3():
     while True:
         acc_avg = {}
         five_sec_string = q.get()
-        five_sec_json = json.loads(five_sec_string)
+        five_sec_json = take_earliest(json.loads(five_sec_string))
         if ENABLE_EXPORT_T2:
             export_t2(five_sec_json)
         for agg_sec in five_sec_json:
