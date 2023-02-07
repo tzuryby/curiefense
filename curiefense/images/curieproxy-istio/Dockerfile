@@ -1,5 +1,5 @@
 ARG RUSTBIN_TAG=latest
-FROM curiefense/curiefense-rustbuild-focal:${RUSTBIN_TAG} AS rustbin
+FROM curiefense/curiefense-rustbuild-jammy:${RUSTBIN_TAG} AS rustbin
 FROM docker.io/istio/proxyv2:1.16.1
 
 RUN apt-get update && \
