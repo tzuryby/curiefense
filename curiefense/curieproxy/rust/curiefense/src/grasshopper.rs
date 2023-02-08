@@ -259,7 +259,7 @@ pub fn challenge_phase01<GH: Grasshopper>(
     };
     let gh_response = match gh.init_challenge(query, mode) {
         Ok(r) => {
-            logs.debug("Challenge phase01 finished. mode: {:?}", mode);
+            logs.debug(|| format!("Challenge phase01 finished. mode: {:?}", mode));
             r
         }
         Err(rr) => {
