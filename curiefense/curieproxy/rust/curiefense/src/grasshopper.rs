@@ -261,7 +261,7 @@ pub fn challenge_phase01<GH: Grasshopper>(
         Ok(r) => {
             logs.debug("Challenge phase01 finished. mode: {:?}", mode);
             r
-        },
+        }
         Err(rr) => {
             logs.error(|| format!("Challenge phase01 error {}", rr));
             return gh_fail_decision(&rr);
@@ -294,7 +294,7 @@ pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &Re
         Ok(r) => {
             logs.debug("Challenge phase02 finished");
             r
-        },
+        }
         Err(rr) => {
             logs.error(|| format!("Challenge phase02 error {}", rr));
             return None;
