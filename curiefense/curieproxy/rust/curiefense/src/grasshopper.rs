@@ -258,7 +258,10 @@ pub fn challenge_phase01<GH: Grasshopper>(
         protocol: &rinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
     };
     let gh_response = match gh.init_challenge(query, mode) {
-        Ok(r) => r,
+        Ok(r) => {
+            logs.debug("Challenge phase01 finished. mode: {:?}", mode);
+            r
+        },
         Err(rr) => {
             logs.error(|| format!("Challenge phase01 error {}", rr));
             return gh_fail_decision(&rr);
@@ -269,11 +272,11 @@ pub fn challenge_phase01<GH: Grasshopper>(
             atype: ActionType::Block,
             block_mode: true,
             headers: Some(gh_response.headers),
-            status: 247, //gh_response.status_code?
+            status: 247,
             content: gh_response.str_response,
             extra_tags: Some(["challenge_phase01"].iter().map(|s| s.to_string()).collect()),
         },
-        reasons, //todo need?
+        reasons,
     )
 }
 
@@ -288,7 +291,10 @@ pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &Re
     }
 
     let verified = match gh.verify_challenge(reqinfo.headers.as_map()) {
-        Ok(r) => r,
+        Ok(r) => {
+            logs.debug("Challenge phase02 finished");
+            r
+        },
         Err(rr) => {
             logs.error(|| format!("Challenge phase02 error {}", rr));
             return None;

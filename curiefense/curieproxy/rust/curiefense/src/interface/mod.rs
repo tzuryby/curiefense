@@ -720,6 +720,7 @@ impl SimpleAction {
                         SimpleActionT::Challenge { ch_level } => *ch_level,
                         _ => GHMode::Active,
                     };
+                    logs.debug(|| format!("Call challenge phase01 with mode: {:?}", ch_mode));
                     challenge_phase01(gh, logs, rinfo, nreason, ch_mode)
                 }
                 _ => Decision::action(Action::default(), nreason),
