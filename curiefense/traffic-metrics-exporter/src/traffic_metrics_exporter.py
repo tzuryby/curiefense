@@ -35,7 +35,7 @@ LOGLEVEL = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(level=LOGLEVEL)
 logger = logging.getLogger("traffic-metrics-exporter")
 SERVER_PORT = int(os.getenv("SERVER_PORT", 8911))
-CUSTOM_HEADERS = os.getenv("CUSTOM_HEADERS", '{}')
+CUSTOM_HEADERS = os.getenv("CUSTOM_HEADERS", "{}")
 
 METRICS_PULL_INTERVAL = int(os.getenv("METRICS_PULL_INTERVAL", 60))
 
@@ -82,10 +82,12 @@ def get_config(key):
             "collection": os.getenv("MONGODB_METRICS_COLLECTION", "metrics1s"),
         },
         "t2_source": {
-            "url": replace_url_placeholders(os.getenv("METRICS_URI", "http://curieproxyngx:8999/")),
+            "url": replace_url_placeholders(
+                os.getenv("METRICS_URI", "http://curieproxyngx:8999/")
+            ),
             "headers": {
                 "Host": os.getenv("METRICS_HOST", "metrics.curiefense.io"),
-                **json.loads(CUSTOM_HEADERS)
+                **json.loads(CUSTOM_HEADERS),
             },
         },
     }
@@ -101,11 +103,10 @@ def get_mongodb():
 
 def replace_url_placeholders(url: str):
     now = datetime.now()
-    minute_pattern = '%Y-%m-%dT%H:%M'
-    now = datetime.strptime('2023-02-09T14:32', minute_pattern)
+    minute_pattern = "%Y-%m-%dT%H:%M"
     placeholders = {
         "$ISO_TIME_FROM_M": now.strftime(minute_pattern),
-        "$ISO_TIME_TO_1M": (now + timedelta(minutes=1)).strftime(minute_pattern)
+        "$ISO_TIME_TO_1M": (now + timedelta(minutes=1)).strftime(minute_pattern),
     }
     for placeholder, value in placeholders.items():
         url = url.replace(placeholder, value)
@@ -207,9 +208,7 @@ def update_t3_counters(t2_dict, acc_avg):
             # Find average for collected values. The last one will be the right number for the whole period.
             key = f"{proxy}-{app}-{profile}-{branch}-{valid_name}"
             collect_values(acc_avg, key, counter_value)
-            counter.labels(*labels).set(
-                choose_func(counter_type)(acc_avg[key])
-            )
+            counter.labels(*labels).set(choose_func(counter_type)(acc_avg[key]))
         elif counter_type in [MAX_PER_REQUEST, AVG_PER_REQUEST]:
             for value in counter_value:
                 # Collect all and get max/mean. Group by intervals of values.
