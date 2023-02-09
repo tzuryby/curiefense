@@ -118,6 +118,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
     //if /c365 then call gh phase01 with mode passive
     if reqinfo.rinfo.qinfo.uri.starts_with("/c3650cdf") {
         if let Some(gh) = mgh {
+            logs.debug("Call challenge phase01 with mode: Passive");
             let decision = challenge_phase01(gh, logs, &reqinfo, Vec::new(), GHMode::Passive);
             return InitResult::Res(AnalyzeResult {
                 decision,
@@ -177,6 +178,7 @@ pub fn analyze_init<GH: Grasshopper>(logs: &mut Logs, mgh: Option<&GH>, p0: APha
         .uri
         .starts_with("/7060ac19f50208cbb6b45328ef94140a612ee92387e015594234077b4d1e64f1")
     {
+        logs.debug("Call challenge phase02");
         if let Some(decision) = mgh.and_then(|gh| challenge_phase02(gh, logs, &reqinfo)) {
             return InitResult::Res(AnalyzeResult {
                 decision,
@@ -459,6 +461,7 @@ pub fn analyze_finish<GH: Grasshopper>(
         // Send challenge, even if the acl is inactive in sec_pol.
         if decision.challenge {
             let decision = if let Some(gh) = mgh {
+                logs.debug("Call challenge phase01 with mode: Active (acl)");
                 challenge_phase01(gh, logs, &reqinfo, Vec::new(), GHMode::Active)
             } else {
                 logs.debug("ACL challenge detected: can't challenge");
