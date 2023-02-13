@@ -420,10 +420,11 @@ mod tests {
         let cfg = with_config(&mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                3 => {
+                4 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[1].message.to_string().contains("Loaded profile"));
-                    assert!(logs.logs[2].message.to_string().contains("CFGLOAD logs end"));
+                    assert!(logs.logs[1].message.to_string().contains("When loading manifest.json: No such file or directory"));
+                    assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[3].message.to_string().contains("CFGLOAD logs end"));
                 }
                 13 => {
                     assert!(logs.logs[2]
