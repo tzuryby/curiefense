@@ -1,4 +1,6 @@
 #! /usr/bin/env python
+import hashlib
+import logging
 import os
 import sys
 import argparse
@@ -7,6 +9,8 @@ import traceback
 import io
 import json
 from enum import Enum
+from google.cloud import storage
+import base64
 
 import typer
 import yaml
@@ -41,8 +45,18 @@ def output(raw, err=False):
         typer.echo(formatted, err=err)
 
 
+
+def get_md5(file_path):
+    hasher = hashlib.md5()
+    with open(file_path, "rb") as content:
+        hasher.update(content.read())
+        return hasher.hexdigest()
+
 BlobsEnum = Enum("Blobs", {name: name for name in utils.BLOBS_PATH})
 DocsEnum = Enum("Docs", {name: name for name in utils.DOCUMENTS_PATH})
+
+logger = logging.getLogger("curiesync_pull")
+
 
 
 ###############
@@ -458,6 +472,80 @@ def push(source_path: str, target_url: str, version: str = ""):
                 if not bucket.exists(target_name):
                     bucket.upload_blob(fpath, target_name, meta_data={})
     cloud.upload_manifest(manifest, bucket, target_path, version)
+
+
+
+
+# def fetch_ipinfo():
+#     if not os.path.isdir(IPINFO_LOCAL_DIR):
+#         os.mkdir(IPINFO_LOCAL_DIR)
+#         os.mkdir(IPINFO_LOCAL_DIR_LAST)
+#         os.mkdir(IPINFO_LOCAL_DIR_UPDATE)
+#
+#     for ipinfo_blob in list(client.list_blobs(bucket_or_name=REMOTE_BUCKET, prefix=IPINFO_BUCKET_DIR)):
+#         file_name = ipinfo_blob.name.split("/")[-1]
+#         if not os.path.isfile(IPINFO_LOCAL_DIR_LAST + file_name):
+#             try:
+#                 ipinfo_blob.download_to_filename(IPINFO_LOCAL_DIR_LAST + file_name)
+#             except Exception as ex:
+#                 logger.error(f"failed downloading {file_name} - {ex}")
+#                 continue
+#             logger.info(f"downloaded {file_name} to {IPINFO_LOCAL_DIR_LAST}")
+#             shutil.copyfile(IPINFO_LOCAL_DIR_LAST + file_name, IPINFO_LOCAL_DIR_UPDATE + file_name)
+#             logger.info(f"copied {file_name} to {IPINFO_LOCAL_DIR_UPDATE}")
+#         else:
+#             remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
+#             local_md5 = get_md5(IPINFO_LOCAL_DIR_LAST + file_name)
+#             if not local_md5 == remote_md5:
+#                 try:
+#                     ipinfo_blob.download_to_filename(IPINFO_LOCAL_DIR_LAST + file_name)
+#                 except Exception as ex:
+#                     logger.error(f"failed downloading {file_name} - {ex}")
+#                     continue
+#                 logger.info(f"successfully downloaded {file_name}")
+#                 shutil.copyfile(IPINFO_LOCAL_DIR_LAST + file_name, IPINFO_LOCAL_DIR_UPDATE + file_name)
+#                 logger.info(f"copied {file_name} to {IPINFO_LOCAL_DIR_UPDATE}")
+#
+#             else:
+#                 logger.info(f"{IPINFO_LOCAL_DIR_LAST} already contains the updated {file_name}")
+
+
+
+@sync.command()
+def pull_ipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
+
+    client = storage.Client(project=project)
+
+    os.makedirs(target_path, exist_ok=True)
+
+    for ipinfo_blob in list(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir)):
+        file_name = ipinfo_blob.name.split("/")[-1]
+        if not os.path.isfile(target_path + file_name):
+            try:
+                ipinfo_blob.download_to_filename(target_path + file_name)
+            except Exception as ex:
+                logger.error(f"failed downloading {file_name} - {ex}")
+                continue
+            logger.info(f"downloaded {file_name} to {target_path}")
+        else:
+            remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
+            local_md5 = get_md5(target_path + file_name)
+            if not local_md5 == remote_md5:
+                try:
+                    ipinfo_blob.download_to_filename(target_path + file_name)
+                except Exception as ex:
+                    logger.error(f"failed downloading {file_name} - {ex}")
+                    continue
+
+
+            else:
+                logger.info(f"{target_path} already contains the updated {file_name}")
+
+
+
+
+
+
 
 
 @sync.command()
