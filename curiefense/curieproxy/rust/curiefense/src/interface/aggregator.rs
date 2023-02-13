@@ -905,7 +905,8 @@ pub async fn aggregated_values() -> String {
         })
         .collect();
     let entries = if entries.is_empty() {
-        let proxy = crate::config::CONFIGS.config
+        let proxy = crate::config::CONFIGS
+            .config
             .read()
             .ok()
             .and_then(|cfg| cfg.container_name.clone());

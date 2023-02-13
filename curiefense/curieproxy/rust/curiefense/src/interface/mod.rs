@@ -203,7 +203,7 @@ pub async fn jsonlog(
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
             match jsonlog_rinfo(dec, rinfo, status_code, tags, stats, logs, proxy, &now) {
-                Err(rr) => (b"null".to_vec(), now),
+                Err(_) => (b"null".to_vec(), now),
                 Ok(y) => (y, now),
             }
         }
@@ -516,7 +516,7 @@ impl SimpleActionT {
             SimpleActionT::Monitor => RawActionType::Monitor,
             SimpleActionT::Custom { .. } => RawActionType::Custom,
             SimpleActionT::Challenge { ch_level } => {
-                return if ch_level == &GHMode::Active {
+                if ch_level == &GHMode::Active {
                     RawActionType::Challenge
                 } else {
                     RawActionType::Ichallenge

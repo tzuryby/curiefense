@@ -255,7 +255,7 @@ pub fn challenge_phase01<GH: Grasshopper>(
         headers: rinfo.headers.as_map(),
         cookies: rinfo.cookies.as_map(),
         ip: &rinfo.rinfo.geoip.ipstr,
-        protocol: &rinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
+        protocol: rinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
     };
     let gh_response = match gh.init_challenge(query, mode) {
         Ok(r) => {
@@ -371,7 +371,7 @@ pub fn handle_bio_reports<GH: Grasshopper>(
         cookies: reqinfo.cookies.as_map(),
         //todo can remove these 2
         ip: &reqinfo.rinfo.geoip.ipstr,
-        protocol: &reqinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
+        protocol: reqinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
     };
     let gh_response = match gh.handle_bio_report(query, precision_level) {
         Ok(r) => r,

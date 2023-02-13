@@ -422,7 +422,10 @@ mod tests {
             match logs.logs.len() {
                 4 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[1].message.to_string().contains("When loading manifest.json: No such file or directory"));
+                    assert!(logs.logs[1]
+                        .message
+                        .to_string()
+                        .contains("When loading manifest.json: No such file or directory"));
                     assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
                     assert!(logs.logs[3].message.to_string().contains("CFGLOAD logs end"));
                 }
