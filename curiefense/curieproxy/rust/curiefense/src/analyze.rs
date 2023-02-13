@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::acl::check_acl;
 use crate::config::contentfilter::ContentFilterRules;
 use crate::config::flow::FlowMap;
-use crate::config::HSDB;
+use crate::config::CONFIGS;
 use crate::contentfilter::{content_filter_check, masking};
 use crate::flow::{flow_build_query, flow_info, flow_process, flow_resolve_query, FlowCheck, FlowResult};
 use crate::grasshopper::{
@@ -493,7 +493,7 @@ pub fn analyze_finish<GH: Grasshopper>(
         |stats, mrls| content_filter_check(logs, stats, &mut tags, &reqinfo, &secpol.content_filter_profile, mrls);
     // otherwise, run content_filter_check
     let (content_filter_result, stats) = match cfrules {
-        CfRulesArg::Global => match HSDB.read() {
+        CfRulesArg::Global => match CONFIGS.hsdb.read() {
             Ok(rd) => cfcheck(stats, rd.get(&secpol.content_filter_profile.id)),
             Err(rr) => {
                 logs.error(|| format!("Could not get lock on HSDB: {}", rr));

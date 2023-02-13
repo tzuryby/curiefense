@@ -13,7 +13,6 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::PoisonError;
 use std::sync::RwLock;
 
 use crate::config::limit::Limit;
@@ -45,15 +44,25 @@ static ALL_CONFIG_FILES: [&str; 10] = [
     "virtual-tags.json",
 ];
 
+pub struct LockedConfig {
+    pub config: RwLock<Config>,
+    pub hsdb: RwLock<HashMap<String, ContentFilterRules>>,
+}
+
+impl LockedConfig {
+    fn initial() -> Self {
+        let mut config = Config::load(Logs::default(), "/cf-config/current/config");
+        let path = Path::new("/cf-config/current/config/json");
+        let hsdb = load_hsdb(&mut config.logs, path, &config.content_filter_profiles);
+        LockedConfig {
+            config: RwLock::new(config),
+            hsdb: RwLock::new(hsdb),
+        }
+    }
+}
+
 lazy_static! {
-    pub static ref CONFIG: RwLock<Config> = {
-        let config = Config::load(Logs::default(), "/cf-config/current/config");
-        RwLock::new(config)
-    };
-    pub static ref HSDB: RwLock<HashMap<String, ContentFilterRules>> = {
-        let hsdb = load_hsdb(&mut Logs::default(), "/cf-config/current/config").unwrap_or_default();
-        RwLock::new(hsdb)
-    };
+    pub static ref CONFIGS: LockedConfig = LockedConfig::initial();
     static ref CONFIG_DEPENDENCIES: HashMap<&'static str, Vec<String>> = {
         let mut map = HashMap::new();
 
@@ -113,7 +122,7 @@ pub fn with_config<R, F>(logs: &mut Logs, f: F) -> Option<R>
 where
     F: FnOnce(&mut Logs, &Config) -> R,
 {
-    match CONFIG.read() {
+    match CONFIGS.config.read() {
         Ok(cfg) => {
             config_logs(logs, &cfg);
             Some(f(logs, &cfg))
@@ -146,7 +155,7 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         files_to_reload.extend(filenames);
     }
 
-    let mut config = match CONFIG.read() {
+    let mut config = match CONFIGS.config.read() {
         Ok(cfg) => cfg.clone(),
         Err(rr) => {
             logs.error(|| rr.to_string());
@@ -195,12 +204,7 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         config.content_filter_profiles = content_filter_profiles;
     }
     if files_to_reload.contains("contentfilter-rules.json") {
-        let raw_content_filter_rules = Config::load_config_file(&mut logs, &bjson, "contentfilter-rules.json");
-        hsdb = Some(resolve_rules(
-            &mut logs,
-            &config.content_filter_profiles,
-            raw_content_filter_rules,
-        ));
+        hsdb = Some(load_hsdb(&mut logs, &bjson, &config.content_filter_profiles));
     }
     if files_to_reload.contains("globalfilter-lists.json") {
         let raw_global_filters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
@@ -242,12 +246,12 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
 
     config.logs = logs.clone();
 
-    match CONFIG.write() {
+    match CONFIGS.config.write() {
         Ok(mut w) => *w = config,
         Err(rr) => logs.error(|| rr.to_string()),
     };
     if let Some(hsdb) = hsdb {
-        match HSDB.write() {
+        match CONFIGS.hsdb.write() {
             Ok(mut dbw) => *dbw = hsdb,
             Err(rr) => logs.error(|| rr.to_string()),
         };
@@ -537,15 +541,19 @@ impl Config {
 
 pub fn load_hsdb(
     logs: &mut Logs,
-    configpath: &str,
-) -> Result<HashMap<String, ContentFilterRules>, PoisonError<std::sync::RwLockReadGuard<'static, Config>>> {
-    let mut bjson = PathBuf::from(configpath);
-    bjson.push("json");
-
-    CONFIG.read().map(|cfg| {
-        let contentfilterrules = Config::load_config_file(logs, &bjson, "contentfilter-rules.json");
-        resolve_rules(logs, &cfg.content_filter_profiles, contentfilterrules)
-    })
+    configpath: &Path,
+    profiles: &HashMap<String, ContentFilterProfile>,
+) -> HashMap<String, ContentFilterRules> {
+    let rawcontentfilterrules = Config::load_config_file(logs, configpath, "contentfilter-rules.json");
+    let contentfilterrules = rawcontentfilterrules
+        .into_iter()
+        .filter_map(|r| {
+            contentfilter::convert_rule(r)
+                .map_err(|rr| logs.error(|| rr.to_string()))
+                .ok()
+        })
+        .collect();
+    resolve_rules(logs, profiles, contentfilterrules)
 }
 
 // securitypolicies_map, securitypolicies, default

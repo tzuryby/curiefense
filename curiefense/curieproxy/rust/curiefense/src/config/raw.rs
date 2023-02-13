@@ -458,7 +458,7 @@ pub struct RawContentFilterEntryMatch {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ContentFilterRule {
+pub struct RawContentFilterRule {
     pub id: String,
     pub operand: String,
     pub risk: u8,
