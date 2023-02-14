@@ -512,7 +512,7 @@ def push(source_path: str, target_url: str, version: str = ""):
 
 
 @sync.command()
-def pull_ipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
+def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
     client = storage.Client(project=project)
 
