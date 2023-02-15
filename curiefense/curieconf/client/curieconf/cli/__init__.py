@@ -518,7 +518,7 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
     os.makedirs(target_path, exist_ok=True)
 
-    for ipinfo_blob in list(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir)):
+    for ipinfo_blob in [*(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir))]:
         file_name = ipinfo_blob.name.split("/")[-1]
         if not os.path.isfile(target_path + file_name):
             try:
