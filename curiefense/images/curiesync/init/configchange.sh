@@ -1,4 +1,6 @@
 #!/bin/sh
 
 # K8s mode, notify localhost
-curl -X POST "http://localhost:8998" -H "Content-Type: application/json" -d "$1"
+CONFIG_URL_NGINX="${CF_URL_NGINX:-http://localhost:8998}"
+
+curl -X POST "$CONFIG_URL_NGINX" -H "Content-Type: application/json" -d "$1"
