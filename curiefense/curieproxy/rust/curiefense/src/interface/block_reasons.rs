@@ -1,5 +1,5 @@
 /// this file contains all the data type that are used when interfacing with a proxy
-use crate::config::contentfilter::SectionIdx;
+use crate::config::{contentfilter::SectionIdx, raw::RawActionType};
 use serde::ser::SerializeMap;
 use serde::Serialize;
 use serde_json::Value;
@@ -20,26 +20,19 @@ pub enum AclStage {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Initiator {
-    GlobalFilter {
-        id: String,
-        name: String,
-    },
+    GlobalFilter,
     Acl {
-        id: String,
         tags: Vec<String>,
         stage: AclStage,
     },
     ContentFilter {
-        id: String,
+        ruleid: String,
         risk_level: u8,
     },
     Limit {
-        id: String,
-        name: String,
         threshold: u64,
     },
     Restriction {
-        id: String,
         tpe: &'static str,
         actual: String,
         expected: String,
@@ -54,18 +47,13 @@ impl std::fmt::Display for Initiator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Initiator::*;
         match self {
-            GlobalFilter { id, name } => write!(f, "global filter {}[{}]", name, id),
-            Acl { id, tags, stage } => write!(f, "acl[{}] {:?} {:?}", id, stage, tags),
-            ContentFilter { id, risk_level } => write!(f, "content filter {}[lvl{}]", id, risk_level),
-            Limit { id, name, threshold } => write!(f, "rate limit {}[{}] threshold={}", name, id, threshold),
+            GlobalFilter => write!(f, "global filter"),
+            Acl { tags, stage } => write!(f, "acl {:?} {:?}", stage, tags),
+            ContentFilter { ruleid, risk_level } => write!(f, "content filter {}[lvl{}]", ruleid, risk_level),
+            Limit { threshold } => write!(f, "rate limit threshold={}", threshold),
             Phase01Fail(r) => write!(f, "grasshopper phase 1 error: {}", r),
             Phase02 => write!(f, "grasshopper phase 2"),
-            Restriction {
-                id,
-                tpe,
-                actual,
-                expected,
-            } => write!(f, "restricted {}[{}][{}/{}]", tpe, id, actual, expected),
+            Restriction { tpe, actual, expected } => write!(f, "restricted {}[{}/{}]", tpe, actual, expected),
         }
     }
 }
@@ -99,31 +87,19 @@ impl Initiator {
         map: &mut <S as serde::Serializer>::SerializeMap,
     ) -> Result<(), S::Error> {
         match self {
-            Initiator::GlobalFilter { id, name } => {
-                map.serialize_entry("id", id)?;
-                map.serialize_entry("name", name)?;
-            }
-            Initiator::Acl { id, tags, stage } => {
-                map.serialize_entry("id", id)?;
+            Initiator::GlobalFilter => (),
+            Initiator::Acl { tags, stage } => {
                 map.serialize_entry("tags", tags)?;
-                map.serialize_entry("stage", stage)?;
+                map.serialize_entry("acl_action", stage)?;
             }
-            Initiator::ContentFilter { id, risk_level } => {
-                map.serialize_entry("id", id)?;
+            Initiator::ContentFilter { ruleid, risk_level } => {
+                map.serialize_entry("ruleid", ruleid)?;
                 map.serialize_entry("risk_level", risk_level)?;
             }
-            Initiator::Limit { id, name, threshold } => {
-                map.serialize_entry("id", id)?;
-                map.serialize_entry("limitname", name)?;
+            Initiator::Limit { threshold } => {
                 map.serialize_entry("threshold", threshold)?;
             }
-            Initiator::Restriction {
-                id,
-                tpe,
-                actual,
-                expected,
-            } => {
-                map.serialize_entry("id", id)?;
+            Initiator::Restriction { tpe, actual, expected } => {
                 map.serialize_entry("type", tpe)?;
                 map.serialize_entry("actual", actual)?;
                 map.serialize_entry("expected", expected)?;
@@ -142,56 +118,14 @@ impl Initiator {
     }
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BDecision {
-    Skip,
-    Monitor,
-    AlterRequest,
-    InitiatorInactive,
-    Blocking,
-}
-
-impl std::fmt::Display for BDecision {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BDecision::Skip => write!(f, "skip"),
-            BDecision::Monitor => write!(f, "monitor"),
-            BDecision::AlterRequest => write!(f, "alter_request"),
-            BDecision::InitiatorInactive => write!(f, "inactive"),
-            BDecision::Blocking => write!(f, "blocking"),
-        }
-    }
-}
-
-impl BDecision {
-    pub fn inactive(&mut self) {
-        if self == &BDecision::Blocking || self == &BDecision::AlterRequest {
-            *self = BDecision::InitiatorInactive;
-        }
-    }
-}
-
-impl Serialize for BDecision {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(match self {
-            BDecision::Skip => "skip",
-            BDecision::Monitor => "monitor",
-            BDecision::AlterRequest => "alter_request",
-            BDecision::InitiatorInactive => "inactive",
-            BDecision::Blocking => "block",
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockReason {
+    pub id: String,
+    pub name: String,
     pub initiator: Initiator,
     pub location: Location,
     pub extra_locations: Vec<Location>,
-    pub decision: BDecision,
+    pub action: RawActionType,
     pub extra: Value,
 }
 
@@ -208,7 +142,7 @@ impl Serialize for BlockReason {
 
 impl std::fmt::Display for BlockReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} - {} - [{}]", self.decision, self.initiator, self.location)
+        write!(f, "{:?} - {} - [{}]", self.action, self.initiator, self.location)
     }
 }
 
@@ -221,17 +155,16 @@ fn extra_locations<'t, I: Iterator<Item = &'t Location>>(i: I) -> (Location, Vec
 
 impl BlockReason {
     pub fn block_reason_desc(reasons: &[Self]) -> Option<String> {
-        reasons
-            .iter()
-            .find(|r| r.decision == BDecision::Blocking)
-            .map(|r| r.to_string())
+        reasons.iter().find(|r| r.action.is_final()).map(|r| r.to_string())
     }
 
-    pub fn global_filter(id: String, name: String, decision: BDecision, locs: &HashSet<Location>) -> Self {
-        let initiator = Initiator::GlobalFilter { id, name };
+    pub fn global_filter(id: String, name: String, action: RawActionType, locs: &HashSet<Location>) -> Self {
+        let initiator = Initiator::GlobalFilter;
         let (location, extra_locations) = extra_locations(locs.iter());
         BlockReason {
-            decision,
+            id,
+            name,
+            action,
             initiator,
             location,
             extra_locations,
@@ -239,167 +172,221 @@ impl BlockReason {
         }
     }
 
-    pub fn limit(id: String, name: String, threshold: u64, decision: BDecision) -> Self {
-        BlockReason::nodetails(Initiator::Limit { id, name, threshold }, decision)
+    pub fn limit(id: String, name: String, threshold: u64, action: RawActionType) -> Self {
+        BlockReason::nodetails(id, name, Initiator::Limit { threshold }, action)
     }
 
     pub fn phase01_unknown(reason: &str) -> Self {
-        BlockReason::nodetails(Initiator::Phase01Fail(reason.to_string()), BDecision::Blocking)
+        BlockReason::nodetails(
+            "phase01".to_string(),
+            "phase01".to_string(),
+            Initiator::Phase01Fail(reason.to_string()),
+            RawActionType::Custom,
+        )
     }
 
     pub fn phase02() -> Self {
-        BlockReason::nodetails(Initiator::Phase02, BDecision::Blocking)
+        BlockReason::nodetails(
+            "phase02".to_string(),
+            "phase02".to_string(),
+            Initiator::Phase02,
+            RawActionType::Custom,
+        )
     }
 
-    fn nodetails(initiator: Initiator, decision: BDecision) -> Self {
+    fn nodetails(id: String, name: String, initiator: Initiator, action: RawActionType) -> Self {
         BlockReason {
+            id,
+            name,
             initiator,
             location: Location::Request,
-            decision,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
 
-    pub fn body_too_deep(id: String, actual: usize, expected: usize) -> Self {
+    pub fn body_too_deep(id: String, name: String, action: RawActionType, expected: usize) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "too deep",
-                actual: actual.to_string(),
+                actual: format!(">{}", expected),
                 expected: expected.to_string(),
             },
             location: Location::Body,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn body_too_large(id: String, actual: usize, expected: usize) -> Self {
+    pub fn body_too_large(id: String, name: String, action: RawActionType, actual: usize, expected: usize) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "too large",
                 actual: actual.to_string(),
                 expected: expected.to_string(),
             },
             location: Location::Body,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn body_missing(id: String) -> Self {
+    pub fn body_missing(id: String, name: String, action: RawActionType) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "missing body",
                 actual: "missing".to_string(),
                 expected: "something".to_string(),
             },
             location: Location::Body,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn body_malformed(id: String, cause: &str) -> Self {
+    pub fn body_malformed(
+        id: String,
+        name: String,
+        action: RawActionType,
+        actual: &str,
+        expected: Option<&str>,
+    ) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "malformed body",
-                actual: cause.to_string(),
-                expected: "well-formed".to_string(),
+                actual: actual.to_string(),
+                expected: expected.unwrap_or("well-formed").to_string(),
             },
             location: Location::Body,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn sqli(location: Location, fp: String) -> Self {
+    pub fn sqli(id: String, name: String, action: RawActionType, location: Location, fp: String) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::ContentFilter {
-                id: format!("sqli:{}", fp),
+                ruleid: format!("sqli:{}", fp),
                 risk_level: 3,
             },
             location,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn xss(location: Location) -> Self {
+    pub fn xss(id: String, name: String, action: RawActionType, location: Location) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::ContentFilter {
-                id: "xss".to_string(),
+                ruleid: "xss".to_string(),
                 risk_level: 3,
             },
             location,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn too_many_entries(id: String, idx: SectionIdx, actual: usize, expected: usize) -> Self {
+    pub fn too_many_entries(
+        id: String,
+        name: String,
+        action: RawActionType,
+        idx: SectionIdx,
+        actual: usize,
+        expected: usize,
+    ) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "too many",
                 actual: actual.to_string(),
                 expected: expected.to_string(),
             },
             location: Location::from_section(idx),
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn entry_too_large(id: String, idx: SectionIdx, name: &str, actual: usize, expected: usize) -> Self {
+    pub fn entry_too_large(
+        id: String,
+        cf_name: String,
+        action: RawActionType,
+        idx: SectionIdx,
+        name: &str,
+        actual: usize,
+        expected: usize,
+    ) -> Self {
         BlockReason {
+            id,
+            name: cf_name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "too large",
                 actual: actual.to_string(),
                 expected: expected.to_string(),
             },
             location: Location::from_name(idx, name),
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn restricted(id: String, location: Location, actual: String, expected: String) -> Self {
+    pub fn restricted(
+        id: String,
+        name: String,
+        action: RawActionType,
+        location: Location,
+        actual: String,
+        expected: String,
+    ) -> Self {
         BlockReason {
+            id,
+            name,
             initiator: Initiator::Restriction {
-                id,
                 tpe: "restricted",
                 actual,
                 expected,
             },
             location,
-            decision: BDecision::Blocking,
+            action,
             extra_locations: Vec::new(),
             extra: Value::Null,
         }
     }
-    pub fn acl(id: String, tags: Tags, stage: AclStage) -> Self {
+    pub fn acl(id: String, name: String, tags: Tags, stage: AclStage) -> Self {
         let mut tagv = Vec::new();
         let mut locations = HashSet::new();
         for (k, v) in tags.tags.into_iter() {
             tagv.push(k);
             locations.extend(v);
         }
-        let decision = match stage {
-            AclStage::Allow | AclStage::Bypass | AclStage::AllowBot => BDecision::Monitor,
-            AclStage::Deny | AclStage::EnforceDeny | AclStage::DenyBot => BDecision::Blocking,
+        let action = match stage {
+            AclStage::Allow | AclStage::Bypass | AclStage::AllowBot => RawActionType::Monitor,
+            AclStage::Deny | AclStage::EnforceDeny => RawActionType::Custom,
+            AclStage::DenyBot => RawActionType::Challenge,
         };
         let (location, extra_locations) = extra_locations(locations.iter());
 
         BlockReason {
-            initiator: Initiator::Acl { id, tags: tagv, stage },
+            id,
+            name,
+            initiator: Initiator::Acl { tags: tagv, stage },
             location,
-            decision,
+            action,
             extra_locations,
             extra: Value::Null,
         }
@@ -424,7 +411,9 @@ impl BlockReason {
     ) -> Result<(), S::Error> {
         self.initiator.serialize_in_map::<S>(map)?;
         self.location.serialize_with_parent::<S>(map)?;
-        map.serialize_entry("active", &Value::Bool(self.decision != BDecision::Monitor))?;
+        map.serialize_entry("action", &self.action)?;
+        map.serialize_entry("trigger_id", &self.id)?;
+        map.serialize_entry("trigger_name", &self.name)?;
         Ok(())
     }
 }

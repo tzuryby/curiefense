@@ -7,8 +7,9 @@ use crate::config::contentfilter::{
     rule_tags, ContentFilterEntryMatch, ContentFilterProfile, ContentFilterRules, ContentFilterSection, Section,
     SectionIdx, ALL_SECTION_IDX, ALL_SECTION_IDX_NO_PLUGINS,
 };
+use crate::config::raw::RawActionType;
 use crate::interface::stats::{BStageAcl, BStageContentFilter, StatsCollect};
-use crate::interface::{BDecision, BlockReason, Initiator, Location, Tags};
+use crate::interface::{BlockReason, Initiator, Location, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::{masker, RequestInfo};
 use crate::Logs;
@@ -52,7 +53,7 @@ fn get_section(idx: SectionIdx, rinfo: &RequestInfo) -> &RequestField {
 }
 
 fn is_blocking(reasons: &[BlockReason]) -> bool {
-    reasons.iter().any(|r| r.decision >= BDecision::Blocking)
+    reasons.iter().any(|r| r.action >= RawActionType::Custom)
 }
 
 #[derive(Debug)]
@@ -84,6 +85,8 @@ pub fn content_filter_check(
         if let Err(reason) = section_check(
             logs,
             &profile.id,
+            &profile.name,
+            profile.action.atype.to_raw(),
             tags,
             *idx,
             profile.sections.get(*idx),
@@ -121,7 +124,16 @@ pub fn content_filter_check(
     let iblock = if cfg!(fuzzing) {
         Vec::new()
     } else {
-        injection_check(tags, &hca_keys, &omit, test_xss, test_sqli)
+        injection_check(
+            &profile.id,
+            &profile.name,
+            profile.action.atype.to_raw(),
+            tags,
+            &hca_keys,
+            &omit,
+            test_xss,
+            test_sqli,
+        )
     };
     if is_blocking(&iblock) {
         return (
@@ -140,15 +152,13 @@ pub fn content_filter_check(
         Some(hsdb) => {
             let (scanresult, stats) = hyperscan(
                 logs,
+                profile,
                 stats,
                 tags,
                 &mut specific_tags,
                 hca_keys,
                 hsdb,
                 &kept,
-                &profile.active,
-                &profile.report,
-                &profile.ignore,
                 &omit.exclusions,
             );
             match scanresult {
@@ -183,6 +193,8 @@ pub fn content_filter_check(
 fn section_check(
     logs: &mut Logs,
     cfid: &str,
+    cfname: &str,
+    action: RawActionType,
     tags: &Tags,
     idx: SectionIdx,
     section: &ContentFilterSection,
@@ -194,6 +206,8 @@ fn section_check(
         if section.max_count > 0 {
             return Err(BlockReason::too_many_entries(
                 cfid.to_string(),
+                cfname.to_string(),
+                action,
                 idx,
                 params.len(),
                 section.max_count,
@@ -209,6 +223,8 @@ fn section_check(
             if section.max_length > 0 {
                 return Err(BlockReason::entry_too_large(
                     cfid.to_string(),
+                    cfname.to_string(),
+                    action,
                     idx,
                     name,
                     value.len(),
@@ -237,6 +253,8 @@ fn section_check(
             } else if name_entry.restrict {
                 return Err(BlockReason::restricted(
                     cfid.to_string(),
+                    cfname.to_string(),
+                    action,
                     Location::from_value(idx, name, value),
                     value.to_string(),
                     mre.unwrap_or_default().to_string(),
@@ -273,6 +291,9 @@ fn section_check(
 /// TODO: This also populates the hca_keys map
 /// this is stupid and needs to be changed
 fn injection_check(
+    cfid: &str,
+    cfname: &str,
+    action: RawActionType,
     tags: &mut Tags,
     hca_keys: &HashMap<String, (SectionIdx, String)>,
     omit: &Omitted,
@@ -298,7 +319,13 @@ fn injection_check(
                     tags.insert_qualified("cf-rule-category", "libinjection", locs.clone());
                     tags.insert_qualified("cf-rule-subcategory", "libinjection-sqli", locs.clone());
                     tags.insert_qualified("cf-rule-risk", "libinjection", locs.clone());
-                    out.push(BlockReason::sqli(locs, fp));
+                    out.push(BlockReason::sqli(
+                        cfid.to_string(),
+                        cfname.to_string(),
+                        action,
+                        locs,
+                        fp,
+                    ));
                 }
             }
         }
@@ -310,7 +337,7 @@ fn injection_check(
                     tags.insert_qualified("cf-rule-category", "libinjection", locs.clone());
                     tags.insert_qualified("cf-rule-subcategory", "libinjection-xss", locs.clone());
                     tags.insert_qualified("cf-rule-risk", "libinjection", locs.clone());
-                    out.push(BlockReason::xss(locs));
+                    out.push(BlockReason::xss(cfid.to_string(), cfname.to_string(), action, locs));
                 }
             }
         }
@@ -321,15 +348,13 @@ fn injection_check(
 #[allow(clippy::too_many_arguments)]
 fn hyperscan(
     logs: &mut Logs,
+    profile: &ContentFilterProfile,
     stats: StatsCollect<BStageAcl>,
     tags: &mut Tags,
     specific_tags: &mut Tags,
     hca_keys: HashMap<String, (SectionIdx, String)>,
     sigs: &ContentFilterRules,
     global_kept: &HashSet<String>,
-    active: &HashSet<String>,
-    report: &HashSet<String>,
-    global_ignore: &HashSet<String>,
     exclusions: &Section<HashMap<String, HashSet<String>>>,
 ) -> (anyhow::Result<Vec<BlockReason>>, StatsCollect<BStageContentFilter>) {
     let scratch = match sigs.db.alloc_scratch() {
@@ -339,6 +364,7 @@ fn hyperscan(
     // TODO: use `intersperse` when this stabilizes
     let to_scan = hca_keys.keys().cloned().collect::<Vec<_>>().join("\n");
     let mut found = false;
+    #[allow(clippy::needless_borrow)]
     if let Err(rr) = sigs.db.scan(&[to_scan], &scratch, |_, _, _, _| {
         found = true;
         Matching::Continue
@@ -351,13 +377,14 @@ fn hyperscan(
         return (Ok(Vec::new()), stats.cf_no_match(sigs.ids.len()));
     }
 
-    let mut founds: HashSet<(&str, Location, BDecision, u8)> = HashSet::new();
+    let mut founds: HashSet<(&str, Location, RawActionType, u8)> = HashSet::new();
 
     let mut matches = 0;
     let mut nactive = 0;
     // something matched! but what?
     for (k, (sid, name)) in hca_keys {
         // for some reason, from is always set to 0 in my tests, so we can't accurately capture substrings
+        #[allow(clippy::needless_borrow)]
         let scanr = sigs.db.scan(&[k.as_bytes()], &scratch, |id, from, to, _flags| {
             match sigs.ids.get(id as usize) {
                 None => logs.error(|| format!("Should not happen, invalid hyperscan index {}", id)),
@@ -373,23 +400,23 @@ fn hyperscan(
                             .get(&name)
                             .map(|ex| new_tags.has_intersection(ex) || new_specific_tags.has_intersection(ex))
                             != Some(true)
-                        && !new_tags.has_intersection(global_ignore)
-                        && !new_specific_tags.has_intersection(global_ignore)
+                        && !new_tags.has_intersection(&profile.ignore)
+                        && !new_specific_tags.has_intersection(&profile.ignore)
                     {
                         matches += 1;
                         let location = Location::from_value(sid, &name, &k);
                         tags.merge(tags.new_with_vtags().with_raw_tags(new_tags, &location));
                         specific_tags.merge(tags.new_with_vtags().with_raw_tags(new_specific_tags, &location));
-                        let decision = if specific_tags.has_intersection(active) {
+                        let decision = if specific_tags.has_intersection(&profile.active) {
                             nactive += 1;
-                            BDecision::Blocking
-                        } else if specific_tags.has_intersection(report) {
-                            BDecision::Monitor
-                        } else if tags.has_intersection(active) {
+                            RawActionType::Custom
+                        } else if specific_tags.has_intersection(&profile.report) {
+                            RawActionType::Monitor
+                        } else if tags.has_intersection(&profile.active) {
                             nactive += 1;
-                            BDecision::Blocking
+                            RawActionType::Custom
                         } else {
-                            BDecision::Monitor
+                            RawActionType::Monitor
                         };
                         founds.insert((&sig.id, location, decision, sig.risk));
                     }
@@ -404,13 +431,15 @@ fn hyperscan(
     (
         Ok(founds
             .into_iter()
-            .map(|(sigid, location, decision, risk_level)| BlockReason {
+            .map(|(sigid, location, action, risk_level)| BlockReason {
+                id: profile.id.clone(),
+                name: profile.name.clone(),
                 initiator: Initiator::ContentFilter {
-                    id: sigid.to_string(),
+                    ruleid: sigid.to_string(),
                     risk_level,
                 },
                 location,
-                decision,
+                action,
                 extra_locations: Vec::new(),
                 extra: serde_json::Value::Null,
             })
@@ -468,8 +497,10 @@ pub fn masking(req: RequestInfo) -> RequestInfo {
                 let target = masker(masking_seed, &v);
                 let npath = ri.rinfo.meta.path.replace(&v, &target);
                 ri.rinfo.meta.path = npath;
-                let nquery = ri.rinfo.qinfo.query.replace(&v, &target);
-                ri.rinfo.qinfo.query = nquery;
+                if let Some(q) = ri.rinfo.qinfo.query {
+                    let nquery = q.replace(&v, &target);
+                    ri.rinfo.qinfo.query = Some(nquery);
+                }
             }
             RefererArgumentValue(_, v) => {
                 let target = masker(masking_seed, &v);
@@ -504,6 +535,7 @@ mod test {
             path: "/foo?arg1=avalue1&arg2=a%20value2".to_string(),
             extra: HashMap::default(),
             requestid: None,
+            protocol: None,
         };
         let mut logs = Logs::default();
         let headers = [("h1", "value1"), ("h2", "value2")]
@@ -581,7 +613,10 @@ mod test {
             "/foo?arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}",
             masked.rinfo.meta.path
         );
-        assert_eq!("arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}", masked.rinfo.qinfo.query);
+        assert_eq!(
+            Some("?arg1=MASKED{e8efcceb}&arg2=MASKED{c96a6118}".to_string()),
+            masked.rinfo.qinfo.query
+        );
         let (logged, _) = async_std::task::block_on(jsonlog(
             &Decision::pass(Vec::new()),
             Some(&masked),
@@ -692,6 +727,7 @@ mod test {
         let meta = RequestMeta {
             authority: Some("myhost".to_string()),
             method: "GET".to_string(),
+            protocol: None,
             path: "/foo/pth/ddd?arg1=SECRETa1&arg2=U0VDUkVUYTI%3D".to_string(),
             extra: HashMap::default(),
             requestid: None,

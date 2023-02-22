@@ -1,6 +1,6 @@
 use crate::config::matchers::Matching;
 use crate::config::raw::{
-    ContentFilterRule, ContentType, RawContentFilterEntryMatch, RawContentFilterProfile, RawContentFilterProperties,
+    ContentType, RawContentFilterEntryMatch, RawContentFilterProfile, RawContentFilterProperties, RawContentFilterRule,
 };
 use crate::interface::{RawTags, SimpleAction};
 use crate::logs::Logs;
@@ -39,6 +39,17 @@ pub struct ContentFilterProfile {
     pub referer_as_uri: bool,
     pub action: SimpleAction,
     pub tags: HashSet<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ContentFilterRule {
+    pub id: String,
+    pub operand: String,
+    pub risk: u8,
+    pub category: String,
+    pub subcategory: String,
+    pub tags: HashSet<String>,
+    pub pattern: Pattern,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -350,11 +361,39 @@ impl ContentFilterProfile {
     }
 }
 
-fn convert_rule(entry: &ContentFilterRule) -> anyhow::Result<Pattern> {
-    Pattern::with_flags(
+pub fn convert_rule(entry: RawContentFilterRule) -> anyhow::Result<ContentFilterRule> {
+    // try to catch pattern compilation errors and log them, ignoring the bad pattern
+    let pattern = Pattern::with_flags(
         &entry.operand,
         CompileFlags::MULTILINE | CompileFlags::DOTALL | CompileFlags::CASELESS,
     )
+    .map_err(|rr| {
+        anyhow::anyhow!(
+            "when converting content filter rule {}, pattern {:?}: {}",
+            &entry.id,
+            &entry.operand,
+            rr
+        )
+    })?;
+    Patterns::from_iter(std::iter::once(pattern.clone()))
+        .build::<Vectored>()
+        .map_err(|rr| {
+            anyhow::anyhow!(
+                "when converting content filter rule {}, pattern {:?}: {}",
+                &entry.id,
+                &entry.operand,
+                rr
+            )
+        })?;
+    Ok(ContentFilterRule {
+        id: entry.id,
+        operand: entry.operand,
+        risk: entry.risk,
+        category: entry.category,
+        subcategory: entry.subcategory,
+        tags: entry.tags,
+        pattern,
+    })
 }
 
 pub fn rule_tags(sig: &ContentFilterRule) -> (RawTags, RawTags) {
@@ -374,7 +413,7 @@ pub fn rule_tags(sig: &ContentFilterRule) -> (RawTags, RawTags) {
 pub fn resolve_rules(
     logs: &mut Logs,
     profiles: &HashMap<String, ContentFilterProfile>,
-    raws: Vec<ContentFilterRule>,
+    rules: Vec<ContentFilterRule>,
 ) -> HashMap<String, ContentFilterRules> {
     // extend the rule tags with the group tags
     // should a given rule be kept for a given profile
@@ -403,13 +442,12 @@ pub fn resolve_rules(
     };
 
     let build_from_profile = |prof: &ContentFilterProfile| -> anyhow::Result<ContentFilterRules> {
-        let ids: Vec<ContentFilterRule> = raws.iter().filter(|r| rule_kept(r, prof)).cloned().collect();
+        let ids: Vec<ContentFilterRule> = rules.iter().filter(|r| rule_kept(r, prof)).cloned().collect();
         if ids.is_empty() {
             return Err(anyhow::anyhow!("no rules were selected, empty profile"));
         }
-        let patterns: anyhow::Result<Vec<Pattern>> = ids.iter().map(convert_rule).collect();
-        patterns
-            .and_then(|ptrns| Patterns::from_iter(ptrns).build::<Vectored>())
+        Patterns::from_iter(ids.iter().map(|i| i.pattern.clone()))
+            .build::<Vectored>()
             .map(|db| ContentFilterRules { db, ids })
     };
 

@@ -69,14 +69,16 @@
       "action": "custom_response",
       "block_mode": false,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_triggers": [
         {
-          "risk_level": 5,
+          "trigger_name": "default contentfilter",
+          "ruleid": "100016",
           "section": "headers",
           "value": "***xp_cmdshell***xp_makecab***",
-          "active": true,
+          "trigger_id": "__default__",
+          "action": "monitor",
           "name": "malicious",
-          "id": "100016"
+          "risk_level": 5
         }
       ]
     },

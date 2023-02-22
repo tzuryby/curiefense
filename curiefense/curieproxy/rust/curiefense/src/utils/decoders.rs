@@ -377,7 +377,7 @@ mod test_lib {
             (b"%4%4%4", b"%4%4%4"),
         ];
         for (input, output) in cases.iter() {
-            let r = urldecode_bytes(*input);
+            let r = urldecode_bytes(input);
             if input == output {
                 assert_eq!(r, DecodingResult::NoChange);
             } else {
