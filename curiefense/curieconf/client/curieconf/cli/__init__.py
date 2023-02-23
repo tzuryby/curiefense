@@ -474,43 +474,6 @@ def push(source_path: str, target_url: str, version: str = ""):
     cloud.upload_manifest(manifest, bucket, target_path, version)
 
 
-
-
-# def fetch_ipinfo():
-#     if not os.path.isdir(IPINFO_LOCAL_DIR):
-#         os.mkdir(IPINFO_LOCAL_DIR)
-#         os.mkdir(IPINFO_LOCAL_DIR_LAST)
-#         os.mkdir(IPINFO_LOCAL_DIR_UPDATE)
-#
-#     for ipinfo_blob in list(client.list_blobs(bucket_or_name=REMOTE_BUCKET, prefix=IPINFO_BUCKET_DIR)):
-#         file_name = ipinfo_blob.name.split("/")[-1]
-#         if not os.path.isfile(IPINFO_LOCAL_DIR_LAST + file_name):
-#             try:
-#                 ipinfo_blob.download_to_filename(IPINFO_LOCAL_DIR_LAST + file_name)
-#             except Exception as ex:
-#                 logger.error(f"failed downloading {file_name} - {ex}")
-#                 continue
-#             logger.info(f"downloaded {file_name} to {IPINFO_LOCAL_DIR_LAST}")
-#             shutil.copyfile(IPINFO_LOCAL_DIR_LAST + file_name, IPINFO_LOCAL_DIR_UPDATE + file_name)
-#             logger.info(f"copied {file_name} to {IPINFO_LOCAL_DIR_UPDATE}")
-#         else:
-#             remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
-#             local_md5 = get_md5(IPINFO_LOCAL_DIR_LAST + file_name)
-#             if not local_md5 == remote_md5:
-#                 try:
-#                     ipinfo_blob.download_to_filename(IPINFO_LOCAL_DIR_LAST + file_name)
-#                 except Exception as ex:
-#                     logger.error(f"failed downloading {file_name} - {ex}")
-#                     continue
-#                 logger.info(f"successfully downloaded {file_name}")
-#                 shutil.copyfile(IPINFO_LOCAL_DIR_LAST + file_name, IPINFO_LOCAL_DIR_UPDATE + file_name)
-#                 logger.info(f"copied {file_name} to {IPINFO_LOCAL_DIR_UPDATE}")
-#
-#             else:
-#                 logger.info(f"{IPINFO_LOCAL_DIR_LAST} already contains the updated {file_name}")
-
-
-
 @sync.command()
 def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
