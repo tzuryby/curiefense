@@ -263,6 +263,42 @@
         "tags": [],
         "map": [
             {
+                "match": "/limits/always-skip",
+                "name": "alwaysskip",
+                "id": "alwaysskip",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwaysskip"
+                ]
+            },
+            {
+                "match": "/limits/always-ichallenge",
+                "name": "alwaysichallenge",
+                "id": "alwaysichallenge",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwaysichallenge"
+                ]
+            },
+            {
+                "match": "/limits/always-challenge",
+                "name": "alwayschallenge",
+                "id": "alwayschallenge",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwayschallenge"
+                ]
+            },
+            {
                 "match": "/limits/always-blocking/xx",
                 "name": "ablock",
                 "id": "ablock",

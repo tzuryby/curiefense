@@ -12,14 +12,16 @@
       "action": "custom_response",
       "block_mode": false,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_triggers": [
         {
-          "risk_level": 5,
+          "trigger_name": "default contentfilter",
+          "ruleid": "100016",
+          "section": "uri",
           "value": "xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_xp_cmdshell_",
-          "request_element": "uri",
-          "active": true,
+          "trigger_id": "__default__",
+          "action": "monitor",
           "name": "arg",
-          "id": "100016"
+          "risk_level": 5
         }
       ],
       "tags": [

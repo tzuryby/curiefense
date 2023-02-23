@@ -9,15 +9,6 @@
         "timestamp": {
           "type": "date_nanos"
         },
-        "processing_stage": {
-          "type": "integer"
-        },
-        "uri": {
-          "type": "keyword"
-        },
-        "reason": {
-          "type": "text"
-        },
         "curiesession": {
           "type": "keyword"
         },
@@ -27,61 +18,79 @@
         "request_id": {
           "type": "keyword"
         },
-        "path": {
-          "type": "keyword"
-        },
-        "acl_triggers": {
-          "type": "nested"
-        },
         "arguments": {
           "type": "flattened"
         },
-        "authority": {
-          "type": "keyword"
-        },
-        "global_filter_triggers": {
-          "type": "nested"
-        },
-        "content_filter_triggers": {
-          "type": "nested"
-        },
-        "cookies": {
-          "type": "flattened"
-        },
-        "global_filters_triggers": {
-          "type": "nested"
-        },
-        "headers": {
-          "type": "flattened"
-        },
-        "ip": {
-          "type": "ip"
-        },
-        "logs": {
-          "type": "text"
-        },
-        "method": {
+        "path": {
           "type": "keyword"
         },
         "path_parts": {
           "type": "flattened"
         },
-        "proxy": {
+        "branch": {
+          "type": "keyword"
+        },
+        "authority": {
+          "type": "keyword"
+        },
+        "cookies": {
           "type": "flattened"
         },
-        "rate_limit_triggers": {
+        "headers": {
+          "type": "flattened"
+        },
+        "plugins": {
+          "type": "flattened"
+        },
+        "query": {
+          "type": "keyword"
+        },
+        "ip": {
+          "type": "ip"
+        },
+        "method": {
+          "type": "keyword"
+        },
+        "response_code": {
+          "type": "integer"
+        },
+        "logs": {
+          "type": "text"
+        },
+        "processing_stage": {
+          "type": "integer"
+        },
+        "acl_triggers": {
           "type": "nested"
         },
-        "requestid": {
-          "type": "keyword"
+        "rl_triggers": {
+          "type": "nested"
+        },
+        "gf_triggers": {
+          "type": "nested"
+        },
+        "cf_triggers": {
+          "type": "nested"
+        },
+        "cf_restrict_triggers": {
+          "type": "nested"
+        },
+        "reason": {
+          "type": "text"
+        },
+        "tags": {
+          "type": "text"
+        },
+        "proxy": {
+          "type": "flattened"
         },
         "security_config": {
           "type": "object",
           "properties": {
-            "global_filters_active": {
+            "gf_rules": {
               "type": "integer"
             },
-            "rate_limit_rules": {
+            "rl_rules": {
               "type": "integer"
             },
             "revision": {
@@ -98,40 +107,28 @@
             }
           }
         },
-        "response_code": {
-          "type": "integer"
-        },
-        "tags": {
-          "type": "text"
-        },
         "trigger_counters": {
           "type": "object",
           "properties": {
             "acl": {
               "type": "integer"
             },
-            "acl_active": {
+            "cf": {
               "type": "integer"
             },
-            "content_filters": {
+            "gf": {
               "type": "integer"
             },
-            "content_filters_active": {
+            "rl": {
               "type": "integer"
             },
-            "global_filters": {
-              "type": "integer"
-            },
-            "global_filters_active": {
-              "type": "integer"
-            },
-            "rate_limit": {
-              "type": "integer"
-            },
-            "rate_limit_active": {
+            "cf_restrict": {
               "type": "integer"
             }
           }
+        },
+        "profiling": {
+          "type": "flattened"
         }
       }
     }

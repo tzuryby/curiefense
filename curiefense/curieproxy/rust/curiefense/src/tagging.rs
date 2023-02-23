@@ -3,11 +3,12 @@ use crate::config::globalfilter::{
 };
 use crate::config::raw::Relation;
 use crate::config::virtualtags::VirtualTags;
+use crate::grasshopper::PrecisionLevel;
 use crate::interface::stats::{BStageMapped, BStageSecpol, StatsCollect};
 use crate::interface::{stronger_decision, BlockReason, Location, SimpleActionT, SimpleDecision, Tags};
 use crate::requestfields::RequestField;
 use crate::utils::RequestInfo;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::net::IpAddr;
 
 struct MatchResult {
@@ -103,8 +104,13 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
                 _ => false,
             },
         ),
-        GlobalFilterEntryE::Path(pth) => check_single(pth, &rinfo.rinfo.qinfo.qpath, Location::Path),
-        GlobalFilterEntryE::Query(qry) => check_single(qry, &rinfo.rinfo.qinfo.query, Location::Path),
+        GlobalFilterEntryE::Path(pth) => check_single(pth, &rinfo.rinfo.qinfo.qpath, Location::Uri),
+        GlobalFilterEntryE::Query(qry) => rinfo
+            .rinfo
+            .qinfo
+            .query
+            .as_ref()
+            .and_then(|q| check_single(qry, q, Location::Uri)),
         GlobalFilterEntryE::Uri(uri) => check_single(uri, &rinfo.rinfo.qinfo.uri, Location::Uri),
         GlobalFilterEntryE::Country(cty) => rinfo
             .rinfo
@@ -175,16 +181,33 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
 
 pub fn tag_request(
     stats: StatsCollect<BStageSecpol>,
-    is_human: bool,
+    precision_level: PrecisionLevel,
     globalfilters: &[GlobalFilterSection],
     rinfo: &RequestInfo,
     vtags: &VirtualTags,
 ) -> (Tags, SimpleDecision, StatsCollect<BStageMapped>) {
     let mut tags = Tags::new(vtags);
-    if is_human {
-        tags.insert("human", Location::Request);
-    } else {
-        tags.insert("bot", Location::Request);
+    use PrecisionLevel::*;
+    match precision_level {
+        Active | Passive => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l1", Location::Request);
+        }
+        Interactive => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l3", Location::Request);
+        }
+        MobileSdk => {
+            tags.insert("human", Location::Request);
+            tags.insert("precision-l4", Location::Request);
+        }
+        Invalid => {
+            tags.insert("bot", Location::Request);
+        }
+        Emulator => {
+            tags.insert("mobile-sdk:emulator", Location::Request);
+            tags.insert("bot", Location::Request);
+        }
     }
     tags.insert_qualified("headers", &rinfo.headers.len().to_string(), Location::Headers);
     tags.insert_qualified("cookies", &rinfo.cookies.len().to_string(), Location::Cookies);
@@ -272,7 +295,6 @@ pub fn tag_request(
 
     let mut matched = 0;
     let mut decision = SimpleDecision::Pass;
-    let mut monitor_headers = HashMap::new();
     for psection in globalfilters {
         let mtch = check_rule(rinfo, &tags, &psection.rule);
         if mtch.matching {
@@ -283,33 +305,19 @@ pub fn tag_request(
             tags.extend(rtags);
             if let Some(a) = &psection.action {
                 // merge headers from Monitor decision
-                if a.atype == SimpleActionT::Monitor {
-                    monitor_headers.extend(a.headers.clone().unwrap_or_default());
-                }
-                let curdec = SimpleDecision::Action(
-                    a.clone(),
-                    vec![BlockReason::global_filter(
+                if a.headers.is_some() || a.atype != SimpleActionT::Monitor {
+                    let br = BlockReason::global_filter(
                         psection.id.clone(),
                         psection.name.clone(),
-                        a.atype.to_bdecision(),
+                        a.atype.to_raw(),
                         &mtch.matched,
-                    )],
-                );
-
-                decision = stronger_decision(decision, curdec);
+                    );
+                    let curdec = SimpleDecision::Action(a.clone(), vec![br]);
+                    decision = stronger_decision(decision, curdec);
+                }
             }
         }
     }
-
-    // if the final decision is a monitor, use cumulated monitor headers as headers
-    decision = if let SimpleDecision::Action(mut action, block_reasons) = decision {
-        if action.atype == SimpleActionT::Monitor {
-            action.headers = Some(monitor_headers);
-        }
-        SimpleDecision::Action(action, block_reasons)
-    } else {
-        decision
-    };
 
     (tags, decision, stats.mapped(globalfilters.len(), matched))
 }

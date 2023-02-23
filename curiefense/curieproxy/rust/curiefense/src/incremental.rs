@@ -12,13 +12,17 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     analyze::{analyze, APhase0, CfRulesArg},
-    body::body_too_large,
     challenge_verified,
     config::{
-        contentfilter::ContentFilterRules, contentfilter::SectionIdx, flow::FlowMap, globalfilter::GlobalFilterSection,
-        hostmap::SecurityPolicy, virtualtags::VirtualTags, Config,
+        contentfilter::ContentFilterRules,
+        contentfilter::{ContentFilterProfile, SectionIdx},
+        flow::FlowMap,
+        globalfilter::GlobalFilterSection,
+        hostmap::SecurityPolicy,
+        virtualtags::VirtualTags,
+        Config,
     },
-    grasshopper::Grasshopper,
+    grasshopper::{Grasshopper, PrecisionLevel},
     interface::{
         stats::{BStageSecpol, SecpolStats, StatsCollect},
         Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags,
@@ -164,11 +168,20 @@ pub fn add_header(idata: IData, key: String, value: String) -> Result<IData, (Lo
         extra_tags: None,
     };
     let cfid = &dt.secpol.content_filter_profile.id;
+    let cfname = &dt.secpol.content_filter_profile.name;
+    let action = dt.secpol.content_filter_profile.action.atype.to_raw();
+
     if dt.secpol.content_filter_active {
         let hdrs = &dt.secpol.content_filter_profile.sections.headers;
         if dt.headers.len() >= hdrs.max_count {
-            let br =
-                BlockReason::too_many_entries(cfid.clone(), SectionIdx::Headers, dt.headers.len() + 1, hdrs.max_count);
+            let br = BlockReason::too_many_entries(
+                cfid.clone(),
+                cfname.clone(),
+                action,
+                SectionIdx::Headers,
+                dt.headers.len() + 1,
+                hdrs.max_count,
+            );
             return Err(early_block(dt, cf_block(), br));
         }
         let kl = key.to_lowercase();
@@ -176,13 +189,21 @@ pub fn add_header(idata: IData, key: String, value: String) -> Result<IData, (Lo
             if let Ok(content_length) = value.parse::<usize>() {
                 let max_size = dt.secpol.content_filter_profile.max_body_size;
                 if content_length > max_size {
-                    let (a, br) = body_too_large(cfid.clone(), max_size, content_length);
+                    let (a, br) = body_too_large(&dt.secpol.content_filter_profile, content_length, max_size);
                     return Err(early_block(dt, a, br));
                 }
             }
         }
         if value.len() > hdrs.max_length {
-            let br = BlockReason::entry_too_large(cfid.clone(), SectionIdx::Headers, &kl, value.len(), hdrs.max_length);
+            let br = BlockReason::entry_too_large(
+                cfid.clone(),
+                cfname.clone(),
+                action,
+                SectionIdx::Headers,
+                &kl,
+                value.len(),
+                hdrs.max_length,
+            );
             return Err(early_block(dt, cf_block(), br));
         }
         dt.headers.insert(kl, value);
@@ -190,6 +211,26 @@ pub fn add_header(idata: IData, key: String, value: String) -> Result<IData, (Lo
         dt.headers.insert(key.to_lowercase(), value);
     }
     Ok(dt)
+}
+
+fn body_too_large(profile: &ContentFilterProfile, actual: usize, expected: usize) -> (Action, BlockReason) {
+    (
+        Action {
+            atype: ActionType::Block,
+            block_mode: true,
+            status: 403,
+            headers: None,
+            content: "Access denied".to_string(),
+            extra_tags: None,
+        },
+        BlockReason::body_too_large(
+            profile.id.clone(),
+            profile.name.clone(),
+            profile.action.atype.to_raw(),
+            actual,
+            expected,
+        ),
+    )
 }
 
 pub fn add_body(idata: IData, new_body: &[u8]) -> Result<IData, (Logs, AnalyzeResult)> {
@@ -204,7 +245,7 @@ pub fn add_body(idata: IData, new_body: &[u8]) -> Result<IData, (Logs, AnalyzeRe
     let new_size = cur_body_size + new_body.len();
     let max_size = dt.secpol.content_filter_profile.max_body_size;
     if dt.secpol.content_filter_active && new_size > max_size {
-        let (a, br) = body_too_large(dt.secpol.content_filter_profile.id.clone(), max_size, new_size);
+        let (a, br) = body_too_large(&dt.secpol.content_filter_profile, new_size, max_size);
         return Err(early_block(dt, a, br));
     }
 
@@ -244,14 +285,14 @@ pub async fn finalize<GH: Grasshopper>(
         idata.plugins,
     );
 
-    // without grasshopper, default to being human
-    let is_human = if let Some(gh) = mgh {
+    let precision_level = if let Some(gh) = mgh {
         challenge_verified(gh, &reqinfo, &mut logs)
     } else {
-        false
+        PrecisionLevel::Invalid
     };
-
-    let (mut tags, globalfilter_dec, stats) = tag_request(idata.stats, is_human, globalfilters, &reqinfo, &vtags);
+    // without grasshopper, default to being human
+    let (mut tags, globalfilter_dec, stats) =
+        tag_request(idata.stats, precision_level, globalfilters, &reqinfo, &vtags);
     tags.insert("all", Location::Request);
 
     let dec = analyze(
@@ -261,7 +302,7 @@ pub async fn finalize<GH: Grasshopper>(
             stats,
             itags: tags,
             reqinfo,
-            is_human,
+            precision_level,
             globalfilter_dec,
             flows: flows.clone(),
         },
@@ -334,6 +375,7 @@ mod test {
             RequestMeta {
                 authority: Some("authority".to_string()),
                 method: "GET".to_string(),
+                protocol: None,
                 path: "/path/to/somewhere".to_string(),
                 extra: HashMap::default(),
                 requestid: None,

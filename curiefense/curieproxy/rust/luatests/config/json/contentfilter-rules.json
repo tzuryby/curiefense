@@ -52,6 +52,16 @@
     "subcategory": "generic"
   },
   {
+    "id": "badrule",
+    "name": "badrule",
+    "msg": "badrule",
+    "operand": "bad(",
+    "risk": 5,
+    "category": "generic",
+    "tags": [],
+    "subcategory": "generic"
+  },
+  {
     "id": "GENERICRL5",
     "name": "GENERICRL5",
     "msg": "GENERICRL5",

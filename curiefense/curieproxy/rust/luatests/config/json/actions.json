@@ -18,6 +18,12 @@
     "name": "5ktcoafw"
   },
   {
+    "type": "ichallenge",
+    "id": "ichallenge",
+    "tags": [],
+    "name": "ichallenge"
+  },
+  {
     "type": "custom",
     "id": "a7ge3v0l",
     "tags": [],
@@ -96,6 +102,28 @@
     "name": "Add header to forwarded request"
   },
   {
+    "params": {
+      "headers": {
+        "header1": "value_1"
+      }
+    },
+    "type": "monitor",
+    "id": "header1",
+    "tags": [],
+    "name": "Add header to forwarded request"
+  },
+  {
+    "params": {
+      "headers": {
+        "header2": "value_2"
+      }
+    },
+    "type": "monitor",
+    "id": "header2",
+    "tags": [],
+    "name": "Add header to forwarded request"
+  },
+  {
     "type": "monitor",
     "id": "monitor",
     "tags": [],
@@ -119,7 +147,9 @@
     "name": "ye8qyg0h"
   },
   {
-    "tags": ["myextratag"],
+    "tags": [
+      "myextratag"
+    ],
     "type": "custom",
     "params": {
       "status": 403,
