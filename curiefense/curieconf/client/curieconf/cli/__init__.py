@@ -506,11 +506,6 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
 
 
-
-
-
-
-
 @sync.command()
 def pull(
     manifest_url: str,
