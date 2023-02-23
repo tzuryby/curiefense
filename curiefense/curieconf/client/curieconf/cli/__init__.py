@@ -491,7 +491,6 @@ class ConfigReloads:
 
 @sync.command()
 def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
-
     client = storage.Client(project=project)
 
     os.makedirs(target_path, exist_ok=True)
