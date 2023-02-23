@@ -30,6 +30,10 @@ impl RequestField {
             });
     }
 
+    pub fn as_map(&self) -> HashMap<&str, &str> {
+        self.fields.iter().map(|(k, (v, _))| (k.as_str(), v.as_str())).collect()
+    }
+
     pub fn add(&mut self, key: String, ds: Location, value: String) {
         let mut v = value.clone();
         let mut replace_parameter = true;

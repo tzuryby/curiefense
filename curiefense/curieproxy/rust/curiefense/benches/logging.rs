@@ -4,7 +4,7 @@ use curiefense::config::contentfilter::{ContentFilterProfile, ContentFilterRules
 use curiefense::config::hostmap::{PolicyId, SecurityPolicy};
 use curiefense::config::raw::AclProfile;
 use curiefense::config::virtualtags::VirtualTags;
-use curiefense::grasshopper::DummyGrasshopper;
+use curiefense::grasshopper::{DummyGrasshopper, PrecisionLevel};
 use curiefense::interface::{SecpolStats, SimpleDecision, StatsCollect};
 use curiefense::logs::{LogLevel, Logs};
 use curiefense::tagging::tag_request;
@@ -24,6 +24,7 @@ fn logging_empty(c: &mut Criterion) {
             path: "/some/path/to?x=1&y=2&z=ZHFzcXNkcXNk".into(),
             requestid: None,
             extra: HashMap::new(),
+            protocol: None,
         },
         mbody: Some(b"{\"zzz\":45}"),
     };
@@ -49,11 +50,12 @@ fn logging_empty(c: &mut Criterion) {
     let stats =
         StatsCollect::new(std::time::Instant::now(), "QSDQSDQSD".into()).secpol(SecpolStats::build(&secpolicy, 0));
     let reqinfo = map_request(&mut logs, secpolicy, None, &raw, None, HashMap::new());
-    let (itags, _, stats) = tag_request(stats, false, &[], &reqinfo, &VirtualTags::default());
+    let (itags, globalfilter_dec, stats) =
+        tag_request(stats, PrecisionLevel::Invalid, &[], &reqinfo, &VirtualTags::default());
     let p0 = APhase0 {
         flows: HashMap::new(),
-        globalfilter_dec: SimpleDecision::Pass,
-        is_human: false,
+        globalfilter_dec,
+        precision_level: PrecisionLevel::Invalid,
         itags,
         reqinfo,
         stats,

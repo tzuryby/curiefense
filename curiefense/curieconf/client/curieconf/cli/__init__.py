@@ -4,13 +4,14 @@ import logging
 import os
 import sys
 import argparse
-import datetime
 import traceback
 import io
 import json
+import subprocess
 from enum import Enum
 from google.cloud import storage
 import base64
+from typing import List, Optional
 
 
 import typer
@@ -474,6 +475,20 @@ def push(source_path: str, target_url: str, version: str = ""):
     cloud.upload_manifest(manifest, bucket, target_path, version)
 
 
+class ConfigReloads:
+    inner: Optional[List[str]] = None
+
+    def add(self, f: str):
+        # if the list is empty, is means all files must be reloaded, so we keep it that way
+        if self.inner is None:
+            self.inner = [f]
+        elif self.inner:
+            self.inner.append(f)
+
+    def change_all(self):
+        self.inner = []
+
+
 @sync.command()
 def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
@@ -524,8 +539,6 @@ def pull(
     pool_path = os.path.join(target_path, "_pool")
     os.makedirs(pool_path, exist_ok=True)
 
-    changes = 0
-
     # download manifest
     manif = io.BytesIO()
     try:
@@ -544,6 +557,8 @@ def pull(
 
     open(os.path.join(conf_path, "manifest.json"), "w").write(manifest_str)
 
+    reloads = ConfigReloads()
+
     # synchronize pool
     for fname, h in manifest["files"].items():
         pool_file = os.path.join(pool_path, h)
@@ -556,7 +571,7 @@ def pull(
                 typer.echo(f"ERROR: Manifest {blobpath} does not exist")
                 raise typer.Exit(code=1)
             blob.download(pool_file)
-            changes += 1
+            reloads.add(fname)
         if os.path.isabs(fname):
             fname = fname[1:]
         conf_file = os.path.join(conf_path, fname)
@@ -571,13 +586,13 @@ def pull(
             except FileNotFoundError:
                 pass
             os.symlink(rel_link, conf_file)
-            changes += 1
+            reloads.add(fname)
         else:
             if old_link != rel_link:
                 # ~atomic symlink replacement
                 os.symlink(rel_link, conf_file + ".tmp")
                 os.replace(conf_file + ".tmp", conf_file)
-                changes += 1
+                reloads.add(fname)
     current_conf = os.path.join(target_path, "current")
     new_conf = os.path.relpath(conf_path, target_path)
     try:
@@ -588,16 +603,17 @@ def pull(
         except FileNotFoundError:
             pass
         os.symlink(new_conf, current_conf)
-        changes += 1
+        reloads.change_all()
     else:
         if old_conf != new_conf:
             # ~atomic symlink replacement
             os.symlink(new_conf, current_conf + ".tmp")
             os.replace(current_conf + ".tmp", current_conf)
-            changes += 1
+            reloads.change_all()
 
-    if changes and on_conf_change:
-        os.system(on_conf_change)
+    if reloads.inner is not None:
+        if on_conf_change:
+            subprocess.run([on_conf_change, json.dumps(reloads.inner)])
 
 
 ###########

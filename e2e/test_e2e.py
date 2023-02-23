@@ -202,7 +202,7 @@ def test_logging(request: pytest.FixtureRequest, requester: RequestHelper):
     assert res.status_code == 200
     for _ in range(15):
         time.sleep(4)
-        mdata = {"query": {"bool": {"must": {"match": {"uri": test_pattern}}}}}
+        mdata = {"query": {"bool": {"must": {"match": {"path": test_pattern}}}}}
         res = requests.get(es_url, json=mdata)
         print(res.json())
         nbhits = res.json()["hits"]["total"]["value"]

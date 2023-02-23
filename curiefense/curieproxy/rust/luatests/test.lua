@@ -119,7 +119,7 @@ local function run_inspect_request_gen(raw_request_map, mode)
     local human = nil
     if raw_request_map.human ~= nil then
       human = raw_request_map.human
-      if human then
+      if human ~= nil and human ~= "invalid" then
         headers["Cookie"] = "rbzid=OK;"
       end
     end
@@ -376,16 +376,36 @@ local function test_raw_request(request_path, mode)
         ", but got " .. cjson.encode(actual.action))
       good = false
     end
-    good = test_status(expected, actual) or good
-    good = test_block_mode(expected, actual) or good
-    good = test_headers(expected, actual) or good
+    good = test_status(expected, actual) and good
+    good = test_block_mode(expected, actual) and good
+    good = test_headers(expected, actual) and good
+    if expected.exec then
+      local func, err = load(expected.exec)
+      if func then
+        local ok, custom_tester = pcall(func)
+        if ok then
+          local test_result = custom_tester(actual, request_map)
+          if test_result ~= true then
+            print("!! custom test failed !!")
+            good = false
+          end
+        else
+          print(custom_tester)
+          good = false
+        end
+      else
+        print(":'(")
+        print(err)
+        good = false
+      end
+    end
 
     local triggers = {
       "acl_triggers",
-      "rate_limit_triggers",
-      "global_filter_triggers",
-      "content_filter_triggers",
-      "restriction_triggers"
+      "rl_triggers",
+      "gf_triggers",
+      "cf_triggers",
+      "cf_restrict_triggers"
     }
     for _, trigger_name in pairs(triggers) do
       good = test_trigger(expected, request_map, trigger_name) and good

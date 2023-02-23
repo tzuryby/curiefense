@@ -11,12 +11,17 @@ use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
 use curiefense::config::reload_config;
 use curiefense::grasshopper::DynGrasshopper;
+use curiefense::grasshopper::GHMode;
+use curiefense::grasshopper::GHQuery;
+use curiefense::grasshopper::GHResponse;
 use curiefense::grasshopper::Grasshopper;
+use curiefense::grasshopper::PrecisionLevel;
 use curiefense::inspect_generic_request_map;
 use curiefense::inspect_generic_request_map_init;
 use curiefense::interface::aggregator::aggregated_values_block;
 use curiefense::logs::LogLevel;
 use curiefense::logs::Logs;
+use curiefense::requestfields::RequestField;
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
 use mlua::prelude::*;
@@ -39,7 +44,7 @@ struct LuaArgs<'l> {
     str_ip: String,
     loglevel: LogLevel,
     secpolid: Option<String>,
-    humanity: Option<bool>,
+    humanity: PrecisionLevel,
     plugins: HashMap<String, String>,
 }
 
@@ -54,7 +59,7 @@ struct LuaArgs<'l> {
 /// * hops, optional number. When set the IP is computed from the x-forwarded-for header, defaulting to the ip argument on failure
 /// * secpolid, optional string. When set, bypass hostname matching for security policy selection
 /// * configpath, path to the lua configuration files, defaults to /cf-config/current/config
-/// * humanity, optional boolean, only used for the test functions
+/// * humanity, PrecisionLevel, only used for the test functions
 fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>, String> {
     let vloglevel = args.get("loglevel").map_err(|_| "Missing log level".to_string())?;
     let vmeta = args.get("meta").map_err(|_| "Missing meta argument".to_string())?;
@@ -107,9 +112,18 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         None => str_ip,
         Some(hops) => curiefense::incremental::extract_ip(hops, &headers).unwrap_or(str_ip),
     };
-    let humanity = match FromLua::from_lua(vhumanity, lua) {
+    let shumanity: Option<String> = match FromLua::from_lua(vhumanity, lua) {
         Err(rr) => return Err(format!("Could not convert the humanity argument: {}", rr)),
         Ok(h) => h,
+    };
+    let humanity = match shumanity.as_deref() {
+        Some("active") => PrecisionLevel::Active,
+        Some("passive") => PrecisionLevel::Passive,
+        Some("interactive") => PrecisionLevel::Interactive,
+        Some("mobileSdk") => PrecisionLevel::MobileSdk,
+        Some("invalid") => PrecisionLevel::Invalid,
+        None => PrecisionLevel::Invalid,
+        Some(x) => return Err(format!("Invalid humanity precision level {}", x)),
     };
     let mplugins: Option<HashMap<String, HashMap<String, String>>> = match FromLua::from_lua(vplugins, lua) {
         Err(rr) => return Err(format!("Could not convert the plugins argument: {}", rr)),
@@ -260,24 +274,32 @@ fn lua_reload_conf(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<Option<St
 }
 
 struct DummyGrasshopper {
-    humanity: bool,
+    humanity: PrecisionLevel,
 }
 
 impl Grasshopper for DummyGrasshopper {
-    fn js_app(&self) -> Option<std::string::String> {
-        None
+    fn is_human(&self, _input: GHQuery) -> Result<PrecisionLevel, String> {
+        Ok(self.humanity)
     }
-    fn js_bio(&self) -> Option<std::string::String> {
-        None
+
+    fn verify_challenge(&self, _headers: HashMap<&str, &str>) -> Result<String, String> {
+        if self.humanity == PrecisionLevel::Invalid {
+            Err("Bad".to_string())
+        } else {
+            Ok("OK".to_string())
+        }
     }
-    fn parse_rbzid(&self, _: &str, _: &str) -> Option<bool> {
-        Some(self.humanity)
+
+    fn init_challenge(&self, _input: GHQuery, _mode: GHMode) -> Result<GHResponse, String> {
+        Ok(GHResponse::invalid())
     }
-    fn gen_new_seed(&self, _: &str) -> Option<std::string::String> {
-        None
+
+    fn should_provide_app_sig(&self, _headers: HashMap<&str, &str>) -> Result<GHResponse, String> {
+        Ok(GHResponse::invalid())
     }
-    fn verify_workproof(&self, _: &str, _: &str) -> Option<std::string::String> {
-        Some("ok".into())
+
+    fn handle_bio_report(&self, _input: GHQuery, _precision_leve: PrecisionLevel) -> Result<GHResponse, String> {
+        Err("not implemented".into())
     }
 }
 
@@ -289,7 +311,7 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
     match lua_convert_args(lua, args) {
         Ok(lua_args) => {
             let gh = DummyGrasshopper {
-                humanity: lua_args.humanity.unwrap_or(false),
+                humanity: lua_args.humanity,
             };
             let res = inspect_request(
                 lua_args.meta,
@@ -398,10 +420,14 @@ mod tests {
         let cfg = with_config(&mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                3 => {
+                4 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[1].message.to_string().contains("Loaded profile"));
-                    assert!(logs.logs[2].message.to_string().contains("CFGLOAD logs end"));
+                    assert!(logs.logs[1]
+                        .message
+                        .to_string()
+                        .contains("When loading manifest.json: No such file or directory"));
+                    assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[3].message.to_string().contains("CFGLOAD logs end"));
                 }
                 13 => {
                     assert!(logs.logs[2]
