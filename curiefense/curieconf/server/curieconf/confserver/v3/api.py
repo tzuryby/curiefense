@@ -694,7 +694,6 @@ async def document_resource_post(
     for entry in data:
         isValid, err = validateJson(entry, document)
         if isValid is False:
-
             raise HTTPException(400, "schema mismatched: " + err)
     res = request.app.backend.documents_create(
         config, document, data, get_gitactor(request)
