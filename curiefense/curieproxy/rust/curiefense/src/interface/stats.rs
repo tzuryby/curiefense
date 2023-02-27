@@ -51,7 +51,9 @@ pub struct BStageInit;
 pub struct BStageSecpol;
 #[derive(Clone)]
 pub struct BStageMapped;
+#[derive(Clone)]
 pub struct BStageFlow;
+#[derive(Clone)]
 pub struct BStageLimit;
 pub struct BStageAcl;
 pub struct BStageContentFilter;

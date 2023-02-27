@@ -16,12 +16,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "section": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
+          "action": "custom",
           "name": "deny",
-          "type": "deny"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -60,11 +64,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect json",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectjson",
+          "type": "malformed body",
+          "actual": "no content type specified",
+          "expected": "[Json]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -104,11 +112,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 473,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect json",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectjson",
+          "type": "malformed body",
+          "actual": "content type is text\/xml",
+          "expected": "[Json]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -150,12 +162,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "section": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
+          "action": "custom",
           "name": "deny1",
-          "type": "deny"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -195,11 +211,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectxml",
+          "type": "malformed body",
+          "actual": "invalid attribute at 1:6 cause expected '=' not '<' at 1:11",
+          "expected": "well-formed",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -237,11 +257,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectxml",
+          "type": "malformed body",
+          "actual": "no content type specified",
+          "expected": "[Xml]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -280,11 +304,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect xml",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectxml",
+          "type": "malformed body",
+          "actual": "content type is application\/json",
+          "expected": "[Xml]",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -323,11 +351,15 @@
       "action": "custom_response",
       "block_mode": true,
       "status": 403,
-      "content_filter_triggers": [
+      "cf_restrict_triggers": [
         {
-          "active": true,
+          "trigger_name": "expect all",
           "section": "body",
-          "type": "body_malformed"
+          "trigger_id": "expectall",
+          "type": "malformed body",
+          "actual": "expected value at line 1 column 1",
+          "expected": "well-formed",
+          "action": "custom"
         }
       ],
       "tags": [
@@ -368,12 +400,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "section": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
+          "action": "custom",
           "name": "deny",
-          "type": "deny"
+          "section": "uri"
         }
       ],
       "tags": [
@@ -415,12 +451,16 @@
       "status": 403,
       "acl_triggers": [
         {
-          "active": true,
-          "section": "uri",
+          "trigger_name": "from tags",
+          "trigger_id": "FROMTAGS",
+          "acl_action": "deny",
           "value": "deny",
-          "ruleid": "deny",
+          "tags": [
+            "deny"
+          ],
+          "action": "custom",
           "name": "deny1",
-          "type": "deny"
+          "section": "uri"
         }
       ],
       "tags": [

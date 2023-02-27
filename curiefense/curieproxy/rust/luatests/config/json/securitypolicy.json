@@ -263,6 +263,42 @@
         "tags": [],
         "map": [
             {
+                "match": "/limits/always-skip",
+                "name": "alwaysskip",
+                "id": "alwaysskip",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwaysskip"
+                ]
+            },
+            {
+                "match": "/limits/always-ichallenge",
+                "name": "alwaysichallenge",
+                "id": "alwaysichallenge",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwaysichallenge"
+                ]
+            },
+            {
+                "match": "/limits/always-challenge",
+                "name": "alwayschallenge",
+                "id": "alwayschallenge",
+                "acl_profile": "__default__",
+                "acl_active": false,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "alwayschallenge"
+                ]
+            },
+            {
                 "match": "/limits/always-blocking/xx",
                 "name": "ablock",
                 "id": "ablock",
@@ -472,8 +508,8 @@
             },
             {
                 "match": "^/limits/include",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits include",
+                "id": "limits include",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -496,8 +532,8 @@
             },
             {
                 "match": "^/limits/method",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits method",
+                "id": "limits method",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -508,8 +544,8 @@
             },
             {
                 "match": "^/limits/exclude",
-                "name": "limits simple",
-                "id": "limits simple",
+                "name": "limits exclude",
+                "id": "limits exclude",
                 "acl_profile": "__default__",
                 "content_filter_profile": "__default__",
                 "acl_active": true,
@@ -528,6 +564,30 @@
                 "content_filter_active": false,
                 "limit_ids": [
                     "limitmultithreshold"
+                ]
+            },
+            {
+                "match": "^/limits/thresholdskip",
+                "name": "skipping threshold",
+                "id": "skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "skipthreshold"
+                ]
+            },
+            {
+                "match": "^/limits/thresholdnoskip",
+                "name": "no skipping threshold",
+                "id": "no skipping threshold",
+                "acl_profile": "__default__",
+                "acl_active": true,
+                "content_filter_profile": "__default__",
+                "content_filter_active": false,
+                "limit_ids": [
+                    "noskipthreshold"
                 ]
             },
             {

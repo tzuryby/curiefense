@@ -38,7 +38,6 @@ logger = logging.getLogger("filters-maxmind")
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return PlainTextResponse(str(exc), status_code=409)
 
-
 # this is ctaching flasks' "abort" from the gitbackend
 @app.exception_handler(WerkzeugHTTPException)
 async def werkzeug_exception_handler(request: Request, exc: WerkzeugHTTPException):
@@ -48,6 +47,7 @@ async def werkzeug_exception_handler(request: Request, exc: WerkzeugHTTPExceptio
 @app.exception_handler(HTTPException)
 async def http_exception_exception_handler(request: Request, exc: HTTPException):
     return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
+
 
 
 def drop_into_pdb(app, exception):

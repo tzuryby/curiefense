@@ -14,7 +14,7 @@
 # Sample perf test run, from a virtualenv that has dependencies installed:
 # (venv) user@host$ KUBECONFIG=~/perftest.kube CLUSTER_NAME=perftest-run1234 DOCKER_TAG=main ./deploy-gke.sh -c -d -b -j -l -p -C
 
-BASEDIR="$(dirname "$(readlink -f "$0")")" 
+BASEDIR="$(dirname "$(readlink -f "$0")")"
 if [ -z "$KUBECONFIG" ]; then
 	KUBECONFIG="$(readlink -f "$(mktemp kubeconfig.XXXXX)")"
 	export KUBECONFIG
@@ -134,7 +134,7 @@ locust_perftest () {
 	NODE_IP=$(kubectl get nodes -o json|jq '.items[0].status.addresses[]|select(.type=="ExternalIP").address'|tr -d '"')
 	CONFSERVER_URL="http://$NODE_IP:30000/api/v3/"
 
-	kubectl apply -f ~/reblaze/lua_filter.yaml
+	kubectl apply -f ./lua_filter.yaml
 	../e2e/set_config.py -u "$CONFSERVER_URL" defaultconfig
 	sleep 60
 	for REQSIZE in 0 1 2 4 8 16; do
@@ -159,7 +159,7 @@ locust_perftest () {
 	for REQSIZE in 0 1 2 4 8 16; do
 		./locusttest.sh istio-only $REQSIZE
 	done
-	
+
 	echo "Generating test report, RESULTS_DIR=$RESULTS_DIR..."
 	jupyter nbconvert --execute "$BASEDIR/../e2e/latency/Curiefense performance report locust.ipynb" --to html --template classic
 	mv "$BASEDIR/../e2e/latency/Curiefense performance report locust.html" "$BASEDIR/../e2e/latency/Curiefense performance report-$VERSION-$DATE.html"

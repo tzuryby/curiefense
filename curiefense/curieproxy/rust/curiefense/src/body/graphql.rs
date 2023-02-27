@@ -4,7 +4,7 @@ use async_graphql_parser::{
     Positioned,
 };
 
-use crate::{interface::Location, requestfields::RequestField};
+use crate::{interface::Location, requestfields::RequestField, utils::BodyProblem};
 
 fn insert_directive(args: &mut RequestField, prefix: String, dir: Directive) {
     for (n, v) in dir.arguments {
@@ -108,10 +108,9 @@ fn insert_operation(
 }
 
 // invariant, max_depth > 0
-pub fn graphql_body(max_depth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), String> {
-    let nesting_err = |()| format!("GraphQL nesting level exceeded: {}", max_depth);
-    let body_utf8 = std::str::from_utf8(body).map_err(|rr| rr.to_string())?;
-    let document = parse_query(body_utf8).map_err(|rr| rr.to_string())?;
+pub fn graphql_body(max_depth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), BodyProblem> {
+    let body_utf8 = std::str::from_utf8(body).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
+    let document = parse_query(body_utf8).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
     for (nm, pdef) in document.fragments {
         let basename = "gfrag-".to_string() + &nm;
         insert_dirsels(
@@ -121,7 +120,7 @@ pub fn graphql_body(max_depth: usize, args: &mut RequestField, body: &[u8]) -> R
             pdef.node.directives,
             Some(pdef.node.selection_set),
         )
-        .map_err(nesting_err)?;
+        .map_err(|_| BodyProblem::TooDeep)?;
     }
 
     let rs = match document.operations {
@@ -130,5 +129,5 @@ pub fn graphql_body(max_depth: usize, args: &mut RequestField, body: &[u8]) -> R
             .into_iter()
             .try_for_each(|(n, op)| insert_operation(max_depth, args, Some(&n), op)),
     };
-    rs.map_err(nesting_err)
+    rs.map_err(|_| BodyProblem::TooDeep)
 }

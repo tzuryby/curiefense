@@ -119,7 +119,7 @@ local function run_inspect_request_gen(raw_request_map, mode)
     local human = nil
     if raw_request_map.human ~= nil then
       human = raw_request_map.human
-      if human then
+      if human ~= nil and human ~= "invalid" then
         headers["Cookie"] = "rbzid=OK;"
       end
     end
@@ -133,6 +133,7 @@ local function run_inspect_request_gen(raw_request_map, mode)
         res = curiefense.inspect_request({loglevel="debug", meta=meta, headers=headers,
                 body=raw_request_map.body, ip=ip, plugins=raw_request_map.plugins})
       else
+        -- APhase1
         local r1 = curiefense.inspect_request_init({loglevel="debug", meta=meta,
                     headers=headers, body=raw_request_map.body, ip=ip,
                     plugins=raw_request_map.plugins})
@@ -170,7 +171,10 @@ local function run_inspect_request_gen(raw_request_map, mode)
           table.insert(rflows, flow:result(flowtype))
         end
 
-        local limits = r1.limits
+        -- APhase2I
+        local r2 = curiefense.inspect_request_flows(r1, rflows)
+
+        local limits = r2.limits
         local rlimits = {}
         for _, limit in pairs(limits) do
           local key = limit.key
@@ -196,7 +200,7 @@ local function run_inspect_request_gen(raw_request_map, mode)
           table.insert(rlimits, limit:result(curcount))
         end
 
-        res = curiefense.inspect_request_process(r1, rflows, rlimits)
+        res = curiefense.inspect_request_process(r2, rlimits)
       end
     end
     if res.error then
@@ -372,18 +376,39 @@ local function test_raw_request(request_path, mode)
         ", but got " .. cjson.encode(actual.action))
       good = false
     end
-    good = test_status(expected, actual) or good
-    good = test_block_mode(expected, actual) or good
-    good = test_headers(expected, actual) or good
+    good = test_status(expected, actual) and good
+    good = test_block_mode(expected, actual) and good
+    good = test_headers(expected, actual) and good
+    if expected.exec then
+      local func, err = load(expected.exec)
+      if func then
+        local ok, custom_tester = pcall(func)
+        if ok then
+          local test_result = custom_tester(actual, request_map)
+          if test_result ~= true then
+            print("!! custom test failed !!")
+            good = false
+          end
+        else
+          print(custom_tester)
+          good = false
+        end
+      else
+        print(":'(")
+        print(err)
+        good = false
+      end
+    end
 
     local triggers = {
       "acl_triggers",
-      "rate_limit_triggers",
-      "global_filter_triggers",
-      "content_filter_triggers"
+      "rl_triggers",
+      "gf_triggers",
+      "cf_triggers",
+      "cf_restrict_triggers"
     }
     for _, trigger_name in pairs(triggers) do
-      good = test_trigger(expected, request_map, trigger_name) or good
+      good = test_trigger(expected, request_map, trigger_name) and good
     end
 
     if not good then

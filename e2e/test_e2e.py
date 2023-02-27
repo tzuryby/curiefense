@@ -7,10 +7,12 @@
 #
 # To run this with minikube (does not support IPv6):
 #
-# pytest --base-protected-url http://$(minikube ip):30081 --base-conf-url http://$(minikube ip):30000/api/v3/ --base-ui-url http://$(minikube ip):30080 --elasticsearch-url http://$IP:30200 .      # pylint: disable=line-too-long
+# export IP=$(minikube ip)
+# pytest --base-protected-url http://$IP:30081 --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:30200 --luatests-path ../curiefense/curieproxy/rust/luatests .      # pylint: disable=line-too-long
 #
 # To run this with docker-compose:
-# pytest --base-protected-url http://localhost:30081/ --base-conf-url http://localhost:30000/api/v3/ --base-ui-url http://localhost:30080 --elasticsearch-url http://localhost:9200 .      # pylint: disable=line-too-long
+# export IP=localhost
+# pytest --base-protected-url http://$IP:30081/ --base-conf-url http://$IP:30000/api/v3/ --base-ui-url http://$IP:30080 --elasticsearch-url http://$IP:9200 --luatests-path ../curiefense/curieproxy/rust/luatests .      # pylint: disable=line-too-long
 
 from typing import Any, Dict, List, Optional
 import reqflip
@@ -90,7 +92,7 @@ class CliHelper:
         time.sleep(20)
 
     def set_configuration(self, luatests_path: str):
-        for (cmdname, path) in [
+        for cmdname, path in [
             ("actions", "actions.json"),
             ("aclprofiles", "acl-profiles.json"),
             ("contentfilterprofiles", "contentfilter-profiles.json"),
@@ -156,7 +158,7 @@ class RequestHelper:
 
         k: str
         v: str
-        for (k, v) in req["headers"].items():
+        for k, v in req["headers"].items():
             if k.startswith(":"):
                 if k == ":method":
                     method = v
@@ -200,7 +202,7 @@ def test_logging(request: pytest.FixtureRequest, requester: RequestHelper):
     assert res.status_code == 200
     for _ in range(15):
         time.sleep(4)
-        mdata = {"query": {"bool": {"must": {"match": {"uri": test_pattern}}}}}
+        mdata = {"query": {"bool": {"must": {"match": {"path": test_pattern}}}}}
         res = requests.get(es_url, json=mdata)
         print(res.json())
         nbhits = res.json()["hits"]["total"]["value"]
@@ -238,7 +240,7 @@ def test_rate_limit(
     if flip_requests:
         pytest.skip("only run raw requests for bit flip tests")
     time.sleep(max_time_limit)
-    for (step, req) in enumerate(limit_request):
+    for step, req in enumerate(limit_request):
         res = requester.run(req)
         if req["pass"]:
             assert res.status_code == 200, "at step %d" % step
@@ -256,7 +258,7 @@ def test_flow_control(
     if flip_requests:
         pytest.skip("only run raw requests for bit flip tests")
     time.sleep(max_time_limit)
-    for (step, req) in enumerate(flow_request):
+    for step, req in enumerate(flow_request):
         res = requester.run(req)
         if req["pass"]:
             assert res.status_code == 200, "at step %d" % step

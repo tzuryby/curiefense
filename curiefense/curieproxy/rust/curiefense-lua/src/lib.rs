@@ -1,17 +1,27 @@
 pub mod userdata;
 
 use curiefense::analyze::analyze_finish;
+use curiefense::analyze::analyze_flows;
 use curiefense::analyze::analyze_init;
-use curiefense::analyze::APhase2;
+use curiefense::analyze::APhase1;
+use curiefense::analyze::APhase2I;
+use curiefense::analyze::APhase2O;
+use curiefense::analyze::APhase3;
 use curiefense::analyze::CfRulesArg;
 use curiefense::analyze::InitResult;
+use curiefense::config::reload_config;
 use curiefense::grasshopper::DynGrasshopper;
+use curiefense::grasshopper::GHMode;
+use curiefense::grasshopper::GHQuery;
+use curiefense::grasshopper::GHResponse;
 use curiefense::grasshopper::Grasshopper;
+use curiefense::grasshopper::PrecisionLevel;
 use curiefense::inspect_generic_request_map;
 use curiefense::inspect_generic_request_map_init;
 use curiefense::interface::aggregator::aggregated_values_block;
 use curiefense::logs::LogLevel;
 use curiefense::logs::Logs;
+use curiefense::requestfields::RequestField;
 use curiefense::utils::RequestMeta;
 use curiefense::utils::{InspectionResult, RawRequest};
 use mlua::prelude::*;
@@ -34,8 +44,7 @@ struct LuaArgs<'l> {
     str_ip: String,
     loglevel: LogLevel,
     secpolid: Option<String>,
-    humanity: Option<bool>,
-    configpath: String,
+    humanity: PrecisionLevel,
     plugins: HashMap<String, String>,
 }
 
@@ -50,7 +59,7 @@ struct LuaArgs<'l> {
 /// * hops, optional number. When set the IP is computed from the x-forwarded-for header, defaulting to the ip argument on failure
 /// * secpolid, optional string. When set, bypass hostname matching for security policy selection
 /// * configpath, path to the lua configuration files, defaults to /cf-config/current/config
-/// * humanity, optional boolean, only used for the test functions
+/// * humanity, PrecisionLevel, only used for the test functions
 fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>, String> {
     let vloglevel = args.get("loglevel").map_err(|_| "Missing log level".to_string())?;
     let vmeta = args.get("meta").map_err(|_| "Missing meta argument".to_string())?;
@@ -65,7 +74,6 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         .get("secpolid")
         .map_err(|_| "Missing log level argument".to_string())?;
     let vhumanity = args.get("human").map_err(|_| "Missing human argument".to_string())?;
-    let vconfigpath = args.get("configpath").map_err(|_| "Missing config path".to_string())?;
     let loglevel = match String::from_lua(vloglevel, lua) {
         Err(rr) => return Err(format!("Could not convert the loglevel argument: {}", rr)),
         Ok(m) => match m.as_str() {
@@ -104,13 +112,18 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         None => str_ip,
         Some(hops) => curiefense::incremental::extract_ip(hops, &headers).unwrap_or(str_ip),
     };
-    let humanity = match FromLua::from_lua(vhumanity, lua) {
+    let shumanity: Option<String> = match FromLua::from_lua(vhumanity, lua) {
         Err(rr) => return Err(format!("Could not convert the humanity argument: {}", rr)),
         Ok(h) => h,
     };
-    let configpath: Option<String> = match FromLua::from_lua(vconfigpath, lua) {
-        Err(rr) => return Err(format!("Could not convert the config path argument: {}", rr)),
-        Ok(p) => p,
+    let humanity = match shumanity.as_deref() {
+        Some("active") => PrecisionLevel::Active,
+        Some("passive") => PrecisionLevel::Passive,
+        Some("interactive") => PrecisionLevel::Interactive,
+        Some("mobileSdk") => PrecisionLevel::MobileSdk,
+        Some("invalid") => PrecisionLevel::Invalid,
+        None => PrecisionLevel::Invalid,
+        Some(x) => return Err(format!("Invalid humanity precision level {}", x)),
     };
     let mplugins: Option<HashMap<String, HashMap<String, String>>> = match FromLua::from_lua(vplugins, lua) {
         Err(rr) => return Err(format!("Could not convert the plugins argument: {}", rr)),
@@ -124,7 +137,6 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         loglevel,
         secpolid,
         humanity,
-        configpath: configpath.unwrap_or_else(|| "/cf-config/current/config".to_string()),
         plugins: mplugins
             .unwrap_or_default()
             .into_iter()
@@ -143,7 +155,6 @@ fn lua_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectionResu
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
             let res = inspect_request(
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -161,13 +172,12 @@ fn lua_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectionResu
 /// ****************************************
 /// Lua interface for the "async dialog" API
 /// ****************************************
-fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult> {
+fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult<APhase1>> {
     match lua_convert_args(lua, args) {
         Ok(lua_args) => {
             let grasshopper = &DynGrasshopper {};
             let res = inspect_init(
                 lua_args.loglevel,
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -188,18 +198,29 @@ fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult> {
     }
 }
 
+fn lua_inspect_flows(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LInitResult<APhase2I>> {
+    let (lpr1, lflow_results) = args;
+    let pr1: LInitResult<APhase1> = FromLua::from_lua(lpr1, lua)?;
+    let lflow_results: Vec<LuaFlowResult> = FromLua::from_lua(lflow_results, lua)?;
+    let flow_results = lflow_results.into_iter().map(|lf| lf.0).collect();
+    Ok(match pr1 {
+        LInitResult::P0Result(r) => LInitResult::P0Result(r),
+        LInitResult::P0Error(r) => LInitResult::P0Error(r),
+        LInitResult::P1(mut logs, bp1) => {
+            let p2o = APhase2O::from_phase1(*bp1, flow_results);
+            let p2i = analyze_flows(&mut logs, p2o);
+            LInitResult::P1(logs, Box::new(p2i))
+        }
+    })
+}
+
 /// This is the processing function, that will an analysis result
-fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue, LuaValue)) -> LuaResult<LuaInspectionResult> {
-    let (lpred, lflow_results, llimit_results) = args;
+fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<LuaInspectionResult> {
+    let (lpred, llimit_results) = args;
     let lerr = |msg| Ok(LuaInspectionResult(Err(msg)));
-    let pred = match FromLua::from_lua(lpred, lua) {
-        Err(rr) => return lerr(format!("Could not convert the pred argument: {}", rr)),
+    let pred: LInitResult<APhase2I> = match FromLua::from_lua(lpred, lua) {
+        Err(rr) => return lerr(format!("Could not convert the pred(2I) argument: {}", rr)),
         Ok(m) => m,
-    };
-    let rflow_results: Result<Vec<LuaFlowResult>, mlua::Error> = FromLua::from_lua(lflow_results, lua);
-    let flow_results = match rflow_results {
-        Err(rr) => return lerr(format!("Could not convert the flow_result argument: {}", rr)),
-        Ok(m) => m.into_iter().map(|n| n.0).collect(),
     };
     let rlimit_results: Result<Vec<LuaLimitResult>, mlua::Error> = FromLua::from_lua(llimit_results, lua);
     let limit_results = match rlimit_results {
@@ -207,38 +228,78 @@ fn lua_inspect_process(lua: &Lua, args: (LuaValue, LuaValue, LuaValue)) -> LuaRe
         Ok(m) => m.into_iter().map(|n| n.0).collect(),
     };
 
-    let (mut logs, p1) = match pred {
+    let (mut logs, p2) = match pred {
         LInitResult::P0Result(_) => {
             return lerr("The first parameter is an inspection result, and should not have been used here!".to_string())
         }
         LInitResult::P0Error(rr) => return lerr(format!("The first parameter is an error: {}", rr)),
-        LInitResult::P1(logs, p1) => (logs, p1),
+        LInitResult::P1(logs, p2) => (logs, p2),
     };
-    let p2 = APhase2::from_phase1(*p1, flow_results, limit_results);
+    let p3 = APhase3::from_phase2(*p2, limit_results);
     let grasshopper = &DynGrasshopper {};
-    let res = analyze_finish(&mut logs, Some(grasshopper), CfRulesArg::Global, p2);
+    let res = analyze_finish(&mut logs, Some(grasshopper), CfRulesArg::Global, p3);
     Ok(LuaInspectionResult(Ok(InspectionResult::from_analyze(logs, res))))
 }
 
+fn lua_reload_conf(lua: &Lua, args: (LuaValue, LuaValue)) -> LuaResult<Option<String>> {
+    let (lfilename, lconfigpath) = args;
+
+    let raw_files: Option<String> = match FromLua::from_lua(lfilename, lua) {
+        Err(rr) => return Ok(Some(format!("Could not convert the files arguments: {}", rr))),
+        Ok(raw) => raw,
+    };
+
+    let files: Vec<String> = match raw_files {
+        None => vec![],
+        Some(raw_files) => match serde_json::from_str(&raw_files) {
+            Err(rr) => {
+                return Ok(Some(format!(
+                    "Could not parse the files argument as valid json array: {}",
+                    rr
+                )))
+            }
+            Ok(files) => files,
+        },
+    };
+    let configpath: String = match lconfigpath {
+        LuaNil => String::from("/cf-config/current/config"),
+        v => match FromLua::from_lua(v, lua) {
+            Err(rr) => return Ok(Some(format!("Could not parse configpath argument to string: {}", rr))),
+            Ok(path) => path,
+        },
+    };
+
+    reload_config(&configpath, files);
+    Ok(None)
+}
+
 struct DummyGrasshopper {
-    humanity: bool,
+    humanity: PrecisionLevel,
 }
 
 impl Grasshopper for DummyGrasshopper {
-    fn js_app(&self) -> Option<std::string::String> {
-        None
+    fn is_human(&self, _input: GHQuery) -> Result<PrecisionLevel, String> {
+        Ok(self.humanity)
     }
-    fn js_bio(&self) -> Option<std::string::String> {
-        None
+
+    fn verify_challenge(&self, _headers: HashMap<&str, &str>) -> Result<String, String> {
+        if self.humanity == PrecisionLevel::Invalid {
+            Err("Bad".to_string())
+        } else {
+            Ok("OK".to_string())
+        }
     }
-    fn parse_rbzid(&self, _: &str, _: &str) -> Option<bool> {
-        Some(self.humanity)
+
+    fn init_challenge(&self, _input: GHQuery, _mode: GHMode) -> Result<GHResponse, String> {
+        Ok(GHResponse::invalid())
     }
-    fn gen_new_seed(&self, _: &str) -> Option<std::string::String> {
-        None
+
+    fn should_provide_app_sig(&self, _headers: HashMap<&str, &str>) -> Result<GHResponse, String> {
+        Ok(GHResponse::invalid())
     }
-    fn verify_workproof(&self, _: &str, _: &str) -> Option<std::string::String> {
-        Some("ok".into())
+
+    fn handle_bio_report(&self, _input: GHQuery, _precision_leve: PrecisionLevel) -> Result<GHResponse, String> {
+        Err("not implemented".into())
     }
 }
 
@@ -250,10 +311,9 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
     match lua_convert_args(lua, args) {
         Ok(lua_args) => {
             let gh = DummyGrasshopper {
-                humanity: lua_args.humanity.unwrap_or(false),
+                humanity: lua_args.humanity,
             };
             let res = inspect_request(
-                &lua_args.configpath,
                 lua_args.meta,
                 lua_args.headers,
                 lua_args.lua_body.as_ref().map(|b| b.as_bytes()),
@@ -271,7 +331,6 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
 /// Rust-native inspection top level function
 #[allow(clippy::too_many_arguments)]
 fn inspect_request<GH: Grasshopper>(
-    configpath: &str,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
@@ -290,14 +349,7 @@ fn inspect_request<GH: Grasshopper>(
         headers,
         mbody,
     };
-    let dec = inspect_generic_request_map(
-        configpath,
-        grasshopper,
-        raw,
-        &mut logs,
-        selected_secpol.as_deref(),
-        plugins,
-    );
+    let dec = inspect_generic_request_map(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins);
 
     Ok(InspectionResult::from_analyze(logs, dec))
 }
@@ -305,7 +357,6 @@ fn inspect_request<GH: Grasshopper>(
 #[allow(clippy::too_many_arguments)]
 fn inspect_init<GH: Grasshopper>(
     loglevel: LogLevel,
-    configpath: &str,
     meta: HashMap<String, String>,
     headers: HashMap<String, String>,
     mbody: Option<&[u8]>,
@@ -325,14 +376,7 @@ fn inspect_init<GH: Grasshopper>(
         mbody,
     };
 
-    let p0 = match inspect_generic_request_map_init(
-        configpath,
-        grasshopper,
-        raw,
-        &mut logs,
-        selected_secpol.as_deref(),
-        plugins,
-    ) {
+    let p0 = match inspect_generic_request_map_init(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins) {
         Err(res) => return Ok((InitResult::Res(res), logs)),
         Ok(p0) => p0,
     };
@@ -350,11 +394,13 @@ fn curiefense(lua: &Lua) -> LuaResult<LuaTable> {
     // end-to-end inspection
     exports.set("inspect_request", lua.create_function(lua_inspect_request)?)?;
     exports.set("inspect_request_init", lua.create_function(lua_inspect_init)?)?;
+    exports.set("inspect_request_flows", lua.create_function(lua_inspect_flows)?)?;
     exports.set("inspect_request_process", lua.create_function(lua_inspect_process)?)?;
     exports.set(
         "aggregated_values",
         lua.create_function(|_, ()| Ok(aggregated_values_block()))?,
     )?;
+    exports.set("lua_reload_conf", lua.create_function(lua_reload_conf)?)?;
     // end-to-end inspection (test)
     exports.set("test_inspect_request", lua.create_function(lua_test_inspect_request)?)?;
 
@@ -369,14 +415,19 @@ mod tests {
     #[test]
     fn config_load() {
         let mut logs = Logs::default();
-        let cfg = with_config("../../cf-config", &mut logs, |_, c| c.clone());
+        reload_config("../../cf-config/", Vec::new());
+
+        let cfg = with_config(&mut logs, |_, c| c.clone());
         if cfg.is_some() {
             match logs.logs.len() {
-                5 => {
+                4 => {
                     assert!(logs.logs[0].message.to_string().contains("CFGLOAD logs start"));
-                    assert!(logs.logs[2].message.to_string().contains("manifest.json"));
-                    assert!(logs.logs[3].message.to_string().contains("Loaded profile"));
-                    assert!(logs.logs[4].message.to_string().contains("CFGLOAD logs end"));
+                    assert!(logs.logs[1]
+                        .message
+                        .to_string()
+                        .contains("When loading manifest.json: No such file or directory"));
+                    assert!(logs.logs[2].message.to_string().contains("Loaded profile"));
+                    assert!(logs.logs[3].message.to_string().contains("CFGLOAD logs end"));
                 }
                 13 => {
                     assert!(logs.logs[2]

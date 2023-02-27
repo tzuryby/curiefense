@@ -15,10 +15,11 @@ use std::io::Read;
 use xmlparser::{ElementEnd, EntityDefinition, ExternalId, Token};
 
 use crate::config::raw::ContentType;
-use crate::interface::{Action, ActionType, BlockReason, Location};
+use crate::interface::Location;
 use crate::logs::Logs;
 use crate::requestfields::RequestField;
 use crate::utils::decoders::parse_urlencoded_params_bytes;
+use crate::utils::BodyProblem;
 
 mod graphql;
 
@@ -93,11 +94,11 @@ fn flatten_json(
 ///  * map/10000 -> +33.534%
 ///
 /// next idea: adapting https://github.com/Geal/nom/blob/master/examples/json_iterator.rs
-fn json_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), String> {
-    let value: Value = serde_json::from_slice(body).map_err(|rr| format!("Invalid JSON body: {}", rr))?;
+fn json_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), BodyProblem> {
+    let value: Value = serde_json::from_slice(body).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
 
     let mut prefix = Vec::new();
-    flatten_json(mxdepth, args, &mut prefix, value).map_err(|()| format!("JSON nesting level exceeded: {}", mxdepth))
+    flatten_json(mxdepth, args, &mut prefix, value).map_err(|()| BodyProblem::TooDeep)
 }
 
 /// builds the XML path for a given stack, by appending key names with their indices
@@ -184,14 +185,14 @@ fn xml_external_id(args: &mut RequestField, stack: &[(String, u64)], name: &str,
 /// This checks the following errors, in addition to the what the lexer gets:
 ///   * mismatched opening and closing tags
 ///   * premature end of document
-fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), String> {
+fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), BodyProblem> {
     let body_utf8 = String::from_utf8_lossy(body);
     let mut stack: Vec<(String, u64)> = Vec::new();
     for rtoken in xmlparser::Tokenizer::from(body_utf8.as_ref()) {
         if stack.len() >= mxdepth {
-            return Err(format!("XML nesting level exceeded: {}", mxdepth));
+            return Err(BodyProblem::TooDeep);
         }
-        let token = rtoken.map_err(|rr| format!("XML parsing error: {}", rr))?;
+        let token = rtoken.map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
         match token {
             Token::ProcessingInstruction { .. } => (),
             Token::Comment { .. } => (),
@@ -215,11 +216,14 @@ fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), 
             }
             Token::ElementEnd { end, .. } => match end {
                 //  <foo/>
-                ElementEnd::Empty => close_xml_element(args, &mut stack, None)?,
+                ElementEnd::Empty => {
+                    close_xml_element(args, &mut stack, None).map_err(|r| BodyProblem::DecodingError(r, None))?
+                }
                 //  <foo>
                 ElementEnd::Open => (),
                 //  </foo>
-                ElementEnd::Close(_, local) => close_xml_element(args, &mut stack, Some(local.as_str()))?,
+                ElementEnd::Close(_, local) => close_xml_element(args, &mut stack, Some(local.as_str()))
+                    .map_err(|r| BodyProblem::DecodingError(r, None))?,
             },
             Token::Attribute { local, value, .. } => {
                 let path = xml_path(&stack) + local.as_str();
@@ -241,25 +245,31 @@ fn xml_body(mxdepth: usize, args: &mut RequestField, body: &[u8]) -> Result<(), 
     if stack.is_empty() {
         Ok(())
     } else {
-        Err("XML error: premature end of document".to_string())
+        Err(BodyProblem::DecodingError(
+            "XML error: premature end of document".to_string(),
+            None,
+        ))
     }
 }
 
 /// parses bodies that are url encoded forms, like query params
-fn forms_body(args: &mut RequestField, body: &[u8]) -> Result<(), String> {
+fn forms_body(args: &mut RequestField, body: &[u8]) -> Result<(), BodyProblem> {
     // TODO: body is traversed twice here, this is inefficient
     if body.contains(&b'=') && body.iter().all(|x| *x > 0x20 && *x < 0x7f) {
         parse_urlencoded_params_bytes(args, body, Location::BodyArgumentValue);
         Ok(())
     } else {
-        Err("Body is not forms encoded".to_string())
+        Err(BodyProblem::DecodingError(
+            "Body is not forms encoded".to_string(),
+            Some("forms-encoded body".to_string()),
+        ))
     }
 }
 
 /// reuses the multipart crate to parse these bodies
 ///
 /// will not work properly with binary data
-fn multipart_form_encoded(boundary: &str, args: &mut RequestField, body: &[u8]) -> Result<(), String> {
+fn multipart_form_encoded(boundary: &str, args: &mut RequestField, body: &[u8]) -> Result<(), BodyProblem> {
     let mut multipart = Multipart::with_body(body, boundary);
     multipart
         .foreach_entry(|mut entry| {
@@ -269,7 +279,7 @@ fn multipart_form_encoded(boundary: &str, args: &mut RequestField, body: &[u8]) 
             let scontent = String::from_utf8_lossy(&content);
             args.add(name, Location::Body, scontent.to_string());
         })
-        .map_err(|rr| format!("Could not parse multipart body: {}", rr))
+        .map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))
 }
 
 /// body parsing function, returns an error when the body can't be decoded
@@ -280,7 +290,7 @@ pub fn parse_body(
     mcontent_type: Option<&str>,
     accepted_types: &[ContentType],
     body: &[u8],
-) -> Result<(), String> {
+) -> Result<(), BodyProblem> {
     logs.debug("body parsing started");
     if max_depth == 0 {
         logs.warning("max_depth is 0, body parsing avoided");
@@ -333,39 +343,14 @@ pub fn parse_body(
         json_body(max_depth, args, body).or_else(|_| forms_body(args, body))
     } else {
         // we expected a specific content type!
-        Err(format!(
-            "Invalid content type={:?}, accepted types={:?}",
-            mcontent_type, accepted_types
+        Err(BodyProblem::DecodingError(
+            match mcontent_type {
+                None => "no content type specified".to_string(),
+                Some(content_type) => format!("content type is {}", content_type),
+            },
+            Some(format!("{:?}", accepted_types)),
         ))
     }
-}
-
-pub fn body_too_deep(expected: usize, actual: usize) -> (Action, BlockReason) {
-    (
-        Action {
-            atype: ActionType::Block,
-            block_mode: true,
-            status: 403,
-            headers: None,
-            content: "Access denied".to_string(),
-            extra_tags: None,
-        },
-        BlockReason::body_too_deep(actual, expected),
-    )
-}
-
-pub fn body_too_large(expected: usize, actual: usize) -> (Action, BlockReason) {
-    (
-        Action {
-            atype: ActionType::Block,
-            block_mode: true,
-            status: 403,
-            headers: None,
-            content: "Access denied".to_string(),
-            extra_tags: None,
-        },
-        BlockReason::body_too_large(actual, expected),
-    )
 }
 
 #[cfg(test)]

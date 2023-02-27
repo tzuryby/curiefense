@@ -864,6 +864,60 @@
     ]
   },
   {
+    "action": "header1",
+    "active": true,
+    "description": "header 1",
+    "id": "header1",
+    "mdate": "2021-07-01T09:50:58.505Z",
+    "name": "header 1",
+    "rule": [
+      "path",
+      "/header_acc_1",
+      "..."
+    ],
+    "source": "self-managed",
+    "tags": [
+      "header1"
+    ]
+  },
+  {
+    "action": "header2",
+    "active": true,
+    "description": "header 2",
+    "id": "header2",
+    "mdate": "2021-07-01T09:50:58.505Z",
+    "name": "header 2",
+    "rule": [
+      "plugins",
+      [
+        "header.test",
+        "yes"
+      ],
+      "..."
+    ],
+    "source": "self-managed",
+    "tags": [
+      "header2"
+    ]
+  },
+  {
+    "action": "monitor",
+    "active": true,
+    "description": "Branch marker",
+    "id": "branchmarker",
+    "mdate": "2021-07-01T09:50:58.505Z",
+    "name": "branch marker",
+    "rule": [
+      "path",
+      "/branch/tag/test",
+      "..."
+    ],
+    "source": "self-managed",
+    "tags": [
+      "branch:test"
+    ]
+  },
+  {
     "id": "filter-header",
     "name": "Filter header",
     "description": "Filter a particual header value",
@@ -872,9 +926,49 @@
     "action": "ye8qyg0h",
     "rule": {
       "relation": "OR",
-      "entries": [["headers", ["test-global-filter-trigger", "header_value"], ""]]
+      "entries": [
+        [
+          "headers",
+          [
+            "test-global-filter-trigger",
+            "header_value"
+          ],
+          ""
+        ]
+      ]
     },
     "mdate": "",
     "source": "self-managed"
+  },
+  {
+    "action": "5ktcoafw",
+    "active": true,
+    "description": "run the challenge with a global filter",
+    "entries_relation": "OR",
+    "id": "gfchallenge",
+    "mdate": "2020-05-23T00:04:41",
+    "name": "gf challenge",
+    "rule": {
+      "relation": "AND",
+      "entries": [
+        {
+          "entries": [
+            [
+              "headers",
+              [
+                "gfchallenge",
+                "true"
+              ],
+              "..."
+            ]
+          ],
+          "relation": "OR"
+        }
+      ]
+    },
+    "source": "self-managed",
+    "tags": [
+      "gfchallenge"
+    ]
   }
 ]
