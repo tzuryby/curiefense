@@ -4,12 +4,13 @@ pub mod body;
 pub mod config;
 pub mod contentfilter;
 pub mod flow;
+pub mod geo;
 pub mod grasshopper;
 pub mod incremental;
 pub mod interface;
+pub mod ipinfo;
 pub mod limit;
 pub mod logs;
-pub mod maxmind;
 pub mod redis;
 pub mod requestfields;
 pub mod securitypolicy;
@@ -21,10 +22,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use analyze::{APhase0, CfRulesArg};
-use body::body_too_large;
 use config::virtualtags::VirtualTags;
 use config::with_config;
-use grasshopper::Grasshopper;
+use grasshopper::{GHQuery, Grasshopper, PrecisionLevel};
 use interface::stats::{SecpolStats, Stats, StatsCollect};
 use interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags};
 use logs::Logs;
@@ -34,23 +34,21 @@ use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
 use crate::config::hostmap::SecurityPolicy;
-
-fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> bool {
-    if let Some(rbzid) = reqinfo.cookies.get("rbzid") {
-        if let Some(ua) = reqinfo.headers.get("user-agent") {
-            logs.debug(|| format!("Checking rbzid cookie {} with user-agent {}", rbzid, ua));
-            return match gh.parse_rbzid(&rbzid.replace('-', "="), ua) {
-                Some(b) => b,
-                None => {
-                    logs.error("Something when wrong when calling parse_rbzid");
-                    false
-                }
-            };
-        } else {
-            logs.debug("Could not find useragent!");
+use crate::interface::SimpleAction;
+//todo should receive sdk configuration from config/raw.rs struct, and pass it to gg
+fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> PrecisionLevel {
+    match gh.is_human(GHQuery {
+        headers: reqinfo.headers.as_map(),
+        cookies: reqinfo.cookies.as_map(),
+        ip: &reqinfo.rinfo.geoip.ipstr,
+        protocol: reqinfo.rinfo.meta.protocol.as_deref().unwrap_or("https"),
+    }) {
+        Ok(level) => level,
+        Err(rr) => {
+            logs.error(|| format!("Grasshopper: {}", rr));
+            PrecisionLevel::Invalid
         }
     }
-    false
 }
 
 /// # Safety
@@ -74,7 +72,6 @@ pub unsafe fn inspect_async_free(ptr: *mut Executor<(Decision, Tags, Logs)>) {
 }
 
 pub fn inspect_generic_request_map<GH: Grasshopper>(
-    configpath: &str,
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
@@ -82,7 +79,6 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
     async_std::task::block_on(inspect_generic_request_map_async(
-        configpath,
         mgh,
         raw,
         logs,
@@ -93,7 +89,6 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
 
 // generic entry point when the request map has already been parsed
 pub fn inspect_generic_request_map_init<GH: Grasshopper>(
-    configpath: &str,
     mgh: Option<&GH>,
     raw: RawRequest,
     logs: &mut Logs,
@@ -110,7 +105,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     #[allow(clippy::large_enum_variant)]
     enum RequestMappingResult<A> {
         NoSecurityPolicy,
-        BodyTooLarge((Action, BlockReason), RequestInfo),
+        BodyTooLarge((SimpleAction, BlockReason), RequestInfo),
         Res(A),
     }
 
@@ -118,8 +113,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     // there is a lot of copying taking place, to minimize the lock time
     // this decision should be backed with benchmarks
 
-    let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, is_human) =
-        match with_config(configpath, logs, |slogs, cfg| {
+    let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, precision_level) =
+        match with_config(logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
             match mmapinfo {
                 Some(secpolicy) => {
@@ -131,9 +126,15 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                         if body.len() > secpolicy.content_filter_profile.max_body_size
                             && !secpolicy.content_filter_profile.ignore_body
                         {
-                            Some(body_too_large(
-                                secpolicy.content_filter_profile.max_body_size,
-                                body.len(),
+                            Some((
+                                secpolicy.content_filter_profile.action.clone(),
+                                BlockReason::body_too_large(
+                                    secpolicy.content_filter_profile.id.clone(),
+                                    secpolicy.content_filter_profile.name.clone(),
+                                    secpolicy.content_filter_profile.action.atype.to_raw(),
+                                    body.len(),
+                                    secpolicy.content_filter_profile.max_body_size,
+                                ),
                             ))
                         } else {
                             None
@@ -160,23 +161,25 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
 
                     let nflows = cfg.flows.clone();
 
-                    // without grasshopper, default to being human
-                    let is_human = if let Some(gh) = mgh {
+                    // without grasshopper, default to being not human
+                    let precision_level = if let Some(gh) = mgh {
                         challenge_verified(gh, &reqinfo, slogs)
                     } else {
-                        false
+                        PrecisionLevel::Invalid
                     };
 
-                    let ntags = tag_request(stats, is_human, &cfg.globalfilters, &reqinfo, &cfg.virtual_tags);
-                    RequestMappingResult::Res((ntags, nflows, reqinfo, is_human))
+                    let ntags = tag_request(stats, precision_level, &cfg.globalfilters, &reqinfo, &cfg.virtual_tags);
+                    RequestMappingResult::Res((ntags, nflows, reqinfo, precision_level))
                 }
                 None => RequestMappingResult::NoSecurityPolicy,
             }
         }) {
             Some(RequestMappingResult::Res(x)) => x,
             Some(RequestMappingResult::BodyTooLarge((action, br), rinfo)) => {
+                let mut tags = tags;
+                let decision = action.to_decision(logs, PrecisionLevel::Invalid, mgh, &rinfo, &mut tags, vec![br]);
                 return Err(AnalyzeResult {
-                    decision: Decision::action(action, vec![br]),
+                    decision,
                     tags,
                     rinfo,
                     stats: Stats::new(logs.start, "unknown".into()),
@@ -213,7 +216,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
         stats,
         itags: ntags,
         reqinfo,
-        is_human,
+        precision_level,
         globalfilter_dec,
         flows,
     })
@@ -221,14 +224,13 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
 
 // generic entry point when the request map has already been parsed
 pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
-    configpath: &str,
     mgh: Option<&GH>,
     raw: RawRequest<'_>,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
     plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
-    match inspect_generic_request_map_init(configpath, mgh, raw, logs, selected_secpol, plugins) {
+    match inspect_generic_request_map_init(mgh, raw, logs, selected_secpol, plugins) {
         Err(res) => res,
         Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
     }

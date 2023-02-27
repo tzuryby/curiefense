@@ -32,7 +32,7 @@
     },
     "type": {
       "type": "string",
-      "enum": ["skip", "custom", "challenge", "monitor"],
+      "enum": ["skip", "custom", "challenge", "ichallenge", "monitor"],
       "title": "Type",
       "description": "Need to be one of predefined strings"
     },

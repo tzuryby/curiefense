@@ -5,10 +5,12 @@ use pdatastructs::hyperloglog::HyperLogLog;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
+use std::hash::Hash;
 
+use crate::config::raw::RawActionType;
 use crate::utils::RequestInfo;
 
-use super::{BDecision, Decision, Location, Tags};
+use super::{Decision, Location, Tags};
 
 lazy_static! {
     static ref AGGREGATED: Mutex<HashMap<AggregationKey, BTreeMap<i64, AggregatedCounters>>> =
@@ -29,6 +31,7 @@ lazy_static! {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(8);
+    static ref PLANET_NAME: String = std::env::var("CF_PLANET_NAME").ok().unwrap_or_default();
     static ref EMPTY_AGGREGATED_DATA: AggregatedCounters = AggregatedCounters::default();
 }
 
@@ -81,6 +84,54 @@ impl<T: Serialize> Arp<T> {
     }
 }
 
+/// Helper structure to display both the Autonomous System number and name in
+/// aggregated data.
+///
+/// It is just a wrapper around a u32, with an additional string description.
+#[derive(Debug, Default, Clone)]
+struct AutonomousSystem {
+    number: u32,
+    company_name: Option<String>,
+}
+
+impl PartialEq for AutonomousSystem {
+    fn eq(&self, other: &Self) -> bool {
+        self.number == other.number
+    }
+}
+impl Eq for AutonomousSystem {}
+
+impl PartialOrd for AutonomousSystem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.number.partial_cmp(&other.number)
+    }
+}
+
+impl Ord for AutonomousSystem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.number.cmp(&other.number)
+    }
+}
+
+impl Hash for AutonomousSystem {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.number.hash(state);
+    }
+}
+
+impl Serialize for AutonomousSystem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if let Some(company_name) = &self.company_name {
+            serializer.serialize_str(&format!("{} ({})", self.number, company_name))
+        } else {
+            serializer.serialize_str(self.number.to_string().as_str())
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct AggregatedCounters {
     status: Bag<u32>,
@@ -95,6 +146,8 @@ struct AggregatedCounters {
     requests_triggered_globalfilter_report: usize,
     requests_triggered_cf_active: usize,
     requests_triggered_cf_report: usize,
+    requests_triggered_restriction_active: usize,
+    requests_triggered_restriction_report: usize,
     requests_triggered_acl_active: usize,
     requests_triggered_acl_report: usize,
     requests_triggered_ratelimit_active: usize,
@@ -124,7 +177,7 @@ struct AggregatedCounters {
     uri: Metric<String>,
     user_agent: Metric<String>,
     country: Metric<String>,
-    asn: Metric<u32>,
+    asn: Metric<AutonomousSystem>,
     headers_amount: Bag<usize>,
     cookies_amount: Bag<usize>,
     args_amount: Bag<usize>,
@@ -141,6 +194,7 @@ struct AggregationKey {
     proxy: Option<String>,
     secpolid: String,
     secpolentryid: String,
+    branch: String,
 }
 
 /// structure used for serialization
@@ -310,15 +364,15 @@ impl<T: Eq + Clone + std::hash::Hash + Serialize> Metric<T> {
         );
         mp.insert(
             format!("top_{}_active", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Active)).unwrap_or(Value::Null),
         );
         mp.insert(
             format!("top_{}_reported", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Report)).unwrap_or(Value::Null),
         );
         mp.insert(
             format!("top_{}_passed", tp),
-            serde_json::to_value(&self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
+            serde_json::to_value(self.top.get(ArpCursor::Pass)).unwrap_or(Value::Null),
         );
     }
 }
@@ -466,21 +520,19 @@ impl AggregatedCounters {
         let mut cf_report = false;
         for r in &dec.reasons {
             use super::Initiator::*;
-            let this_blocked = match r.decision {
-                BDecision::Skip => {
+            let this_blocked = match r.action {
+                RawActionType::Skip => {
                     skipped = true;
                     false
                 }
-                BDecision::Monitor => false,
-                BDecision::AlterRequest => false,
-                BDecision::InitiatorInactive => false,
-                BDecision::Blocking => {
+                RawActionType::Monitor => false,
+                RawActionType::Custom | RawActionType::Challenge | RawActionType::Ichallenge => {
                     blocked = true;
                     true
                 }
             };
             match &r.initiator {
-                GlobalFilter { id: _, name: _ } => {
+                GlobalFilter => {
                     if this_blocked {
                         self.requests_triggered_globalfilter_active += 1;
                     } else {
@@ -508,11 +560,7 @@ impl AggregatedCounters {
                     }
                     self.challenge += 1;
                 }
-                Limit {
-                    id: _,
-                    name: _,
-                    threshold: _,
-                } => {
+                Limit { threshold: _ } => {
                     if this_blocked {
                         self.requests_triggered_ratelimit_active += 1;
                     } else {
@@ -533,22 +581,15 @@ impl AggregatedCounters {
                     self.ruleid.get_mut(cursor).inc(ruleid.clone());
                     self.risk_level.get_mut(cursor).inc(*risk_level);
                 }
-                BodyTooDeep { actual: _, expected: _ }
-                | BodyMissing
-                | BodyMalformed(_)
-                | Sqli(_)
-                | Xss
-                | Restricted
-                | TooManyEntries { actual: _, expected: _ }
-                | EntryTooLarge { actual: _, expected: _ } => {
+                Restriction { .. } => {
                     if this_blocked {
-                        self.requests_triggered_cf_active += 1;
+                        self.requests_triggered_restriction_active += 1;
                     } else {
-                        self.requests_triggered_cf_report += 1;
+                        self.requests_triggered_restriction_report += 1;
                     }
                 }
             }
-            for loc in &r.location {
+            for loc in std::iter::once(&r.location).chain(r.extra_locations.iter()) {
                 let aggloc = if this_blocked {
                     self.location.get_mut(ArpCursor::Active)
                 } else {
@@ -567,7 +608,7 @@ impl AggregatedCounters {
                     | Location::UriArgument(_) => aggloc.args += 1,
                     Location::Request => (),
                     Location::Ip => aggloc.attrs += 1,
-                    Location::Path | Location::Pathpart(_) | Location::PathpartValue(_, _) => aggloc.uri += 1,
+                    Location::Pathpart(_) | Location::PathpartValue(_, _) => aggloc.uri += 1,
                     Location::Header(_)
                     | Location::HeaderValue(_, _)
                     | Location::RefererPath
@@ -667,7 +708,13 @@ impl AggregatedCounters {
             }
         }
         if let Some(asn) = &rinfo.rinfo.geoip.asn {
-            self.asn.inc(asn, cursor);
+            self.asn.inc(
+                &AutonomousSystem {
+                    number: *asn,
+                    company_name: rinfo.rinfo.geoip.company.clone(),
+                },
+                cursor,
+            );
         }
 
         self.args_amount.inc(rinfo.rinfo.qinfo.args.len());
@@ -723,6 +770,14 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
     content.insert(
         "requests_triggered_globalfilter_report".into(),
         Value::Number(serde_json::Number::from(e.requests_triggered_globalfilter_report)),
+    );
+    content.insert(
+        "requests_triggered_restriction_active".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_active)),
+    );
+    content.insert(
+        "requests_triggered_restriction_report".into(),
+        Value::Number(serde_json::Number::from(e.requests_triggered_restriction_report)),
     );
     content.insert(
         "requests_triggered_cf_active".into(),
@@ -791,13 +846,14 @@ fn serialize_counters(e: &AggregatedCounters) -> Value {
 }
 
 fn serialize_entry(sample: i64, hdr: &AggregationKey, counters: &AggregatedCounters) -> Value {
-    let naive_dt = chrono::NaiveDateTime::from_timestamp(sample * *SAMPLE_DURATION, 0);
+    let naive_dt =
+        chrono::NaiveDateTime::from_timestamp_opt(sample * *SAMPLE_DURATION, 0).unwrap_or(chrono::NaiveDateTime::MIN);
     let timestamp: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(naive_dt, chrono::Utc);
     let mut content = serde_json::Map::new();
 
     content.insert(
         "timestamp".into(),
-        serde_json::to_value(&timestamp).unwrap_or_else(|_| Value::String("??".into())),
+        serde_json::to_value(timestamp).unwrap_or_else(|_| Value::String("??".into())),
     );
     content.insert(
         "proxy".into(),
@@ -808,6 +864,8 @@ fn serialize_entry(sample: i64, hdr: &AggregationKey, counters: &AggregatedCount
     );
     content.insert("secpolid".into(), Value::String(hdr.secpolid.clone()));
     content.insert("secpolentryid".into(), Value::String(hdr.secpolentryid.clone()));
+    content.insert("branch".into(), Value::String(hdr.branch.clone()));
+    content.insert("planet_name".into(), Value::String(PLANET_NAME.clone()));
     content.insert("counters".into(), serialize_counters(counters));
     Value::Object(content)
 }
@@ -847,7 +905,8 @@ pub async fn aggregated_values() -> String {
         })
         .collect();
     let entries = if entries.is_empty() {
-        let proxy = crate::config::CONFIG
+        let proxy = crate::config::CONFIGS
+            .config
             .read()
             .ok()
             .and_then(|cfg| cfg.container_name.clone());
@@ -860,6 +919,7 @@ pub async fn aggregated_values() -> String {
                         proxy: proxy.clone(),
                         secpolid: "__default__".to_string(),
                         secpolentryid: "__default__".to_string(),
+                        branch: "-".to_string(),
                     },
                     &AggregatedCounters::default(),
                 )
@@ -887,10 +947,17 @@ pub async fn aggregate(
 ) {
     let seconds = rinfo.timestamp.timestamp();
     let sample = seconds / *SAMPLE_DURATION;
+    let branch_tag = tags
+        .inner()
+        .keys()
+        .filter_map(|t| t.strip_prefix("branch:"))
+        .next()
+        .unwrap_or("-");
     let key = AggregationKey {
         proxy: rinfo.rinfo.container_name.clone(),
         secpolid: rinfo.rinfo.secpolicy.policy.id.to_string(),
         secpolentryid: rinfo.rinfo.secpolicy.entry.id.to_string(),
+        branch: branch_tag.to_string(),
     };
     let mut guard = AGGREGATED.lock().await;
     prune_old_values(&mut guard, sample);

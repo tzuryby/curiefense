@@ -1,11 +1,12 @@
+use crate::config::hostmap::SecurityPolicy;
 /// this file contains all the data type that are used when interfacing with a proxy
 use crate::config::matchers::RequestSelector;
 use crate::config::raw::{RawAction, RawActionType};
-use crate::grasshopper::{challenge_phase01, Grasshopper};
+use crate::grasshopper::{challenge_phase01, GHMode, Grasshopper, PrecisionLevel};
 use crate::logs::Logs;
 use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
-use crate::utils::{selector, RequestInfo, Selected};
+use crate::utils::{selector, GeoIp, RequestInfo, Selected};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
@@ -23,20 +24,6 @@ pub mod tagging;
 pub enum SimpleDecision {
     Pass,
     Action(SimpleAction, Vec<BlockReason>),
-}
-
-pub fn stronger_decision(d1: SimpleDecision, d2: SimpleDecision) -> SimpleDecision {
-    match (&d1, &d2) {
-        (SimpleDecision::Pass, _) => d2,
-        (_, SimpleDecision::Pass) => d1,
-        (SimpleDecision::Action(s1, _), SimpleDecision::Action(s2, _)) => {
-            if s1.atype.priority() >= s2.atype.priority() {
-                d1
-            } else {
-                d2
-            }
-        }
-    }
 }
 
 /// Merge two decisions together.
@@ -71,9 +58,12 @@ pub fn merge_decisions(d1: Decision, d2: Decision) -> Decision {
     // Merge headers if kept action is monitor
     if let Some(action) = &mut kept.maction {
         if action.atype == ActionType::Monitor {
+            // if the kept action is monitor, the thrown action is monitor or pass, so we might need to merge headers
+            let throw_headers = thrown.maction.and_then(|action| action.headers);
             if let Some(headers) = &mut action.headers {
-                let throw_headers = thrown.maction.and_then(|action| action.headers).unwrap_or_default();
-                headers.extend(throw_headers)
+                headers.extend(throw_headers.unwrap_or_default())
+            } else {
+                action.headers = throw_headers;
             }
         }
     }
@@ -81,6 +71,33 @@ pub fn merge_decisions(d1: Decision, d2: Decision) -> Decision {
     kept.reasons.extend(thrown.reasons);
 
     kept
+}
+
+/// identical to merge_decisions, but for simple decisions
+pub fn stronger_decision(d1: SimpleDecision, d2: SimpleDecision) -> SimpleDecision {
+    match (d1, d2) {
+        (SimpleDecision::Pass, d2) => d2,
+        (d1, SimpleDecision::Pass) => d1,
+        (SimpleDecision::Action(mut s1, mut kept_reasons), SimpleDecision::Action(s2, br2)) => {
+            kept_reasons.extend(br2);
+            if s1.atype.priority() > s2.atype.priority() {
+                SimpleDecision::Action(s1, kept_reasons)
+            } else if s1.atype == SimpleActionT::Monitor && s2.atype == SimpleActionT::Monitor {
+                s1.headers = match (s1.headers, s2.headers) {
+                    (None, None) => None,
+                    (Some(h1), None) => Some(h1),
+                    (None, Some(h2)) => Some(h2),
+                    (Some(mut h1), Some(h2)) => {
+                        h1.extend(h2);
+                        Some(h1)
+                    }
+                };
+                SimpleDecision::Action(s1, kept_reasons)
+            } else {
+                SimpleDecision::Action(s2, kept_reasons)
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -98,13 +115,17 @@ pub struct Decision {
 }
 
 impl Decision {
-    pub fn skip(initiator: Initiator, location: HashSet<Location>) -> Self {
+    pub fn skip(id: String, name: String, initiator: Initiator, location: Location) -> Self {
         Decision {
             maction: None,
             reasons: vec![BlockReason {
+                id,
+                name,
                 initiator,
                 location,
-                decision: BDecision::Skip,
+                action: RawActionType::Skip,
+                extra_locations: Vec::new(),
+                extra: serde_json::Value::Null,
             }],
         }
     }
@@ -128,7 +149,7 @@ impl Decision {
     /// is the action final (no further processing)
     pub fn is_final(&self) -> bool {
         self.maction.as_ref().map(|a| a.atype.is_final()).unwrap_or(false)
-            || self.reasons.iter().any(|r| r.decision == BDecision::Skip)
+            || self.reasons.iter().any(|r| r.action.is_final())
     }
 
     pub fn response_json(&self) -> String {
@@ -182,10 +203,7 @@ pub async fn jsonlog(
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
             match jsonlog_rinfo(dec, rinfo, status_code, tags, stats, logs, proxy, &now) {
-                Err(rr) => {
-                    println!("JSON creation error: {}", rr);
-                    (b"null".to_vec(), now)
-                }
+                Err(_) => (b"null".to_vec(), now),
                 Ok(y) => (y, now),
             }
         }
@@ -204,7 +222,11 @@ pub fn jsonlog_rinfo(
     proxy: HashMap<String, String>,
     now: &chrono::DateTime<chrono::Utc>,
 ) -> serde_json::Result<Vec<u8>> {
-    let block_reason_desc = BlockReason::block_reason_desc(&dec.reasons);
+    let block_reason_desc = if dec.is_final() {
+        BlockReason::block_reason_desc(&dec.reasons)
+    } else {
+        None
+    };
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
 
@@ -212,33 +234,36 @@ pub fn jsonlog_rinfo(
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
     let mut map_ser = ser.serialize_map(None)?;
     map_ser.serialize_entry("timestamp", now)?;
+    //     map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
     map_ser.serialize_entry("request_id", &request_id)?;
     map_ser.serialize_entry("arguments", &rinfo.rinfo.qinfo.args)?;
-    // TODO BQ
-    // map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
+    map_ser.serialize_entry("path", &rinfo.rinfo.qinfo.qpath)?;
     map_ser.serialize_entry("path_parts", &rinfo.rinfo.qinfo.path_as_map)?;
     map_ser.serialize_entry("authority", &rinfo.rinfo.host)?;
     map_ser.serialize_entry("cookies", &rinfo.cookies)?;
     map_ser.serialize_entry("headers", &rinfo.headers)?;
     if !rinfo.plugins.is_empty() {
-        // TODO BQ
-        // map_ser.serialize_entry("plugins", &rinfo.plugins)?;
+        map_ser.serialize_entry("plugins", &rinfo.plugins)?;
     }
-    map_ser.serialize_entry("uri", &rinfo.rinfo.meta.path)?;
+    map_ser.serialize_entry("query", &rinfo.rinfo.qinfo.query)?;
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
     map_ser.serialize_entry("response_code", &rcode)?;
     map_ser.serialize_entry("logs", logs)?;
     map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
+
     map_ser.serialize_entry("acl_triggers", get_trigger(&InitiatorKind::Acl))?;
-    map_ser.serialize_entry("rate_limit_triggers", get_trigger(&InitiatorKind::RateLimit))?;
-    map_ser.serialize_entry("global_filter_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
-    map_ser.serialize_entry("content_filter_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
+    map_ser.serialize_entry("rl_triggers", get_trigger(&InitiatorKind::RateLimit))?;
+    map_ser.serialize_entry("gf_triggers", get_trigger(&InitiatorKind::GlobalFilter))?;
+    map_ser.serialize_entry("cf_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
+    map_ser.serialize_entry("cf_restrict_triggers", get_trigger(&InitiatorKind::Restriction))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
 
+    let branch_tag = tags.inner().keys().filter_map(|t| t.strip_prefix("branch:")).next();
+    map_ser.serialize_entry("branch", &branch_tag)?;
     // it's too bad one can't directly write the recursive structures from just the serializer object
     // that's why there are several one shot structures for nested data:
     struct LogTags<'t> {
@@ -287,7 +312,7 @@ pub fn jsonlog_rinfo(
 
     struct LogProxy<'t> {
         p: &'t HashMap<String, String>,
-        l: &'t Option<(f64, f64)>,
+        geo: &'t GeoIp,
         n: &'t Option<String>,
     }
     impl<'t> Serialize for LogProxy<'t> {
@@ -301,11 +326,51 @@ pub fn jsonlog_rinfo(
             }
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "geo_long",
-                value: self.l.as_ref().map(|x| x.0),
+                value: self.geo.location.as_ref().map(|x| x.0),
             })?;
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "geo_lat",
-                value: self.l.as_ref().map(|x| x.1),
+                value: self.geo.location.as_ref().map(|x| x.1),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_name",
+                value: self.geo.as_name.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_domain",
+                value: self.geo.as_domain.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_as_type",
+                value: self.geo.as_type.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_country",
+                value: self.geo.company_country.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_domain",
+                value: self.geo.company_domain.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_company_type",
+                value: self.geo.company_type.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_carrier",
+                value: self.geo.mobile_carrier_name.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_country",
+                value: self.geo.mobile_country.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_mcc",
+                value: self.geo.mobile_mcc.as_ref(),
+            })?;
+            sq.serialize_element(&crate::utils::json::BigTableKV {
+                name: "geo_mobile_mnc",
+                value: self.geo.mobile_mnc.as_ref(),
             })?;
             sq.serialize_element(&crate::utils::json::BigTableKV {
                 name: "container",
@@ -318,12 +383,12 @@ pub fn jsonlog_rinfo(
         "proxy",
         &LogProxy {
             p: &proxy,
-            l: &rinfo.rinfo.geoip.location,
+            geo: &rinfo.rinfo.geoip,
             n: &rinfo.rinfo.container_name,
         },
     )?;
 
-    struct SecurityConfig<'t>(&'t Stats);
+    struct SecurityConfig<'t>(&'t Stats, &'t SecurityPolicy);
     impl<'t> Serialize for SecurityConfig<'t> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -334,12 +399,14 @@ pub fn jsonlog_rinfo(
             mp.serialize_entry("acl_active", &self.0.secpol.acl_enabled)?;
             mp.serialize_entry("cf_active", &self.0.secpol.content_filter_enabled)?;
             mp.serialize_entry("cf_rules", &self.0.content_filter_total)?;
-            mp.serialize_entry("rate_limit_rules", &self.0.secpol.limit_amount)?;
-            mp.serialize_entry("global_filters_active", &self.0.secpol.globalfilters_amount)?;
+            mp.serialize_entry("rl_rules", &self.0.secpol.limit_amount)?;
+            mp.serialize_entry("gf_rules", &self.0.secpol.globalfilters_amount)?;
+            mp.serialize_entry("secpolid", &self.1.policy.id)?;
+            mp.serialize_entry("secpolentryid", &self.1.entry.id)?;
             mp.end()
         }
     }
-    map_ser.serialize_entry("security_config", &SecurityConfig(stats))?;
+    map_ser.serialize_entry("security_config", &SecurityConfig(stats, &rinfo.rinfo.secpolicy))?;
 
     struct TriggerCounters<'t>(&'t HashMap<InitiatorKind, Vec<&'t BlockReason>>);
     impl<'t> Serialize for TriggerCounters<'t> {
@@ -347,26 +414,24 @@ pub fn jsonlog_rinfo(
         where
             S: Serializer,
         {
-            let stats_counter = |kd: InitiatorKind| -> (usize, usize) {
+            let stats_counter = |kd: InitiatorKind| -> usize {
                 match self.0.get(&kd) {
-                    None => (0, 0),
-                    Some(v) => (v.len(), v.iter().filter(|r| r.decision == BDecision::Blocking).count()),
+                    None => 0,
+                    Some(v) => v.len(),
                 }
             };
-            let (acl, acl_active) = stats_counter(InitiatorKind::Acl);
-            let (global_filters, global_filters_active) = stats_counter(InitiatorKind::GlobalFilter);
-            let (rate_limit, rate_limit_active) = stats_counter(InitiatorKind::RateLimit);
-            let (content_filters, content_filters_active) = stats_counter(InitiatorKind::ContentFilter);
+            let acl = stats_counter(InitiatorKind::Acl);
+            let global_filters = stats_counter(InitiatorKind::GlobalFilter);
+            let rate_limit = stats_counter(InitiatorKind::RateLimit);
+            let content_filters = stats_counter(InitiatorKind::ContentFilter);
+            let restriction = stats_counter(InitiatorKind::Restriction);
 
             let mut mp = serializer.serialize_map(None)?;
             mp.serialize_entry("acl", &acl)?;
-            mp.serialize_entry("acl_active", &acl_active)?;
-            mp.serialize_entry("global_filters", &global_filters)?;
-            mp.serialize_entry("global_filters_active", &global_filters_active)?;
-            mp.serialize_entry("rate_limit", &rate_limit)?;
-            mp.serialize_entry("rate_limit_active", &rate_limit_active)?;
-            mp.serialize_entry("content_filters", &content_filters)?;
-            mp.serialize_entry("content_filters_active", &content_filters_active)?;
+            mp.serialize_entry("gf", &global_filters)?;
+            mp.serialize_entry("rl", &rate_limit)?;
+            mp.serialize_entry("cf", &content_filters)?;
+            mp.serialize_entry("cf_restrict", &restriction)?;
             mp.end()
         }
     }
@@ -416,7 +481,7 @@ pub enum SimpleActionT {
     Skip,
     Monitor,
     Custom { content: String },
-    Challenge,
+    Challenge { ch_level: GHMode },
 }
 
 impl SimpleActionT {
@@ -424,9 +489,20 @@ impl SimpleActionT {
         use SimpleActionT::*;
         match self {
             Custom { content: _ } => 8,
-            Challenge => 6,
+            Challenge { ch_level: _ } => 6,
             Monitor => 1,
             Skip => 9,
+        }
+    }
+
+    pub fn rate_limit_priority(&self) -> u32 {
+        use SimpleActionT::*;
+        match self {
+            Custom { content: _ } => 8,
+            Challenge { .. } => 6,
+            Monitor => 1,
+            // skip action should be ignored when using with rate limit
+            Skip => 0,
         }
     }
 
@@ -434,11 +510,18 @@ impl SimpleActionT {
         !matches!(self, SimpleActionT::Monitor)
     }
 
-    pub fn to_bdecision(&self) -> BDecision {
+    pub fn to_raw(&self) -> RawActionType {
         match self {
-            SimpleActionT::Skip => BDecision::Skip,
-            SimpleActionT::Monitor => BDecision::Monitor,
-            SimpleActionT::Challenge | SimpleActionT::Custom { content: _ } => BDecision::Blocking,
+            SimpleActionT::Skip => RawActionType::Skip,
+            SimpleActionT::Monitor => RawActionType::Monitor,
+            SimpleActionT::Custom { .. } => RawActionType::Custom,
+            SimpleActionT::Challenge { ch_level } => {
+                if ch_level == &GHMode::Active {
+                    RawActionType::Challenge
+                } else {
+                    RawActionType::Ichallenge
+                }
+            }
         }
     }
 }
@@ -534,7 +617,12 @@ impl SimpleAction {
             RawActionType::Custom => SimpleActionT::Custom {
                 content: rawaction.params.content.clone().unwrap_or_default(),
             },
-            RawActionType::Challenge => SimpleActionT::Challenge,
+            RawActionType::Challenge => SimpleActionT::Challenge {
+                ch_level: GHMode::Active,
+            },
+            RawActionType::Ichallenge => SimpleActionT::Challenge {
+                ch_level: GHMode::Interactive,
+            },
         };
         let status = rawaction.params.status.unwrap_or(503);
         let headers = rawaction.params.headers.as_ref().map(|hm| {
@@ -559,9 +647,16 @@ impl SimpleAction {
         ))
     }
 
-    /// returns None when it is a challenge, Some(action) otherwise
-    fn to_action(&self, rinfo: &RequestInfo, tags: &Tags, is_human: bool) -> Option<Action> {
+    /// returns Err(reasons) when it is a challenge, Ok(decision) otherwise
+    fn build_decision(
+        &self,
+        rinfo: &RequestInfo,
+        tags: &Tags,
+        precision_level: PrecisionLevel,
+        reason: Vec<BlockReason>,
+    ) -> Result<Decision, Vec<BlockReason>> {
         let mut action = Action::default();
+        let mut reason = reason;
         action.block_mode = action.atype.is_blocking();
         action.status = self.status;
         action.headers = self.headers.as_ref().map(|hm| {
@@ -576,19 +671,33 @@ impl SimpleAction {
                 action.atype = ActionType::Block;
                 action.content = content.clone();
             }
-            SimpleActionT::Challenge => {
+            SimpleActionT::Challenge { ch_level } => {
+                let is_human = match ch_level {
+                    GHMode::Passive => precision_level.is_human(),
+                    GHMode::Active => precision_level.is_human(),
+                    GHMode::Interactive => precision_level.is_interactive(),
+                };
                 if !is_human {
-                    return None;
+                    return Err(reason);
                 }
                 action.atype = ActionType::Monitor;
+                // clean up challenge reasons
+                for r in reason.iter_mut() {
+                    r.action.inactive()
+                }
             }
         }
-        Some(action)
+        if action.atype == ActionType::Monitor {
+            action.status = 200;
+            action.block_mode = false;
+        }
+        Ok(Decision::action(action, reason))
     }
 
     pub fn to_decision<GH: Grasshopper>(
         &self,
-        is_human: bool,
+        logs: &mut Logs,
+        precision_level: PrecisionLevel,
         mgh: Option<&GH>,
         rinfo: &RequestInfo,
         tags: &mut Tags,
@@ -603,14 +712,21 @@ impl SimpleAction {
                 reasons: reason,
             };
         }
-        let action = match self.to_action(rinfo, tags, is_human) {
-            None => match (mgh, rinfo.headers.get("user-agent")) {
-                (Some(gh), Some(ua)) => return challenge_phase01(gh, ua, reason),
-                _ => Action::default(),
+        match self.build_decision(rinfo, tags, precision_level, reason) {
+            Err(nreason) => match mgh {
+                //if None-must be one of the challenge actions
+                Some(gh) => {
+                    let ch_mode = match &self.atype {
+                        SimpleActionT::Challenge { ch_level } => *ch_level,
+                        _ => GHMode::Active,
+                    };
+                    logs.debug(|| format!("Call challenge phase01 with mode: {:?}", ch_mode));
+                    challenge_phase01(gh, logs, rinfo, nreason, ch_mode)
+                }
+                _ => Decision::action(Action::default(), nreason),
             },
-            Some(a) => a,
-        };
-        Decision::action(action, reason)
+            Ok(a) => a,
+        }
     }
 
     pub fn is_blocking(&self) -> bool {

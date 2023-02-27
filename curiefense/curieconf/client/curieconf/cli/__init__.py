@@ -1,12 +1,18 @@
 #! /usr/bin/env python
+import hashlib
+import logging
 import os
 import sys
 import argparse
-import datetime
 import traceback
 import io
 import json
+import subprocess
 from enum import Enum
+from google.cloud import storage
+import base64
+from typing import List, Optional
+
 
 import typer
 import yaml
@@ -41,8 +47,17 @@ def output(raw, err=False):
         typer.echo(formatted, err=err)
 
 
+def get_md5(file_path):
+    hasher = hashlib.md5()
+    with open(file_path, "rb") as content:
+        hasher.update(content.read())
+        return hasher.hexdigest()
+
+
 BlobsEnum = Enum("Blobs", {name: name for name in utils.BLOBS_PATH})
 DocsEnum = Enum("Docs", {name: name for name in utils.DOCUMENTS_PATH})
+
+logger = logging.getLogger("curiesync_pull")
 
 
 ###############
@@ -460,6 +475,49 @@ def push(source_path: str, target_url: str, version: str = ""):
     cloud.upload_manifest(manifest, bucket, target_path, version)
 
 
+class ConfigReloads:
+    inner: Optional[List[str]] = None
+
+    def add(self, f: str):
+        # if the list is empty, is means all files must be reloaded, so we keep it that way
+        if self.inner is None:
+            self.inner = [f]
+        elif self.inner:
+            self.inner.append(f)
+
+    def change_all(self):
+        self.inner = []
+
+
+@sync.command()
+def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
+    client = storage.Client(project=project)
+
+    os.makedirs(target_path, exist_ok=True)
+
+    for ipinfo_blob in [*(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir))]:
+        file_name = ipinfo_blob.name.split("/")[-1]
+        if not os.path.isfile(target_path + file_name):
+            try:
+                ipinfo_blob.download_to_filename(target_path + file_name)
+            except Exception as ex:
+                logger.error(f"failed downloading {file_name} - {ex}")
+                continue
+            logger.info(f"downloaded {file_name} to {target_path}")
+        else:
+            remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
+            local_md5 = get_md5(target_path + file_name)
+            if not local_md5 == remote_md5:
+                try:
+                    ipinfo_blob.download_to_filename(target_path + file_name)
+                except Exception as ex:
+                    logger.error(f"failed downloading {file_name} - {ex}")
+                    continue
+
+            else:
+                logger.info(f"{target_path} already contains the updated {file_name}")
+
+
 @sync.command()
 def pull(
     manifest_url: str,
@@ -480,8 +538,6 @@ def pull(
     pool_path = os.path.join(target_path, "_pool")
     os.makedirs(pool_path, exist_ok=True)
 
-    changes = 0
-
     # download manifest
     manif = io.BytesIO()
     try:
@@ -500,6 +556,8 @@ def pull(
 
     open(os.path.join(conf_path, "manifest.json"), "w").write(manifest_str)
 
+    reloads = ConfigReloads()
+
     # synchronize pool
     for fname, h in manifest["files"].items():
         pool_file = os.path.join(pool_path, h)
@@ -512,7 +570,7 @@ def pull(
                 typer.echo(f"ERROR: Manifest {blobpath} does not exist")
                 raise typer.Exit(code=1)
             blob.download(pool_file)
-            changes += 1
+            reloads.add(fname)
         if os.path.isabs(fname):
             fname = fname[1:]
         conf_file = os.path.join(conf_path, fname)
@@ -527,13 +585,13 @@ def pull(
             except FileNotFoundError:
                 pass
             os.symlink(rel_link, conf_file)
-            changes += 1
+            reloads.add(fname)
         else:
             if old_link != rel_link:
                 # ~atomic symlink replacement
                 os.symlink(rel_link, conf_file + ".tmp")
                 os.replace(conf_file + ".tmp", conf_file)
-                changes += 1
+                reloads.add(fname)
     current_conf = os.path.join(target_path, "current")
     new_conf = os.path.relpath(conf_path, target_path)
     try:
@@ -544,16 +602,17 @@ def pull(
         except FileNotFoundError:
             pass
         os.symlink(new_conf, current_conf)
-        changes += 1
+        reloads.change_all()
     else:
         if old_conf != new_conf:
             # ~atomic symlink replacement
             os.symlink(new_conf, current_conf + ".tmp")
             os.replace(current_conf + ".tmp", current_conf)
-            changes += 1
+            reloads.change_all()
 
-    if changes and on_conf_change:
-        os.system(on_conf_change)
+    if reloads.inner is not None:
+        if on_conf_change:
+            subprocess.run([on_conf_change, json.dumps(reloads.inner)])
 
 
 ###########

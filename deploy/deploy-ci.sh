@@ -40,12 +40,13 @@ nohup minikube tunnel > "$LOGS_DIR/minikube-tunnel.log" &
 pushd deploy/istio-helm || exit
 ./deploy.sh -f charts/use-local-bucket.yaml -f charts/values-istio-ci.yaml
 sleep 10
+kubectl apply -f set-xff-2-hops.yaml
 popd || exit
 
 PARAMS=()
 
 pushd deploy/curiefense-helm || exit
-./deploy.sh -f use-local-bucket.yaml -f e2e-ci.yaml "${PARAMS[@]}" "$@"
+./deploy.sh -f use-local-bucket.yaml --set 'global.images.uiserver=curiefense/uiserver:main' -f e2e-ci.yaml "${PARAMS[@]}" "$@"
 
 # Expose services
 # No need to pass the namespace as it's already
@@ -64,7 +65,7 @@ INGRESS_HOST=$(minikube ip)
 INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].nodePort}')
 URL=$INGRESS_HOST:$INGRESS_PORT
 
-while ! curl -fsS "http://$URL/productpage" | grep -q "command=GET";
+while ! curl -fsS "http://$URL/productpage" | grep "GET /productpage";
 do
     if [[ $(date -u +%s) -ge $endtime ]];
     then

@@ -36,7 +36,7 @@ local function custom_response(handle, action_params)
         handle.status = status
     end
 
-    handle.log(handle.ERR, cjson.encode(action_params))
+    handle.log(handle.DEBUG, cjson.encode(action_params))
 
     if block_mode then
         if action_params["content"] then handle.say(action_params["content"]) end
@@ -90,7 +90,9 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
     --   * path : the full request uri
     --   * method : the HTTP verb
     --   * authority : optionally, the HTTP2 authority field
-    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil }
+    --   * scheme: http / https
+    local meta = { path=handle.var.request_uri, method=handle.req.get_method(), authority=nil,
+            scheme=handle.var.scheme }
     local params = {loglevel=loglevel, meta=meta, headers=headers, body=body_content,
             ip=handle.var.remote_addr, hops=HOPS, plugins=plugins}
 
@@ -107,37 +109,22 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
     if not res.decided then
         -- handle flow / limit
         local flows = res.flows
-        local limits = res.limits
         local rflows = {}
         local rlimits = {}
+        local red = nil
 
         -- TODO: avoid connecting to redis when there are no flows and all limits are zero limits
-        if not rawequal(next(flows), nil) or not rawequal(next(limits), nil) then
+        if not rawequal(next(flows), nil) then
             -- Redis required
-            local red = redis_connect(handle)
+            red = redis_connect(handle)
             red:init_pipeline()
             for _, flow in pairs(flows) do
                 red:llen(flow.key)
-            end
-            for _, limit in pairs(limits) do
-                local key = limit.key
-                if not limit.zero_limits then
-                    local pw = limit.pairwith
-                    if pw then
-                        red:sadd(key, pw)
-                        red:scard(key)
-                        red:ttl(key)
-                    else
-                        red:incr(key)
-                        red:ttl(key)
-                    end
-                end
             end
             local results, redis_err = red:commit_pipeline()
             if redis_err or not results then
                 handle.log(handle.ERR, "failed to run redis calls: " .. redis_err)
                 flows = {}
-                limits = {}
             end
 
             local result_idx = 1
@@ -165,6 +152,38 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
                 end
                 table.insert(rflows, flow:result(flowtype))
             end
+        end
+
+        local r2 = curiefense.inspect_request_flows(res, rflows)
+        local limits = r2.limits
+
+        if not rawequal(next(limits), nil) then
+            if red == nil then
+                red = redis_connect(handle)
+            end
+            red:init_pipeline()
+
+            for _, limit in pairs(limits) do
+                local key = limit.key
+                if not limit.zero_limits then
+                    local pw = limit.pairwith
+                    if pw then
+                        red:sadd(key, pw)
+                        red:scard(key)
+                        red:ttl(key)
+                    else
+                        red:incr(key)
+                        red:ttl(key)
+                    end
+                end
+            end
+            local results, redis_err = red:commit_pipeline()
+            if redis_err or not results then
+                handle.log(handle.ERR, "failed to run redis calls: " .. redis_err)
+                limits = {}
+            end
+
+            local result_idx = 1
 
             red:init_pipeline()
             for _, limit in pairs(limits) do
@@ -193,7 +212,7 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
             red:set_keepalive(300000, 360)
         end
 
-        res = curiefense.inspect_request_process(res, rflows, rlimits)
+        res = curiefense.inspect_request_process(r2, rlimits)
         if res.error then
             handle.log(handle.ERR, sfmt("curiefense.inspect_request_process error %s", res.error))
         end
