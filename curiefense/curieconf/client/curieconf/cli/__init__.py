@@ -495,21 +495,26 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
     os.makedirs(target_path, exist_ok=True)
 
-
     for ipinfo_blob in [*(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir))]:
         remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
         file_name = ipinfo_blob.name.split("/")[-1]
         if not os.path.isfile(target_path + file_name):
             try:
                 ipinfo_blob.download_to_filename(target_path + file_name)
-                with open(target_path+file_name.split(".")[0]+"_hash", "w") as hash_file:
+                with open(
+                    target_path + file_name.split(".")[0] + "_hash", "w"
+                ) as hash_file:
                     hash_file.write(remote_md5)
             except Exception as ex:
-                typer.echo(f"failed downloading {file_name} - {ex}", )
+                typer.echo(
+                    f"failed downloading {file_name} - {ex}",
+                )
                 continue
             typer.echo(f"downloaded {file_name} to {target_path}")
         else:
-            with open(target_path+file_name.split(".")[0]+"_hash", "r+") as hash_file:
+            with open(
+                target_path + file_name.split(".")[0] + "_hash", "r+"
+            ) as hash_file:
 
                 remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
                 local_md5 = hash_file.readline().rstrip()
@@ -524,8 +529,9 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
                         continue
 
                 else:
-                    typer.echo(f"{target_path} already contains the updated {file_name}")
-
+                    typer.echo(
+                        f"{target_path} already contains the updated {file_name}"
+                    )
 
 
 @sync.command()
