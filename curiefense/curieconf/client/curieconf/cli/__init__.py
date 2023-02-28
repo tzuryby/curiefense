@@ -495,6 +495,7 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
     os.makedirs(target_path, exist_ok=True)
 
+
     for ipinfo_blob in [*(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir))]:
         remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
         file_name = ipinfo_blob.name.split("/")[-1]
@@ -664,5 +665,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-    pullipinfo("rbz-internal", "rbz-dev-auto-acl", "ipinfo", "/tmp/ipinfo/")
+    main()
