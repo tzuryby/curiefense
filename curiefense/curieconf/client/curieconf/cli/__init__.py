@@ -515,7 +515,6 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
             with open(
                 target_path + file_name.split(".")[0] + "_hash", "r+"
             ) as hash_file:
-
                 remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
                 local_md5 = hash_file.readline().rstrip()
                 if not local_md5 == remote_md5:
