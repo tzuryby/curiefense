@@ -13,6 +13,7 @@ from pydantic import (
     Extra,
 )
 import jsonschema
+import bleach
 
 # monkey patch to force RestPlus to use Draft3 validator to benefit from "any" json type
 jsonschema.Draft4Validator = jsonschema.Draft3Validator
@@ -1041,7 +1042,13 @@ async def key_resource_delete(nsname: str, key: str, request: Request):
 async def fetch_resource_get(url: str):
     """Fetch an URL"""
     try:
+        if not url.startswith("https://"):
+            raise HTTPException(400, "forbidden url")
         r = requests.get(url)
+        r_string = r.content.decode()
+        if not bleach.clean(r_string) == r_string:
+            raise HTTPException(400, "forbidden url")
+
     except Exception as e:
         raise HTTPException(400, "cannot retrieve [%s]: %s" % (url, e))
     return r.content
