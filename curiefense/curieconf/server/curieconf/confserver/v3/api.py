@@ -11,6 +11,7 @@ from pydantic import (
     StrictBool,
     StrictInt,
     Extra,
+    HttpUrl
 )
 import jsonschema
 import bleach
@@ -1039,7 +1040,7 @@ async def key_resource_delete(nsname: str, key: str, request: Request):
 
 
 @router.get("/tools/fetch", tags=[Tags.tools])
-async def fetch_resource_get(url: str):
+async def fetch_resource_get(url: HttpUrl):
     """Fetch an URL"""
     try:
         if not url.startswith("https://"):
