@@ -502,9 +502,7 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
         if not os.path.isfile(target_path + file_name):
             try:
                 ipinfo_blob.download_to_filename(target_path + file_name)
-                with open(
-                        hash_file_name, "w"
-                ) as hash_file:
+                with open(hash_file_name, "w") as hash_file:
                     hash_file.write(remote_md5)
             except Exception as ex:
                 typer.echo(f"failed downloading {file_name} - {ex}", err=True)
