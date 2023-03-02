@@ -4,15 +4,7 @@ from enum import Enum
 from typing import Optional, List, Union
 
 from fastapi import Request, HTTPException, APIRouter
-from pydantic import (
-    BaseModel,
-    Field,
-    StrictStr,
-    StrictBool,
-    StrictInt,
-    Extra,
-    HttpUrl
-)
+from pydantic import BaseModel, Field, StrictStr, StrictBool, StrictInt, Extra, HttpUrl
 import jsonschema
 import bleach
 
