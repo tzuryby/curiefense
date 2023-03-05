@@ -9,6 +9,7 @@ import io
 import json
 import subprocess
 from enum import Enum
+from pathlib import Path
 from google.cloud import storage
 import base64
 from typing import List, Optional
@@ -497,8 +498,9 @@ def pullipinfo(project: str, bucket: str, ipinfo_dir: str, target_path: str):
 
     for ipinfo_blob in [*(client.list_blobs(bucket_or_name=bucket, prefix=ipinfo_dir))]:
         remote_md5 = base64.b64decode(ipinfo_blob.md5_hash).hex()
-        file_name = ipinfo_blob.name.split("/")[-1]
-        hash_file_name = target_path + file_name.split(".")[0] + "_hash"
+        path = Path(ipinfo_blob.name)
+        file_name = path.name
+        hash_file_name = target_path + path.stem + "_hash"
         if not os.path.isfile(target_path + file_name):
             try:
                 ipinfo_blob.download_to_filename(target_path + file_name)
