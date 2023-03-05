@@ -20,8 +20,10 @@ fi
 if [ "$RUN_MODE" = "SYNC_ONCE" ]; then
     info "Synchronizing once"
     curieconfctl sync pull "${CURIE_BUCKET_LINK}" /cf-config
-    curieconfctl sync pullipinfo rbz-internal rbz-dev-auto-acl ipinfo /cf-config/ipinfo/
-
+    if [ "$USE_IPINFO" = "true" ]
+    then
+      curieconfctl sync pullipinfo "${IPINFO_PROJECT}" "${IPINFO_REMOTE_BUCKET}" "${IPINFO_REMOTE_DIR}" /cf-config/ipinfo/
+    fi
     exit 0
 fi
 
@@ -49,8 +51,11 @@ if [ "$RUN_MODE" = "PERIODIC_SYNC" ] || [ -z "$RUN_MODE" ]; then
     while :;
     do
         info "Pulling ${CURIE_BUCKET_LINK}"
-        curieconfctl sync pullipinfo rbz-internal rbz-dev-auto-acl ipinfo /cf-config/ipinfo/
         curieconfctl sync pull "${CURIE_BUCKET_LINK}" /cf-config --on-conf-change "$CONFIGCHANGE"
+        if [ "$USE_IPINFO" = "true" ]
+        then
+          curieconfctl sync pullipinfo "${IPINFO_PROJECT}" "${IPINFO_REMOTE_BUCKET}" "${IPINFO_REMOTE_DIR}" /cf-config/ipinfo/
+        fi
         info "Sleeping"
         sleep $PERIOD
     done
