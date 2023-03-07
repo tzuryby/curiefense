@@ -376,9 +376,7 @@ class GitBackend(CurieBackend):
                     if docname in addd:
                         doc = self.update_doc(doc, addd[docname])
                     if docname in deld:
-                        deleid = {
-                            eid for eid, val in deld[docname].items() if val is True
-                        }
+                        deleid = {entry["id"] for entry in deld[docname]}
                         doc = [entry for entry in doc if entry["id"] not in deleid]
                     self.add_document(docname, doc)
             self.commit("Update config [%s]%s" % (config, renamed), actor=actor)

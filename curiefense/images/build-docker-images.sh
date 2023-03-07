@@ -30,7 +30,7 @@ IFS=' ' read -ra RUST_DISTROS <<< "${RUST_DISTROS:-bionic focal jammy}"
 if [ -n "$TESTIMG" ]; then
     IMAGES=("$TESTIMG")
     OTHER_IMAGES_DOCKER_TAG="$DOCKER_TAG"
-    DOCKER_TAG="test"
+    DOCKER_TAG="main"
     echo "Building only image $TESTIMG"
 else
     IMAGES=(confserver curieproxy-istio curieproxy-envoy \
