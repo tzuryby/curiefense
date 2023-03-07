@@ -1,22 +1,24 @@
 import datetime
 import typing
-from enum import Enum
-from typing import Optional, List, Union
-
-from fastapi import Request, HTTPException, APIRouter
-from pydantic import BaseModel, Field, StrictStr, StrictBool, StrictInt, Extra, HttpUrl
+import os
+import requests
+import json
 import jsonschema
 import bleach
+from jsonschema import validate
+from pathlib import Path
+from enum import Enum
+from typing import Optional, List, Union
+from fastapi import Request, HTTPException, APIRouter, Header
+from pydantic import BaseModel, Field, StrictStr, StrictBool, StrictInt, Extra, HttpUrl
+
+from curieconf.utils import cloud
+
 
 # monkey patch to force RestPlus to use Draft3 validator to benefit from "any" json type
 jsonschema.Draft4Validator = jsonschema.Draft3Validator
 
-# from curieconf import utils
-from curieconf.utils import cloud
-
 # TODO: TEMP DEFINITIONS
-import os
-
 router = APIRouter(prefix="/api/v3")
 options = {}
 val = os.environ.get("CURIECONF_TRUSTED_USERNAME_HEADER", None)
@@ -26,10 +28,6 @@ val = os.environ.get("CURIECONF_TRUSTED_EMAIL_HEADER", None)
 if val:
     options["trusted_email_header"] = val
 
-import requests
-from jsonschema import validate
-from pathlib import Path
-import json
 
 ##############
 ### MODELS ###
@@ -54,24 +52,24 @@ class Limit(BaseModel):
     global_: StrictBool = Field(alias="global")
     active: StrictBool
     timeframe: StrictInt
-    thresholds: List[Threshold]
+    thresholds: Optional[List[Threshold]]
     include: typing.Any
     exclude: typing.Any
     key: anyTypeUnion
     pairwith: typing.Any
-    tags: List[StrictStr]
+    tags: Optional[List[StrictStr]]
 
 
 # securitypolicy
 class SecProfileMap(BaseModel):
-    id: StrictStr = None
-    name: StrictStr = None
+    id: StrictStr
+    name: StrictStr
     description: Optional[StrictStr]
-    match: StrictStr = None
-    acl_profile: StrictStr = None
-    acl_active: StrictBool = None
-    content_filter_profile: StrictStr = None
-    content_filter_active: StrictBool = None
+    match: StrictStr
+    acl_profile: StrictStr
+    acl_active: StrictBool
+    content_filter_profile: StrictStr
+    content_filter_active: StrictBool
     limit_ids: Optional[list]
 
 
@@ -146,7 +144,7 @@ class GlobalFilter(BaseModel):
     name: StrictStr
     source: StrictStr
     mdate: StrictStr
-    description: StrictStr
+    description: Optional[StrictStr]
     active: StrictBool
     action: typing.Any
     tags: Optional[List[StrictStr]]
@@ -250,7 +248,6 @@ class VersionLog(BaseModel, extra=Extra.allow):
     version: Optional[StrictStr]
     # TODO - dt_format="iso8601"
     date: Optional[datetime.datetime]
-    # star_: Optional[List[typing.Any]] = Field(alias="*")
 
 
 class Meta(BaseModel):
@@ -502,8 +499,9 @@ async def config_clone_name_post(
     return request.app.backend.configs_clone(config, data, new_name)
 
 
+# Meant to mimick flask https://flask-restx.readthedocs.io/en/latest/mask.html functionality
+# filtering only keys requested in X-Fields header. (works only for non-nested keys)
 def filter_x_fields(res, x_fields):
-    fields = []
     if x_fields.startswith(("[", "{", "(")):
         x_fields = x_fields[1:-1]
     x_fields = x_fields.replace(" ", "")
@@ -518,12 +516,13 @@ def filter_x_fields(res, x_fields):
     "/configs/{config}/v/",
     tags=[Tags.congifs],
 )
-async def config_list_version_get(config: str, request: Request):
+async def config_list_version_get(config: str, request: Request,
+                                  x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
     """Get all versions of a given configuration"""
     res = request.app.backend.configs_list_versions(config)
 
-    if request.headers.get("X-fields", False):
-        res = filter_x_fields(res, request.headers["X-fields"])
+    if x_fields:
+        res = filter_x_fields(res, x_fields)
     return res
 
 
@@ -591,11 +590,12 @@ async def blob_resource_delete(config: str, blob: str, request: Request):
 
 
 @router.get("/configs/{config}/b/{blob}/v/", tags=[Tags.congifs])
-async def blob_list_version_resource_get(config: str, blob: str, request: Request):
+async def blob_list_version_resource_get(config: str, blob: str, request: Request,
+                                         x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
     """Retrieve the list of versions of a given blob"""
     res = request.app.backend.blobs_list_versions(config, blob)
-    if request.headers.get("X-fields", False):
-        res = filter_x_fields(res, request.headers["X-fields"])
+    if x_fields:
+        res = filter_x_fields(res, x_fields)
     return res
 
 
@@ -605,14 +605,15 @@ async def blob_list_version_resource_get(config: str, blob: str, request: Reques
     response_model=BlobEntry,
 )
 async def blob_version_resource_get(
-    config: str, blob: str, version: str, request: Request
+    config: str, blob: str, version: str, request: Request,
+        x_fields: Optional[str] = Header(default=None, alias="X-Fields")
 ):
     """Retrieve the given version of a blob"""
 
     res = request.app.backend.blobs_get(config, blob, version)
-    if request.headers.get("X-fields", False):
-        res = filter_x_fields([res], request.headers["X-fields"])
-    return request.app.backend.blobs_get(config, blob, version)
+    if x_fields:
+        res = filter_x_fields([res], x_fields)
+    return res
 
 
 @router.put("/configs/{config}/b/{blob}/v/{version}/revert/", tags=[Tags.congifs])
@@ -640,26 +641,16 @@ async def document_resource_get(config: str, request: Request):
 
 
 @router.get("/configs/{config}/d/{document}/", tags=[Tags.congifs])
-async def document_resource_get(config: str, document: str, request: Request):
-    def filter_document_mask(res, x_fields):
-        fields = []
-        if x_fields:
-            if x_fields.startswith(("[", "{", "(")):
-                x_fields = x_fields[1:-1]
-            x_fields = x_fields.replace(" ", "")
-            fields = x_fields.split(",")
-            return [{field: r[field] for field in fields if field in r} for r in res]
-        else:
-            return res
-
+async def document_resource_get(config: str, document: str, request: Request,
+                                x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
     """Get a complete document"""
-
-    headers = request.headers
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
     res = request.app.backend.documents_get(config, document)
 
-    return filter_document_mask(res, headers.get("x-fields", None))
+    if x_fields:
+        res = filter_x_fields([res], x_fields)
+    return res
 
 
 async def _filter(data, keys):
@@ -742,7 +733,6 @@ async def document_list_version_resource_get(
     if document not in models:
         raise HTTPException(404, "document does not exist")
     res = request.app.backend.documents_list_versions(config, document)
-    # res_filtered = [{key: r[key] for key in list(VersionLog.__fields__.keys())} for r in res]
     return res
 
 
