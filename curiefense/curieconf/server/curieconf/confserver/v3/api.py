@@ -649,7 +649,7 @@ async def document_resource_get(config: str, document: str, request: Request,
     res = request.app.backend.documents_get(config, document)
 
     if x_fields:
-        res = filter_x_fields([res], x_fields)
+        res = filter_x_fields(res, x_fields)
     return res
 
 
