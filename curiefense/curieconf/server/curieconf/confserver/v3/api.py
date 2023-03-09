@@ -516,8 +516,11 @@ def filter_x_fields(res, x_fields):
     "/configs/{config}/v/",
     tags=[Tags.congifs],
 )
-async def config_list_version_get(config: str, request: Request,
-                                  x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
+async def config_list_version_get(
+    config: str,
+    request: Request,
+    x_fields: Optional[str] = Header(default=None, alias="X-Fields"),
+):
     """Get all versions of a given configuration"""
     res = request.app.backend.configs_list_versions(config)
 
@@ -590,8 +593,12 @@ async def blob_resource_delete(config: str, blob: str, request: Request):
 
 
 @router.get("/configs/{config}/b/{blob}/v/", tags=[Tags.congifs])
-async def blob_list_version_resource_get(config: str, blob: str, request: Request,
-                                         x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
+async def blob_list_version_resource_get(
+    config: str,
+    blob: str,
+    request: Request,
+    x_fields: Optional[str] = Header(default=None, alias="X-Fields"),
+):
     """Retrieve the list of versions of a given blob"""
     res = request.app.backend.blobs_list_versions(config, blob)
     if x_fields:
@@ -605,8 +612,11 @@ async def blob_list_version_resource_get(config: str, blob: str, request: Reques
     response_model=BlobEntry,
 )
 async def blob_version_resource_get(
-    config: str, blob: str, version: str, request: Request,
-        x_fields: Optional[str] = Header(default=None, alias="X-Fields")
+    config: str,
+    blob: str,
+    version: str,
+    request: Request,
+    x_fields: Optional[str] = Header(default=None, alias="X-Fields"),
 ):
     """Retrieve the given version of a blob"""
 
@@ -641,8 +651,12 @@ async def document_resource_get(config: str, request: Request):
 
 
 @router.get("/configs/{config}/d/{document}/", tags=[Tags.congifs])
-async def document_resource_get(config: str, document: str, request: Request,
-                                x_fields: Optional[str] = Header(default=None, alias="X-Fields")):
+async def document_resource_get(
+    config: str,
+    document: str,
+    request: Request,
+    x_fields: Optional[str] = Header(default=None, alias="X-Fields"),
+):
     """Get a complete document"""
     if document not in models:
         raise HTTPException(status_code=404, detail="document does not exist")
