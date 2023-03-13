@@ -13,6 +13,9 @@ fi
 echo "Config directory $TARGETDIR is empty"
 
 if [ -n "$IF_NO_CONFIG_PULL_FROM" ]; then
+	if [ -n "$CURIECONF_GIT_SSH_KEY_PATH" ]; then
+		export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -i $CURIECONF_GIT_SSH_KEY_PATH"
+	fi
 	echo "Cloning configuration from $IF_NO_CONFIG_PULL_FROM"
 	git clone --mirror "$IF_NO_CONFIG_PULL_FROM" "$TARGETDIR"
 	exit 0
