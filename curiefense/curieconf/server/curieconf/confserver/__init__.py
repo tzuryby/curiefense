@@ -26,12 +26,12 @@ async def startup():
 from .v3 import api as api_v3
 
 logging.basicConfig(
-    handlers=[logging.FileHandler("fastapi.log"), logging.StreamHandler()],
+    handlers=[logging.StreamHandler()],
     level=logging.INFO,
     format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("filters-maxmind")
+logger = logging.getLogger("confserver")
 
 
 @app.exception_handler(RequestValidationError)
@@ -87,17 +87,14 @@ def main(args=None):
 
     options = parser.parse_args(args)
 
-    # TODO - find replacements for got_request_exception and prometheus_flask_exporter
+    # TODO - find replacements for got_request_exception
     # if options.pdb:
     #     flask.got_request_exception.connect(drop_into_pdb)
-    # metrics = PrometheusMetrics(app)
 
     try:
         app.backend = Backends.get_backend(app, options.dbpath)
         app.options = options.__dict__
         uvicorn.run(app, host=options.host, port=options.port)
-
-    #        app.run(debug=options.debug, host=options.host, port=options.port)
     finally:
         pass
 
