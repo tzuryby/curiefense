@@ -196,9 +196,11 @@ pub async fn jsonlog(
     logs: &Logs,
     proxy: HashMap<String, String>,
 ) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
+    println!("***MOD in jsonlog");
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
     let status_code = rcode.or_else(|| proxy.get("status").and_then(|stt_str| stt_str.parse().ok()));
     let bytes_sent = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
+    println!("***MOD jsonlog bytes_sent: {:?}", bytes_sent);
     match mrinfo {
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
@@ -222,6 +224,7 @@ pub fn jsonlog_rinfo(
     proxy: HashMap<String, String>,
     now: &chrono::DateTime<chrono::Utc>,
 ) -> serde_json::Result<Vec<u8>> {
+    println!("***MOD in jsonlog_rinfo");
     let block_reason_desc = if dec.is_final() {
         BlockReason::block_reason_desc(&dec.reasons)
     } else {
@@ -236,6 +239,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("timestamp", now)?;
     //     map_ser.serialize_entry("@timestamp", now)?;
     map_ser.serialize_entry("curiesession", &rinfo.session)?;
+    println!("***MOD in jsonlog_rinfo after curiesession");
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
     map_ser.serialize_entry("request_id", &request_id)?;
@@ -448,7 +452,9 @@ pub fn jsonlog_rinfo(
         }
     }
     map_ser.serialize_entry("profiling", &stats.timing)?;
+    println!("***MOD in jsonlog_rinfo after last serialize_entry");
     SerializeMap::end(map_ser)?;
+    println!("***MOD in jsonlog_rinfo return Ok(outbuffer)");
     Ok(outbuffer)
 }
 
