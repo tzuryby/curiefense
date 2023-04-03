@@ -12,22 +12,15 @@ fi
 # The file that we are going to monitor
 confarchive=/cf-config/current/config/customconf.tar.gz
 
-# Store the initial md5sum of the file
-if [ -f "$confarchive" ]; then
-    # If the file exists, calculate its md5sum
-    original_md5=$(md5sum "$confarchive" | awk '{print $1}')
-else
-    # If the file does not exist, store an empty string
-    original_md5=""
-fi
+# Hashsum for the config file, empty to invoke initial loading
+original_md5=""
 
-while true
-do
+while true; do
 if [ -f "$confarchive" ]; then
     # Compare the current md5sum with the original
     current_md5=$(md5sum "$confarchive" | awk '{print $1}')
     if [ "$current_md5" != "$original_md5" ]; then
-        echo "watch-customconf: New copy of $confarchive found. calling reload script."
+        echo "watch-customconf: New copy of $confarchive found, reloading..."
         # If the md5sums are different, it means that the file has been modified, so call the reload script
         /usr/local/bin/nginx-conf-reload.sh &
         # Update the original md5sum
@@ -35,7 +28,7 @@ if [ -f "$confarchive" ]; then
     fi
     sleep 10; # Sleep for 10 seconds before checking the file again
 else
-    echo "watch-customconf: ${confarchive} missing" >&2
+    echo "watch-customconf: ${confarchive} is missing" >&2
     sleep 1; # Sleep for 1 second before checking the file again
 fi
 done
