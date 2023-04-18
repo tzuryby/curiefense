@@ -45,9 +45,14 @@ if [ -n "$IF_NO_CONFIG_INIT_FROM" ]; then
 	git checkout -b prod
 	rm -rf config
 	cp -R "$IF_NO_CONFIG_INIT_FROM/prod/." .
+	sed -i -e 's/TARGET_BRANCH/prod/g' config/json/globalfilter-lists.json
 	git add .
 	git commit -m "Create config [prod]"
 	git checkout -b stage
+	cp -R "$IF_NO_CONFIG_INIT_FROM/prod/." .
+	sed -i -e 's/TARGET_BRANCH/stage/g' config/json/globalfilter-lists.json
+	git add .
+	git commit -m "Override config [stage]"
 	git remote add db "$TARGETDIR"
 	git push --all db
 	cd ..
