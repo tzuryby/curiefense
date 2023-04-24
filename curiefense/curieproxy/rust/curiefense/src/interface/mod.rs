@@ -435,61 +435,42 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("security_config", &SecurityConfig(stats, &rinfo.rinfo.secpolicy))?;
 
     struct TriggerCounters<'t>(&'t HashMap<InitiatorKind, Vec<&'t BlockReason>>);
-    struct TriggerCountersCalculated {
-        acl: usize,
-        global_filters: usize,
-        rate_limit: usize,
-        content_filters: usize,
-        restriction: usize,
-    }
-
-    //calculate actual trigger counters to use later in multiple places
-    fn CalcTriggerCounters(trigger_counters: TriggerCounters) -> TriggerCountersCalculated {
-        let stats_counter = |kd: InitiatorKind| -> usize {
-            match trigger_counters.0.get(&kd) {
-                None => 0,
-                Some(v) => v.len(),
-            }
-        };
-        let acl = stats_counter(InitiatorKind::Acl);
-        let global_filters = stats_counter(InitiatorKind::GlobalFilter);
-        let rate_limit = stats_counter(InitiatorKind::RateLimit);
-        let content_filters = stats_counter(InitiatorKind::ContentFilter);
-        let restriction = stats_counter(InitiatorKind::Restriction);
-
-        let calculated = TriggerCountersCalculated {
-            acl,
-            global_filters,
-            rate_limit,
-            content_filters,
-            restriction,
-        };
-        return calculated;
-    }
-    let calculated_trigger_counters = CalcTriggerCounters(TriggerCounters(&greasons));
-
-    impl<'t> Serialize for TriggerCountersCalculated {
+    impl<'t> Serialize for TriggerCounters<'t> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
+            let stats_counter = |kd: InitiatorKind| -> usize {
+                match self.0.get(&kd) {
+                    None => 0,
+                    Some(v) => v.len(),
+                }
+            };
+            let acl = stats_counter(InitiatorKind::Acl);
+            let global_filters = stats_counter(InitiatorKind::GlobalFilter);
+            let rate_limit = stats_counter(InitiatorKind::RateLimit);
+            let content_filters = stats_counter(InitiatorKind::ContentFilter);
+            let restriction = stats_counter(InitiatorKind::Restriction);
+
             let mut mp = serializer.serialize_map(None)?;
-            mp.serialize_entry("acl", &self.acl)?;
-            mp.serialize_entry("gf", &self.global_filters)?;
-            mp.serialize_entry("rl", &self.rate_limit)?;
-            mp.serialize_entry("cf", &self.content_filters)?;
-            mp.serialize_entry("cf_restrict", &self.restriction)?;
+            mp.serialize_entry("acl", &acl)?;
+            mp.serialize_entry("gf", &global_filters)?;
+            mp.serialize_entry("rl", &rate_limit)?;
+            mp.serialize_entry("cf", &content_filters)?;
+            mp.serialize_entry("cf_restrict", &restriction)?;
             mp.end()
         }
     }
-    map_ser.serialize_entry("trigger_counters", &calculated_trigger_counters)?;
+    map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
 
-    let sum_block_trig: usize = calculated_trigger_counters.acl
-        + calculated_trigger_counters.global_filters
-        + calculated_trigger_counters.rate_limit
-        + calculated_trigger_counters.content_filters
-        + calculated_trigger_counters.restriction;
-    let blocked = sum_block_trig > 0;
+    //blocked
+    let mut blocked = false;
+    for r in &dec.reasons {
+        if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
+            blocked = true;
+            break;
+        }
+    }
     map_ser.serialize_entry("blocked", &blocked)?;
 
     struct EmptyMap;
