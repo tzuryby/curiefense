@@ -267,6 +267,11 @@ pub fn challenge_phase01<GH: Grasshopper>(
             return gh_fail_decision(&rr);
         }
     };
+    let ch_tag = if mode == GHMode::Interactive {
+        "ichallenge"
+    } else {
+        "challenge"
+    };
     Decision::action(
         Action {
             atype: ActionType::Block,
@@ -274,7 +279,7 @@ pub fn challenge_phase01<GH: Grasshopper>(
             headers: Some(gh_response.headers),
             status: 247,
             content: gh_response.str_response,
-            extra_tags: Some(["challenge_phase01"].iter().map(|s| s.to_string()).collect()),
+            extra_tags: Some(["challenge_phase01", ch_tag].iter().map(|s| s.to_string()).collect()),
         },
         reasons,
     )

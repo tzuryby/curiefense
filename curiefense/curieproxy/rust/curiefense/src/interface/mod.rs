@@ -262,6 +262,55 @@ pub fn jsonlog_rinfo(
         map_ser.serialize_entry("request_length", &request_length)?;
     }
 
+    map_ser.serialize_entry("host", &rinfo.headers.get("host"))?;
+    map_ser.serialize_entry("user_agent", &rinfo.headers.get("user-agent"))?;
+    map_ser.serialize_entry("referer", &rinfo.headers.get("referer"))?;
+    map_ser.serialize_entry("hostname", &rinfo.rinfo.container_name)?;
+    map_ser.serialize_entry("rbzid", &rinfo.cookies.get("rbzid"))?;
+
+    //pulled up from tags
+    let mut has_monitor = false;
+    let mut has_challenge = false;
+    let mut has_ichallenge = false;
+    let mut has_human = false;
+    let mut has_bot = false;
+    for t in tags.inner().keys() {
+        if let Some(val) = t.strip_prefix("geo-region:") {
+            map_ser.serialize_entry("geo_region", &val)?;
+        }
+        if let Some(val) = t.strip_prefix("geo-country:") {
+            map_ser.serialize_entry("geo_country", &val)?;
+        }
+        if let Some(val) = t.strip_prefix("geo-org:") {
+            map_ser.serialize_entry("geo_org", &val)?;
+        }
+        if let Some(val) = t.strip_prefix("geo-asn:") {
+            map_ser.serialize_entry("geo_asn", &val)?;
+        }
+        match t.as_str() {
+            "action:monitor" => has_monitor = true,
+            "human" => has_human = true,
+            "bot" => has_bot = true,
+            _ => {}
+        }
+    }
+    if let Some(action) = &dec.maction {
+        if let Some(tags) = &action.extra_tags {
+            for t in tags {
+                match t.as_str() {
+                    "challenge" => has_challenge = true,
+                    "ichallenge" => has_ichallenge = true,
+                    _ => {}
+                }
+            }
+        }
+    }
+    map_ser.serialize_entry("monitor", &has_monitor)?;
+    map_ser.serialize_entry("challenge", &has_challenge)?;
+    map_ser.serialize_entry("ichallenge", &has_ichallenge)?;
+    map_ser.serialize_entry("human", &has_human)?;
+    map_ser.serialize_entry("bot", &has_bot)?;
+
     map_ser.serialize_entry("curiesession_ids", &NameValue::new(&rinfo.session_ids))?;
     let request_id = proxy.get("request_id").or(rinfo.rinfo.meta.requestid.as_ref());
     map_ser.serialize_entry("request_id", &request_id)?;
@@ -308,6 +357,7 @@ pub fn jsonlog_rinfo(
                 code_vec.push(("status-class", format!("{}xx", code / 100)));
             }
 
+            println!("## arbel1 extra tag: {:?}", self.extra);
             self.tags.serialize_with_extra(
                 serializer,
                 self.extra.iter().flat_map(|i| i.iter().map(|s| s.as_str())),
