@@ -280,7 +280,12 @@ pub fn challenge_phase01<GH: Grasshopper>(
     )
 }
 
-pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &RequestInfo) -> Option<Decision> {
+pub fn challenge_phase02<GH: Grasshopper>(
+    gh: &GH,
+    logs: &mut Logs,
+    reqinfo: &RequestInfo,
+    reasons: Vec<BlockReason>,
+) -> Option<Decision> {
     if !reqinfo
         .rinfo
         .qinfo
@@ -317,11 +322,16 @@ pub fn challenge_phase02<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &Re
             content: "{}".to_string(),
             extra_tags: Some(["challenge_phase02"].iter().map(|s| s.to_string()).collect()),
         },
-        vec![],
+        reasons,
     ))
 }
 
-pub fn check_app_sig<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &RequestInfo) -> Option<Decision> {
+pub fn check_app_sig<GH: Grasshopper>(
+    gh: &GH,
+    logs: &mut Logs,
+    reqinfo: &RequestInfo,
+    reasons: Vec<BlockReason>,
+) -> Option<Decision> {
     if !reqinfo
         .rinfo
         .qinfo
@@ -347,7 +357,7 @@ pub fn check_app_sig<GH: Grasshopper>(gh: &GH, logs: &mut Logs, reqinfo: &Reques
             content: "{}".to_string(),
             extra_tags: Some(["check_app_sig"].iter().map(|s| s.to_string()).collect()),
         },
-        vec![],
+        reasons,
     ))
 }
 
@@ -356,6 +366,7 @@ pub fn handle_bio_reports<GH: Grasshopper>(
     logs: &mut Logs,
     reqinfo: &RequestInfo,
     precision_level: PrecisionLevel,
+    reasons: Vec<BlockReason>,
 ) -> Option<Decision> {
     if !reqinfo
         .rinfo
@@ -389,6 +400,6 @@ pub fn handle_bio_reports<GH: Grasshopper>(
             content: gh_response.str_response,
             extra_tags: Some(["handle_bio_reports"].iter().map(|s| s.to_string()).collect()),
         },
-        vec![],
+        reasons,
     ))
 }
