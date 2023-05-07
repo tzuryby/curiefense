@@ -20,6 +20,7 @@ use crate::logs::Logs;
 use crate::requestfields::RequestField;
 use crate::utils::decoders::parse_urlencoded_params_bytes;
 use crate::utils::BodyProblem;
+use jmespath;
 
 mod graphql;
 
@@ -313,7 +314,39 @@ pub fn parse_body(
                 }
                 ContentType::Json => {
                     if content_type.ends_with("/json") {
-                        return json_body(max_depth, args, body);
+                        let json_body_res =  json_body(max_depth, args, body);
+                        if let Ok(res) = json_body_res {
+                            let body_utf8 = std::str::from_utf8(body).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
+                            let data = jmespath::Variable::from_json(body_utf8).unwrap();
+
+                            if data.is_array() {
+                                let expr = jmespath::compile("[].query").unwrap();
+                                let query_val = expr.search(data).unwrap();
+
+                                if let Some(queries) = query_val.as_array() {
+                                    let mut graphql_res = Ok(());
+                                    for q in queries {
+                                        if let Some(q_str) = q.as_string() {
+                                            graphql_res = graphql::graphql_body_str(max_depth, args, &q_str);
+                                            if graphql_res.is_err() {
+                                                return graphql_res;
+                                            }
+                                        }
+                                    }
+                                    return graphql_res;
+                                }
+                            }
+                            else {
+                                let expr = jmespath::compile("query").unwrap();
+                                let query_val = expr.search(data).unwrap();
+                                if let Some(q_str) = query_val.as_string() {
+                                    return graphql::graphql_body_str(max_depth, args, &q_str);
+                                }
+                            }
+                        }
+
+                        //if there are no graphql entries - return regularly
+                        return json_body_res;
                     }
                 }
                 ContentType::MultipartForm => {

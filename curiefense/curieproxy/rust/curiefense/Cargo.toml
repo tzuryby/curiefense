@@ -33,6 +33,7 @@ async-graphql-parser = "3.0.38"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 arbitrary = { version = "1", features = ["derive"] }
 pdatastructs = "0.7"
+jmespath = "^0.3.0"
 
 [dependencies.multipart]
 version = "0.18"
