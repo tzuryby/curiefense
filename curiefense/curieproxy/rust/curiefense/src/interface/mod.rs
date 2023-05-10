@@ -357,7 +357,6 @@ pub fn jsonlog_rinfo(
                 code_vec.push(("status-class", format!("{}xx", code / 100)));
             }
 
-            println!("## arbel1 extra tag: {:?}", self.extra);
             self.tags.serialize_with_extra(
                 serializer,
                 self.extra.iter().flat_map(|i| i.iter().map(|s| s.as_str())),
