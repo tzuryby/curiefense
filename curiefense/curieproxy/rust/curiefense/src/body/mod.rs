@@ -429,7 +429,7 @@ mod tests {
     ) -> RequestField {
         let mut logs = Logs::default();
         let mut args = RequestField::new(dec);
-        parse_body(&mut logs, &mut args, max_depth, mcontent_type, accepted_types, body).unwrap();
+        parse_body(&mut logs, &mut args, max_depth, mcontent_type, accepted_types, "", body).unwrap();
         for lg in logs.logs {
             if lg.level > LogLevel::Debug {
                 panic!("unexpected log: {:?}", lg);
@@ -441,7 +441,7 @@ mod tests {
     fn test_parse_bad(mcontent_type: Option<&str>, accepted_types: &[ContentType], body: &[u8], max_depth: usize) {
         let mut logs = Logs::default();
         let mut args = RequestField::new(&[]);
-        assert!(parse_body(&mut logs, &mut args, max_depth, mcontent_type, accepted_types, body).is_err());
+        assert!(parse_body(&mut logs, &mut args, max_depth, mcontent_type, accepted_types, "", body).is_err());
     }
 
     fn test_parse_dec(
@@ -542,6 +542,7 @@ mod tests {
             500,
             Some("application/json"),
             &[],
+            "",
             br#"{"a": "body_arg"}"#,
         )
         .unwrap();
@@ -930,6 +931,7 @@ mod tests {
             0,
             Some("application/x-www-form-urlencoded"),
             &[],
+            "",
             b"a=1&b=2&c=3",
         )
         .unwrap();
