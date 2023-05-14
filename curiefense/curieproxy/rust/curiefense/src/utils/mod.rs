@@ -870,6 +870,7 @@ mod tests {
             &[],
             None,
             500,
+            "",
         );
 
         assert_eq!(qinfo.qpath, "/a/b/%20c");
@@ -918,7 +919,7 @@ mod tests {
     #[test]
     fn test_map_args_simple() {
         let mut logs = Logs::default();
-        let qinfo = map_args(&mut logs, &[], "/a/b", None, &[], None, 500);
+        let qinfo = map_args(&mut logs, &[], "/a/b", None, &[], None, 500, "");
 
         assert_eq!(qinfo.qpath, "/a/b");
         assert_eq!(qinfo.uri, "/a/b");
