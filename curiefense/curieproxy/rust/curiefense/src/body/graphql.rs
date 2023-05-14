@@ -113,6 +113,7 @@ pub fn graphql_body(max_depth: usize, args: &mut RequestField, body: &[u8]) -> R
     graphql_body_str(max_depth, args, body_utf8)
 }
 
+//same as graphql_body, but receives the body param as str
 pub fn graphql_body_str(max_depth: usize, args: &mut RequestField, body: &str) -> Result<(), BodyProblem> {
     let document = parse_query(body).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
     for (nm, pdef) in document.fragments {

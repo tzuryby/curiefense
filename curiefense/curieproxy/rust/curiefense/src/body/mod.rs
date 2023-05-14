@@ -20,7 +20,9 @@ use crate::logs::Logs;
 use crate::requestfields::RequestField;
 use crate::utils::decoders::parse_urlencoded_params_bytes;
 use crate::utils::BodyProblem;
-use jmespath;
+use jsonpath_rust::JsonPathFinder;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 mod graphql;
 
@@ -30,6 +32,11 @@ fn json_path(prefix: &[String]) -> String {
     } else {
         prefix.join("_")
     }
+}
+
+lazy_static! {
+    static ref GRAPHQL_REGEX: Regex =
+        Regex::new(r#""\s?:\s?"\s?((?:query|mutation|subscription|fragment)\s[^"]*)(?:}?(?:\n)?"),?"#).unwrap();
 }
 
 /// flatten a JSON tree into the RequestField key/value store
@@ -283,6 +290,24 @@ fn multipart_form_encoded(boundary: &str, args: &mut RequestField, body: &[u8]) 
         .map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))
 }
 
+///try to parse a list of graphql queries
+fn parse_graphql_array(
+    matches: Vec<&str>,
+    max_depth: usize,
+    args: &mut RequestField,
+    logs: &mut Logs,
+) -> Result<(), BodyProblem> {
+    let mut graphql_res = Ok(());
+    for item in matches.iter() {
+        graphql_res = graphql::graphql_body_str(max_depth, args, &item);
+        if graphql_res.is_err() {
+            logs.debug(|| format!("error while parsing with graphql:  {:?}", graphql_res));
+            return graphql_res;
+        }
+    }
+    return graphql_res;
+}
+
 /// body parsing function, returns an error when the body can't be decoded
 pub fn parse_body(
     logs: &mut Logs,
@@ -290,6 +315,7 @@ pub fn parse_body(
     max_depth: usize,
     mcontent_type: Option<&str>,
     accepted_types: &[ContentType],
+    graphql_property: &str,
     body: &[u8],
 ) -> Result<(), BodyProblem> {
     logs.debug("body parsing started");
@@ -314,38 +340,40 @@ pub fn parse_body(
                 }
                 ContentType::Json => {
                     if content_type.ends_with("/json") {
-                        let json_body_res =  json_body(max_depth, args, body);
+                        let json_body_res = json_body(max_depth, args, body);
                         if let Ok(res) = json_body_res {
-                            let body_utf8 = std::str::from_utf8(body).map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
-                            let data = jmespath::Variable::from_json(body_utf8).unwrap();
-
-                            if data.is_array() {
-                                let expr = jmespath::compile("[].query").unwrap();
-                                let query_val = expr.search(data).unwrap();
-
-                                if let Some(queries) = query_val.as_array() {
-                                    let mut graphql_res = Ok(());
-                                    for q in queries {
-                                        if let Some(q_str) = q.as_string() {
-                                            graphql_res = graphql::graphql_body_str(max_depth, args, &q_str);
-                                            if graphql_res.is_err() {
-                                                return graphql_res;
-                                            }
-                                        }
+                            //result of string body
+                            let body_json_str = std::str::from_utf8(body)
+                                .map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
+                            // use default regex - if has no graphql_property (jsonpath filter)
+                            if graphql_property.is_empty() {
+                                let mut matches: Vec<String> = Vec::new();
+                                for capture in GRAPHQL_REGEX.captures_iter(body_json_str) {
+                                    if let Some(m) = capture.get(1) {
+                                        let matched_str = m.as_str().replace("\\n", "\n");
+                                        matches.push(matched_str);
                                     }
-                                    return graphql_res;
                                 }
-                            }
-                            else {
-                                let expr = jmespath::compile("query").unwrap();
-                                let query_val = expr.search(data).unwrap();
-                                if let Some(q_str) = query_val.as_string() {
-                                    return graphql::graphql_body_str(max_depth, args, &q_str);
+                                let matches_vec: Vec<&str> = matches.iter().map(|s| s.as_str()).collect();
+                                if !matches_vec.is_empty() {
+                                    return parse_graphql_array(matches_vec, max_depth, args, logs);
+                                }
+                                //else - there are no graphql matches, return original json_body_res
+                            } else {
+                                match JsonPathFinder::from_str(body_json_str, graphql_property) {
+                                    Ok(finder) => {
+                                        let found_queries = finder.find();
+                                        if let Value::Array(arr) = found_queries {
+                                            let matches: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
+                                            return parse_graphql_array(matches, max_depth, args, logs);
+                                        }
+                                        //else (it's not an array) - there are no graphql matches, return original json_body_res
+                                    }
+                                    Err(e) => logs.debug(|| format!("error while parsing with jsonpath: {}", e)),
                                 }
                             }
                         }
-
-                        //if there are no graphql entries - return regularly
+                        //regular /json body
                         return json_body_res;
                     }
                 }

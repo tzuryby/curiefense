@@ -394,6 +394,8 @@ pub struct RawContentFilterProfile {
     pub action: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub graphql_property: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
