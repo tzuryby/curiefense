@@ -168,7 +168,7 @@ fn map_args(
     accepted_types: &[ContentType],
     mbody: Option<&[u8]>,
     max_depth: usize,
-    graphql_property: &str,
+    graphql_path: &str,
 ) -> QueryInfo {
     // this is necessary to do this in this convoluted way so at not to borrow attrs
     let uri = match urldecode_str(path) {
@@ -188,7 +188,7 @@ fn map_args(
             max_depth,
             mcontent_type,
             accepted_types,
-            graphql_property,
+            graphql_path,
             body,
         ) {
             // if the body could not be parsed, store it in an argument, as if it was text
@@ -706,7 +706,7 @@ pub fn map_request(
             raw.mbody
         },
         secpolicy.content_filter_profile.max_body_depth,
-        &secpolicy.content_filter_profile.graphql_property,
+        &secpolicy.content_filter_profile.graphql_path,
     );
     if secpolicy.content_filter_profile.referer_as_uri {
         if let Some(rf) = headers.get("referer") {

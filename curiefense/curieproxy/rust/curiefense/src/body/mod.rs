@@ -315,7 +315,7 @@ pub fn parse_body(
     max_depth: usize,
     mcontent_type: Option<&str>,
     accepted_types: &[ContentType],
-    graphql_property: &str,
+    graphql_path: &str,
     body: &[u8],
 ) -> Result<(), BodyProblem> {
     logs.debug("body parsing started");
@@ -345,8 +345,8 @@ pub fn parse_body(
                             //result of string body
                             let body_json_str = std::str::from_utf8(body)
                                 .map_err(|rr| BodyProblem::DecodingError(rr.to_string(), None))?;
-                            // use default regex - if has no graphql_property (jsonpath filter)
-                            if graphql_property.is_empty() {
+                            // use default regex - if has no graphql_path (jsonpath filter)
+                            if graphql_path.is_empty() {
                                 let mut matches: Vec<String> = Vec::new();
                                 for capture in GRAPHQL_REGEX.captures_iter(body_json_str) {
                                     if let Some(m) = capture.get(1) {
@@ -360,7 +360,7 @@ pub fn parse_body(
                                 }
                                 //else - there are no graphql matches, return original json_body_res
                             } else {
-                                match JsonPathFinder::from_str(body_json_str, graphql_property) {
+                                match JsonPathFinder::from_str(body_json_str, graphql_path) {
                                     Ok(finder) => {
                                         let found_queries = finder.find();
                                         if let Value::Array(arr) = found_queries {
