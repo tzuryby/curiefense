@@ -524,7 +524,6 @@ pub fn jsonlog_rinfo(
         map_ser.serialize_entry("blocked", &blocked)?;
     }
 
-
     struct EmptyMap;
     impl Serialize for EmptyMap {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
