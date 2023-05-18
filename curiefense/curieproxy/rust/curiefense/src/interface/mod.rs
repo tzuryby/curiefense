@@ -512,15 +512,18 @@ pub fn jsonlog_rinfo(
     }
     map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
 
-    //blocked
-    let mut blocked = false;
-    for r in &dec.reasons {
-        if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
-            blocked = true;
-            break;
+    //blocked (only if doesn't have challenge, because it'll be counted differently)
+    if !(has_challenge || has_ichallenge) {
+        let mut blocked = false;
+        for r in &dec.reasons {
+            if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
+                blocked = true;
+                break;
+            }
         }
+        map_ser.serialize_entry("blocked", &blocked)?;
     }
-    map_ser.serialize_entry("blocked", &blocked)?;
+
 
     struct EmptyMap;
     impl Serialize for EmptyMap {
