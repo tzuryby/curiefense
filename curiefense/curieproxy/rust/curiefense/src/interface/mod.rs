@@ -8,10 +8,10 @@ use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, GeoIp, RequestInfo, Selected};
 use chrono::{DateTime, Duration, DurationRound};
+use md5;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
-use md5;
 
 pub use self::block_reasons::*;
 pub use self::stats::*;
