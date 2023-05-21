@@ -47,6 +47,31 @@ impl Serialize for TimingInfo {
     }
 }
 
+impl TimingInfo {
+    pub fn sum_fields(&self) -> u64 {
+        let mut sum = 0;
+        if let Some(value) = self.secpol {
+            sum += value;
+        }
+        if let Some(value) = self.mapping {
+            sum += value;
+        }
+        if let Some(value) = self.flow {
+            sum += value;
+        }
+        if let Some(value) = self.limit {
+            sum += value;
+        }
+        if let Some(value) = self.acl {
+            sum += value;
+        }
+        if let Some(value) = self.content_filter {
+            sum += value;
+        }
+        sum
+    }
+}
+
 pub struct BStageInit;
 pub struct BStageSecpol;
 #[derive(Clone)]
