@@ -276,7 +276,7 @@ pub fn jsonlog_rinfo(
 
     map_ser.serialize_entry("geo_region", &rinfo.rinfo.geoip.region)?;
     map_ser.serialize_entry("geo_country", &rinfo.rinfo.geoip.country_name)?;
-    map_ser.serialize_entry("geo-org", &rinfo.rinfo.geoip.company)?;
+    map_ser.serialize_entry("geo_org", &rinfo.rinfo.geoip.company)?;
 
     //pulled up from tags
     let mut has_monitor = false;
