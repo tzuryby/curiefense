@@ -147,6 +147,15 @@ impl Decision {
         self.maction.as_ref().map(|a| a.atype.is_blocking()).unwrap_or(false)
     }
 
+    pub fn blocked(&self) -> bool {
+        for r in &self.reasons {
+            if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// is the action final (no further processing)
     pub fn is_final(&self) -> bool {
         self.maction.as_ref().map(|a| a.atype.is_final()).unwrap_or(false)
@@ -198,8 +207,13 @@ pub async fn jsonlog(
     proxy: HashMap<String, String>,
 ) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
-    let status_code = rcode.or_else(|| proxy.get("status").and_then(|stt_str| stt_str.parse().ok()));
-    let bytes_sent = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
+    let proxy_status = proxy.get("status").and_then(|stt_str| stt_str.parse().ok());
+    let bytes_sent: Option<usize> = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
+    let status_code = if !dec.blocked() && proxy_status.is_some() {
+        proxy_status
+    } else {
+        rcode.or_else(|| proxy_status)
+    };
     match mrinfo {
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
@@ -327,6 +341,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
     map_ser.serialize_entry("response_code", &rcode)?;
+
     map_ser.serialize_entry("logs", logs)?;
     map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
 
@@ -512,14 +527,8 @@ pub fn jsonlog_rinfo(
     }
     map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
 
-    //blocked
-    let mut blocked = false;
-    for r in &dec.reasons {
-        if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
-            blocked = true;
-            break;
-        }
-    }
+    // blocked
+    let blocked = dec.blocked();
     map_ser.serialize_entry("blocked", &blocked)?;
 
     struct EmptyMap;
