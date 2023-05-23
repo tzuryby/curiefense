@@ -849,3 +849,53 @@ fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<TV
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_blocked_no_reasons() {
+        let default_action = Some(Action::default());
+        let dec = Decision { maction: default_action, reasons: vec![] };
+        assert_eq!(dec.blocked(), false);
+    }
+
+    #[test]
+    fn test_blocked_no_blocking_reasons() {
+        let default_action = Some(Action::default());
+        let reasons = vec![
+            BlockReason::limit(
+                "01".to_string(),
+                "block-reason-01".to_string(),
+                23,
+                RawActionType::Monitor,
+            ),
+            BlockReason::limit(
+                "02".to_string(),
+                "block-reason-02".to_string(),
+                42,
+                RawActionType::Skip,
+            ),
+        ];
+        let dec = Decision { maction: default_action, reasons };
+        assert_eq!(dec.blocked(), false);
+    }
+
+    #[test]
+    fn test_blocked_with_blocking_reason() {
+        let default_action = Some(Action::default());
+        // phase02 has `RawActionType::Custom`, so should be blocked
+        let reasons = vec![
+            BlockReason::limit(
+                "01".to_string(),
+                "monitor".to_string(),
+                23,
+                RawActionType::Monitor,
+            ),
+            BlockReason::phase02(),
+        ];
+        let dec = Decision { maction: default_action, reasons };
+        assert_eq!(dec.blocked(), true);
+    }
+}
