@@ -48,27 +48,27 @@ impl Serialize for TimingInfo {
 }
 
 impl TimingInfo {
-    pub fn sum_fields(&self) -> u64 {
-        let mut sum = 0;
+    pub fn max_value(&self) -> u64 {
+        let mut max_value: u64 = 0;
         if let Some(value) = self.secpol {
-            sum += value;
+            max_value = value.max(max_value);
         }
         if let Some(value) = self.mapping {
-            sum += value;
+            max_value = value.max(max_value);
         }
         if let Some(value) = self.flow {
-            sum += value;
+            max_value = value.max(max_value);
         }
         if let Some(value) = self.limit {
-            sum += value;
+            max_value = value.max(max_value);
         }
         if let Some(value) = self.acl {
-            sum += value;
+            max_value = value.max(max_value);
         }
         if let Some(value) = self.content_filter {
-            sum += value;
+            max_value = value.max(max_value);
         }
-        sum
+        max_value
     }
 }
 

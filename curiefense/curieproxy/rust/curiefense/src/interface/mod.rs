@@ -537,7 +537,7 @@ pub fn jsonlog_rinfo(
     }
     map_ser.serialize_entry("profiling", &stats.timing)?;
 
-    map_ser.serialize_entry("rbz_latency", &stats.timing.sum_fields())?;
+    map_ser.serialize_entry("rbz_latency", &stats.timing.max_value())?;
 
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
