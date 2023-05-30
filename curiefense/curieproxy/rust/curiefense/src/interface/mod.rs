@@ -8,6 +8,7 @@ use crate::utils::json::NameValue;
 use crate::utils::templating::{parse_request_template, RequestTemplate, TVar, TemplatePart};
 use crate::utils::{selector, GeoIp, RequestInfo, Selected};
 use chrono::{DateTime, Duration, DurationRound};
+use md5;
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{HashMap, HashSet};
@@ -280,7 +281,16 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("user_agent", &rinfo.headers.get("user-agent"))?;
     map_ser.serialize_entry("referer", &rinfo.headers.get("referer"))?;
     map_ser.serialize_entry("hostname", &rinfo.rinfo.container_name)?;
-    map_ser.serialize_entry("rbzid", &rinfo.cookies.get("rbzid"))?;
+
+    if let Some(rbzid) = rinfo.cookies.get("rbzid") {
+        let digest = md5::compute(rbzid);
+        let md5_rbzid = format!("{:x}", digest);
+        map_ser.serialize_entry("rbzid", &md5_rbzid)?;
+    }
+
+    map_ser.serialize_entry("geo_region", &rinfo.rinfo.geoip.region)?;
+    map_ser.serialize_entry("geo_country", &rinfo.rinfo.geoip.country_name)?;
+    map_ser.serialize_entry("geo_org", &rinfo.rinfo.geoip.company)?;
 
     //pulled up from tags
     let mut has_monitor = false;
@@ -289,15 +299,6 @@ pub fn jsonlog_rinfo(
     let mut has_human = false;
     let mut has_bot = false;
     for t in tags.inner().keys() {
-        if let Some(val) = t.strip_prefix("geo-region:") {
-            map_ser.serialize_entry("geo_region", &val)?;
-        }
-        if let Some(val) = t.strip_prefix("geo-country:") {
-            map_ser.serialize_entry("geo_country", &val)?;
-        }
-        if let Some(val) = t.strip_prefix("geo-org:") {
-            map_ser.serialize_entry("geo_org", &val)?;
-        }
         if let Some(val) = t.strip_prefix("geo-asn:") {
             map_ser.serialize_entry("geo_asn", &val)?;
         }
@@ -527,9 +528,11 @@ pub fn jsonlog_rinfo(
     }
     map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
 
-    // blocked
-    let blocked = dec.blocked();
-    map_ser.serialize_entry("blocked", &blocked)?;
+    // blocked (only if doesn't have challenge, because it'll be counted differently)
+    if !(has_challenge || has_ichallenge) {
+        let blocked = dec.blocked();
+        map_ser.serialize_entry("blocked", &blocked)?;
+    }
 
     struct EmptyMap;
     impl Serialize for EmptyMap {
@@ -542,6 +545,9 @@ pub fn jsonlog_rinfo(
         }
     }
     map_ser.serialize_entry("profiling", &stats.timing)?;
+
+    map_ser.serialize_entry("rbz_latency", &stats.timing.max_value())?;
+
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
 }
