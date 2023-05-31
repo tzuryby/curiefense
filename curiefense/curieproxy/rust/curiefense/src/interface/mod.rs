@@ -267,6 +267,8 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("user_agent", &rinfo.headers.get("user-agent"))?;
     map_ser.serialize_entry("referer", &rinfo.headers.get("referer"))?;
     map_ser.serialize_entry("hostname", &rinfo.rinfo.container_name)?;
+    map_ser.serialize_entry("protocol", &rinfo.headers.get("x-forwarded-proto"))?;
+    map_ser.serialize_entry("port", &rinfo.headers.get("x-forwarded-port"))?;
 
     if let Some(rbzid) = rinfo.cookies.get("rbzid") {
         let digest = md5::compute(rbzid);
