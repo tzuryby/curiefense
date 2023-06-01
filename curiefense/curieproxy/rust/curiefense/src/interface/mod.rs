@@ -292,7 +292,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("geo_country", &rinfo.rinfo.geoip.country_name)?;
     map_ser.serialize_entry("geo_org", &rinfo.rinfo.geoip.company)?;
 
-    //pulled up from tags
+    // pulled up from tags
     let mut has_monitor = false;
     let mut has_challenge = false;
     let mut has_ichallenge = false;
@@ -391,11 +391,17 @@ pub fn jsonlog_rinfo(
     {
         rcode = None;
     }
+    // Do not log block action for non-blocking decision
+    let blocked = dec.blocked();
+    let mut filtered_tags = tags.clone();
+    if !blocked && filtered_tags.contains("action:content-filter-block") {
+        filtered_tags.tags.remove("action:content-filter-block");
+    }
 
     map_ser.serialize_entry(
         "tags",
         &LogTags {
-            tags,
+            tags: &filtered_tags,
             extra: dec.maction.as_ref().and_then(|a| a.extra_tags.as_ref()),
             rcode,
         },
@@ -530,7 +536,6 @@ pub fn jsonlog_rinfo(
 
     // blocked (only if doesn't have challenge, because it'll be counted differently)
     if !(has_challenge || has_ichallenge) {
-        let blocked = dec.blocked();
         map_ser.serialize_entry("blocked", &blocked)?;
     }
 
