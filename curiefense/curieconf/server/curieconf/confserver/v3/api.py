@@ -11,9 +11,10 @@ from enum import Enum
 from typing import Optional, List, Union
 from fastapi import Request, HTTPException, APIRouter, Header
 from pydantic import BaseModel, Field, StrictStr, StrictBool, StrictInt, Extra, HttpUrl
+from urllib.parse import unquote
 
 from curieconf.utils import cloud
-
+from server.curieconf.confserver import logger
 
 # monkey patch to force RestPlus to use Draft3 validator to benefit from "any" json type
 jsonschema.Draft4Validator = jsonschema.Draft3Validator
@@ -1112,3 +1113,62 @@ async def git_fetch_resource_put(giturl: GitUrl, request: Request):
     else:
         msg = "ok"
     return {"ok": ok, "status": msg}
+
+
+@router.put("/tools/backup/create", tags=[Tags.tools])
+@router.put("/tools/backup/create/{backup_file_name}", tags=[Tags.tools])
+async def backup_create(
+    request: Request, buckets: List[Bucket], backup_file_name: str = "backup"
+):
+    """Create backup for database"""
+
+    backup_file_name = unquote(backup_file_name)
+    backup_file_name = "/cf-persistent-config/" + backup_file_name
+
+    ok = True
+    status = []
+    current_backup_filename = None
+    try:
+        current_backup_filename = request.app.backend.create_zip_archive_for_folder(
+            backup_file_name
+        )
+        status.append("Backup created")
+
+        buckets = await request.json()
+        if type(buckets) is not list:
+            raise HTTPException(400, "body must be a list")
+
+        for bucket in buckets:
+            logs = []
+            try:
+                cloud.upload_file(
+                    current_backup_filename,
+                    bucket["url"],
+                    prnt=lambda x: logs.append(x),
+                )
+
+            except Exception as e:
+                ok = False
+                s = False
+                msg = repr(e)
+                logger.error(f"Exception when upload backup to cloud. {e}")
+            else:
+                s = True
+                msg = "ok"
+            status.append(
+                {"name": bucket["name"], "ok": s, "logs": logs, "message": msg}
+            )
+
+            os.remove(current_backup_filename)
+            status.append("Backup removed")
+
+    except (PermissionError, FileNotFoundError, OSError) as e:
+        logger.error(f"Can't remove local backup. {e}")
+        raise HTTPException(500, f"Can't remove local backup. {e}")
+
+    except Exception as e:
+        if current_backup_filename is not None:
+            os.remove(current_backup_filename)
+        raise HTTPException(500, f"Something went wrong. ${e}")
+
+    return {"ok": ok, "status": status}

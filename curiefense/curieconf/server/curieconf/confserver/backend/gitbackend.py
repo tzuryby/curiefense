@@ -13,6 +13,10 @@ import fasteners
 from typing import Dict, List
 import jsonpath_ng
 import pathlib
+import os
+import shutil
+
+from .. import logger
 
 
 CURIE_AUTHOR = git.Actor("Curiefense API", "curiefense@reblaze.com")
@@ -71,7 +75,7 @@ class ThreadAndProcessLock(object):
     def __init__(self, lockfile):
         self._lockfile = lockfile
         self.tlock = threading.Lock()
-        self.flock = fasteners.InterProcessLock("/tmp/tmp_lock_file")
+        self.flock = fasteners.InterProcessLock(lockfile)
 
     def __enter__(self):
         self.tlock.__enter__()
@@ -89,12 +93,12 @@ class GitBackend(CurieBackend):
         self.parsed_url = urllib.parse.urlparse(url)
         if self.parsed_url.netloc != "" or self.parsed_url.scheme != "git":
             raise CurieGitBackendException(
-                "Bad URL format [%s]. (eg: git:///path/to/repo)"
+                f"Bad URL format [${self.parsed_url}]. (eg: git:///path/to/repo)"
             )
-        repopath = self.parsed_url.path
-        self.repo = get_repo(repopath)
-        lockpath = os.path.join(repopath, ".curieconf_lock")
-        self.repo.lock = ThreadAndProcessLock(lockpath)
+        self.repo_path = self.parsed_url.path
+        self.repo = get_repo(self.repo_path)
+        lock_path = os.path.join(self.repo_path, ".curieconf_lock")
+        self.repo.lock = ThreadAndProcessLock(lock_path)
 
     ### Helpers
 
@@ -896,3 +900,22 @@ class GitBackend(CurieBackend):
                 "Deleting key [%s] in  namespace [%s]" % (key, nsname), actor=actor
             )
         return {"ok": True}
+
+    def create_zip_archive_for_folder(self, zip_filename):
+        start_time = time.time()
+
+        if zip_filename.endswith(".zip"):
+            zip_filename = zip_filename[:-4]
+
+        # Create a ZIP archive
+        with self.repo.lock:
+            # Tried to use gitpython to create an archive, but it created a 0Kb archive.
+            # Used here the default way to create an archive in Python
+            shutil.make_archive(zip_filename, "zip", self.repo_path)
+
+        elapsed_time = time.time() - start_time
+
+        logger.info(
+            f"ZIP archive '{zip_filename}.zip' created successfully. Execution time: {elapsed_time:.2f} seconds"
+        )
+        return f"{zip_filename}.zip"
