@@ -246,14 +246,6 @@ pub fn jsonlog_rinfo(
         let bytes_sent = val.parse::<i32>().unwrap_or_default();
         map_ser.serialize_entry("bytes_sent", &bytes_sent)?;
     }
-    if let Some(val) = proxy.get("upstream_response_time") {
-        let upstream_response_time = val.parse::<f32>().unwrap_or_default();
-        map_ser.serialize_entry("upstream_response_time", &upstream_response_time)?;
-    }
-    if let Some(val) = proxy.get("upstream_status") {
-        let upstream_status = val.parse::<i32>().unwrap_or_default();
-        map_ser.serialize_entry("upstream_status", &upstream_status)?;
-    }
     if let Some(val) = proxy.get("request_time") {
         let request_time = val.parse::<f32>().unwrap_or_default();
         map_ser.serialize_entry("request_time", &request_time)?;
@@ -261,6 +253,30 @@ pub fn jsonlog_rinfo(
     if let Some(val) = proxy.get("request_length") {
         let request_length = val.parse::<f32>().unwrap_or_default();
         map_ser.serialize_entry("request_length", &request_length)?;
+    }
+    if let Some(val) = proxy.get("upstream_response_time") {
+        let upstream_response_time = if let Ok(val) = val.parse::<f32>() {
+            val
+        } else {
+            let values: Vec<f32> = val
+                .split(',')
+                .map(|v| v.trim().parse::<f32>())
+                .filter_map(Result::ok)
+                .collect();
+            values.iter().sum()
+        };
+        map_ser.serialize_entry("upstream_response_time", &upstream_response_time)?;
+    }
+    if let Some(val) = proxy.get("upstream_status") {
+        let values: Vec<i32> = if let Ok(single_value) = val.parse::<i32>() {
+            vec![single_value]
+        } else {
+            val.split(',')
+                .map(|v| v.trim().parse::<i32>())
+                .filter_map(Result::ok)
+                .collect()
+        };
+        map_ser.serialize_entry("upstream_status", &values)?;
     }
 
     map_ser.serialize_entry("host", &rinfo.headers.get("host"))?;
