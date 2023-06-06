@@ -1,3 +1,4 @@
+import logging
 import os
 from io import BytesIO
 import git, gitdb
@@ -16,8 +17,8 @@ import pathlib
 import os
 import shutil
 
-from .. import logger
 
+logger = logging.getLogger("confserver")
 
 CURIE_AUTHOR = git.Actor("Curiefense API", "curiefense@reblaze.com")
 
@@ -93,7 +94,7 @@ class GitBackend(CurieBackend):
         self.parsed_url = urllib.parse.urlparse(url)
         if self.parsed_url.netloc != "" or self.parsed_url.scheme != "git":
             raise CurieGitBackendException(
-                f"Bad URL format [${self.parsed_url}]. (eg: git:///path/to/repo)"
+                f"Bad URL format [{self.parsed_url}]. (eg: git:///path/to/repo)"
             )
         self.repo_path = self.parsed_url.path
         self.repo = get_repo(self.repo_path)

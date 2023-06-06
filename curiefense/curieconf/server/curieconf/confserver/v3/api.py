@@ -1,4 +1,5 @@
 import datetime
+import logging
 import typing
 import os
 import requests
@@ -14,7 +15,9 @@ from pydantic import BaseModel, Field, StrictStr, StrictBool, StrictInt, Extra, 
 from urllib.parse import unquote
 
 from curieconf.utils import cloud
-from server.curieconf.confserver import logger
+
+
+logger = logging.getLogger("confserver")
 
 # monkey patch to force RestPlus to use Draft3 validator to benefit from "any" json type
 jsonschema.Draft4Validator = jsonschema.Draft3Validator
