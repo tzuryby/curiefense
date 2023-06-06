@@ -258,25 +258,18 @@ pub fn jsonlog_rinfo(
         let upstream_response_time = if let Ok(val) = val.parse::<f32>() {
             val
         } else {
-            let values: Vec<f32> = val
-                .split(',')
-                .map(|v| v.trim().parse::<f32>())
-                .filter_map(Result::ok)
-                .collect();
+            let values = parse_values::<f32>(val);
             values.iter().sum()
         };
         map_ser.serialize_entry("upstream_response_time", &upstream_response_time)?;
     }
     if let Some(val) = proxy.get("upstream_status") {
-        let values: Vec<i32> = if let Ok(single_value) = val.parse::<i32>() {
-            vec![single_value]
-        } else {
-            val.split(',')
-                .map(|v| v.trim().parse::<i32>())
-                .filter_map(Result::ok)
-                .collect()
-        };
+        let values = parse_values::<i32>(val);
         map_ser.serialize_entry("upstream_status", &values)?;
+    }
+    if let Some(val) = proxy.get("upstream_addr") {
+        let values = parse_values::<String>(val);
+        map_ser.serialize_entry("upstream_addr", &values)?;
     }
 
     map_ser.serialize_entry("host", &rinfo.headers.get("host"))?;
@@ -557,6 +550,14 @@ pub fn jsonlog_rinfo(
 
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
+}
+
+//parse and split multiple values into a vector
+fn parse_values<T: std::str::FromStr>(val: &str) -> Vec<T> {
+    val.split(',')
+        .map(|v| v.trim().parse::<T>())
+        .filter_map(Result::ok)
+        .collect()
 }
 
 // blocking version
