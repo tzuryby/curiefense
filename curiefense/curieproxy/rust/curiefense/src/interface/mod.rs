@@ -254,22 +254,37 @@ pub fn jsonlog_rinfo(
         let request_length = val.parse::<f32>().unwrap_or_default();
         map_ser.serialize_entry("request_length", &request_length)?;
     }
-    if let Some(val) = proxy.get("upstream_response_time") {
-        let upstream_response_time = if let Ok(val) = val.parse::<f32>() {
-            val
-        } else {
-            let values = parse_values::<f32>(val);
-            values.iter().sum()
-        };
-        map_ser.serialize_entry("upstream_response_time", &upstream_response_time)?;
-    }
-    if let Some(val) = proxy.get("upstream_status") {
-        let values = parse_values::<i32>(val);
-        map_ser.serialize_entry("upstream_status", &values)?;
-    }
-    if let Some(val) = proxy.get("upstream_addr") {
-        let values = parse_values::<String>(val);
-        map_ser.serialize_entry("upstream_addr", &values)?;
+    if let Some(response_times) = proxy.get("upstream_response_time") {
+        if let Some(statuses) = proxy.get("upstream_status") {
+            if let Some(addresses) = proxy.get("upstream_addr") {
+                let response_times = parse_values::<f32>(response_times);
+                let statuses = parse_values::<i32>(statuses);
+                let addresses = parse_values::<String>(addresses);
+
+                let response_times_sum: f32 = response_times.iter().sum();
+                map_ser.serialize_entry("upstream_response_time", &response_times_sum)?;
+                map_ser.serialize_entry("upstream_status", &statuses)?;
+                map_ser.serialize_entry("upstream_addr", &addresses)?;
+
+                //add upstream_data only if all lists are the same length (no single field is missing)
+                if response_times.len() == statuses.len() && response_times.len() == addresses.len() {
+                    let upstream_data: Vec<_> = response_times
+                        .into_iter()
+                        .zip(statuses)
+                        .zip(addresses)
+                        .map(|((response_time, status), address)| {
+                            serde_json::json!({
+                                "response_time": format!("{:.3}", response_time),
+                                "status": status,
+                                "addr": address,
+                            })
+                        })
+                        .collect();
+
+                    map_ser.serialize_entry("upstream_data", &upstream_data)?;
+                }
+            }
+        }
     }
 
     map_ser.serialize_entry("host", &rinfo.headers.get("host"))?;
