@@ -148,6 +148,15 @@ impl Decision {
         self.maction.as_ref().map(|a| a.atype.is_blocking()).unwrap_or(false)
     }
 
+    pub fn blocked(&self) -> bool {
+        for r in &self.reasons {
+            if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// is the action final (no further processing)
     pub fn is_final(&self) -> bool {
         self.maction.as_ref().map(|a| a.atype.is_final()).unwrap_or(false)
@@ -199,8 +208,13 @@ pub async fn jsonlog(
     proxy: HashMap<String, String>,
 ) -> (Vec<u8>, chrono::DateTime<chrono::Utc>) {
     let now = mrinfo.map(|i| i.timestamp).unwrap_or_else(chrono::Utc::now);
-    let status_code = rcode.or_else(|| proxy.get("status").and_then(|stt_str| stt_str.parse().ok()));
-    let bytes_sent = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
+    let proxy_status = proxy.get("status").and_then(|stt_str| stt_str.parse().ok());
+    let bytes_sent: Option<usize> = proxy.get("bytes_sent").and_then(|s| s.parse().ok());
+    let status_code = if !dec.blocked() && proxy_status.is_some() {
+        proxy_status
+    } else {
+        rcode.or_else(|| proxy_status)
+    };
     match mrinfo {
         Some(rinfo) => {
             aggregator::aggregate(dec, status_code, rinfo, tags, bytes_sent).await;
@@ -278,7 +292,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("geo_country", &rinfo.rinfo.geoip.country_name)?;
     map_ser.serialize_entry("geo_org", &rinfo.rinfo.geoip.company)?;
 
-    //pulled up from tags
+    // pulled up from tags
     let mut has_monitor = false;
     let mut has_challenge = false;
     let mut has_ichallenge = false;
@@ -328,6 +342,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("ip", &rinfo.rinfo.geoip.ip)?;
     map_ser.serialize_entry("method", &rinfo.rinfo.meta.method)?;
     map_ser.serialize_entry("response_code", &rcode)?;
+
     map_ser.serialize_entry("logs", logs)?;
     map_ser.serialize_entry("processing_stage", &stats.processing_stage)?;
 
@@ -376,11 +391,17 @@ pub fn jsonlog_rinfo(
     {
         rcode = None;
     }
+    // Do not log block action for non-blocking decision
+    let blocked = dec.blocked();
+    let mut filtered_tags = tags.clone();
+    if !blocked && filtered_tags.contains("action:content-filter-block") {
+        filtered_tags.tags.remove("action:content-filter-block");
+    }
 
     map_ser.serialize_entry(
         "tags",
         &LogTags {
-            tags,
+            tags: &filtered_tags,
             extra: dec.maction.as_ref().and_then(|a| a.extra_tags.as_ref()),
             rcode,
         },
@@ -513,15 +534,8 @@ pub fn jsonlog_rinfo(
     }
     map_ser.serialize_entry("trigger_counters", &TriggerCounters(&greasons))?;
 
-    //blocked (only if doesn't have challenge, because it'll be counted differently)
+    // blocked (only if doesn't have challenge, because it'll be counted differently)
     if !(has_challenge || has_ichallenge) {
-        let mut blocked = false;
-        for r in &dec.reasons {
-            if !(matches!(r.action, RawActionType::Monitor) || matches!(r.action, RawActionType::Skip)) {
-                blocked = true;
-                break;
-            }
-        }
         map_ser.serialize_entry("blocked", &blocked)?;
     }
 
@@ -845,4 +859,53 @@ fn render_template(rinfo: &RequestInfo, tags: &Tags, template: &[TemplatePart<TV
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_blocked_no_reasons() {
+        let default_action = Some(Action::default());
+        let dec = Decision {
+            maction: default_action,
+            reasons: vec![],
+        };
+        assert_eq!(dec.blocked(), false);
+    }
+
+    #[test]
+    fn test_blocked_no_blocking_reasons() {
+        let default_action = Some(Action::default());
+        let reasons = vec![
+            BlockReason::limit(
+                "01".to_string(),
+                "block-reason-01".to_string(),
+                23,
+                RawActionType::Monitor,
+            ),
+            BlockReason::limit("02".to_string(), "block-reason-02".to_string(), 42, RawActionType::Skip),
+        ];
+        let dec = Decision {
+            maction: default_action,
+            reasons,
+        };
+        assert_eq!(dec.blocked(), false);
+    }
+
+    #[test]
+    fn test_blocked_with_blocking_reason() {
+        let default_action = Some(Action::default());
+        // phase02 has `RawActionType::Custom`, so should be blocked
+        let reasons = vec![
+            BlockReason::limit("01".to_string(), "monitor".to_string(), 23, RawActionType::Monitor),
+            BlockReason::phase02(),
+        ];
+        let dec = Decision {
+            maction: default_action,
+            reasons,
+        };
+        assert_eq!(dec.blocked(), true);
+    }
 }
