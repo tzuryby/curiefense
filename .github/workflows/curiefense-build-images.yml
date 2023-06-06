@@ -15,6 +15,10 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      - name: Cleaning root partition
+        run: |
+            sudo apt-get clean
+            sudo apt-get update
 
       - name: Build and push the images
         run: |
