@@ -282,8 +282,6 @@ pub fn jsonlog_rinfo(
                         .collect();
 
                     map_ser.serialize_entry("upstream_data", &upstream_data)?;
-                } else {
-                    logs.error(|| format!("Upstream data lists have different sizes"));
                 }
             }
         }
