@@ -260,14 +260,6 @@ pub fn jsonlog_rinfo(
         let bytes_sent = val.parse::<i32>().unwrap_or_default();
         map_ser.serialize_entry("bytes_sent", &bytes_sent)?;
     }
-    if let Some(val) = proxy.get("upstream_response_time") {
-        let upstream_response_time = val.parse::<f32>().unwrap_or_default();
-        map_ser.serialize_entry("upstream_response_time", &upstream_response_time)?;
-    }
-    if let Some(val) = proxy.get("upstream_status") {
-        let upstream_status = val.parse::<i32>().unwrap_or_default();
-        map_ser.serialize_entry("upstream_status", &upstream_status)?;
-    }
     if let Some(val) = proxy.get("request_time") {
         let request_time = val.parse::<f32>().unwrap_or_default();
         map_ser.serialize_entry("request_time", &request_time)?;
@@ -275,6 +267,38 @@ pub fn jsonlog_rinfo(
     if let Some(val) = proxy.get("request_length") {
         let request_length = val.parse::<f32>().unwrap_or_default();
         map_ser.serialize_entry("request_length", &request_length)?;
+    }
+    if let Some(response_times) = proxy.get("upstream_response_time") {
+        if let Some(statuses) = proxy.get("upstream_status") {
+            if let Some(addresses) = proxy.get("upstream_addr") {
+                let response_times = parse_values::<f32>(response_times);
+                let statuses = parse_values::<i32>(statuses);
+                let addresses = parse_values::<String>(addresses);
+
+                let response_times_sum: f32 = response_times.iter().sum();
+                map_ser.serialize_entry("upstream_response_time", &response_times_sum)?;
+                map_ser.serialize_entry("upstream_status", &statuses)?;
+                map_ser.serialize_entry("upstream_addr", &addresses)?;
+
+                //add upstream_data only if all lists are the same length (no single field is missing)
+                if response_times.len() == statuses.len() && response_times.len() == addresses.len() {
+                    let upstream_data: Vec<_> = response_times
+                        .into_iter()
+                        .zip(statuses)
+                        .zip(addresses)
+                        .map(|((response_time, status), address)| {
+                            serde_json::json!({
+                                "response_time": format!("{:.3}", response_time),
+                                "status": status,
+                                "addr": address,
+                            })
+                        })
+                        .collect();
+
+                    map_ser.serialize_entry("upstream_data", &upstream_data)?;
+                }
+            }
+        }
     }
 
     map_ser.serialize_entry("host", &rinfo.headers.get("host"))?;
@@ -557,6 +581,14 @@ pub fn jsonlog_rinfo(
 
     SerializeMap::end(map_ser)?;
     Ok(outbuffer)
+}
+
+//parse and split multiple values into a vector
+fn parse_values<T: std::str::FromStr>(val: &str) -> Vec<T> {
+    val.split(',')
+        .map(|v| v.trim().parse::<T>())
+        .filter_map(Result::ok)
+        .collect()
 }
 
 // blocking version
