@@ -146,3 +146,18 @@ def export(conf, url, prnt=None):
     upload_manifest(
         manifest, bucket, root, None, prnt=prnt
     )  # no config name; always upload to manifest.json
+
+
+def upload_file(file_path, url, prnt=None):
+    bucket, root = get_bucket(url)
+    file_name = os.path.basename(file_path)
+    remote_path = os.path.join(root, file_name)
+
+    with open(file_path, "rb") as file:
+        file_data = io.BytesIO(file.read())
+        file_data.seek(0)
+
+    if prnt:
+        prnt(f"Uploading file '{file_path}' to '{remote_path}'")
+
+    bucket.upload_blob(file_data, remote_path, meta_data={})
