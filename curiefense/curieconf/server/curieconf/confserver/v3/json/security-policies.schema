@@ -65,7 +65,7 @@
             "type": "string",
             "minLength": 1,
             "title": "Challenge's Cookie Domain",
-            "description": "Defines the domain Reblaze will use when setting a challenge cookie. The default value (“$host”) tells Reblaze to use the domain being accessed by the user, "$wildcard" means the domain string from the first "." and onward, and also a custom domain is optional"
+            "description": "Defines the domain Reblaze will use when setting a challenge cookie. The default value (“$host”) tells Reblaze to use the domain being accessed by the user, “$wildcard“ means the domain string from the first “.“ and onward, and also a custom domain is optional"
         },
         "map": {
             "type": "array",
