@@ -14,6 +14,7 @@ pub mod logs;
 pub mod redis;
 pub mod requestfields;
 pub mod securitypolicy;
+pub mod servergroup;
 pub mod simple_executor;
 pub mod tagging;
 pub mod utils;
@@ -29,6 +30,7 @@ use interface::stats::{SecpolStats, Stats, StatsCollect};
 use interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags};
 use logs::Logs;
 use securitypolicy::match_securitypolicy;
+use servergroup::match_servergroup;
 use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
@@ -96,6 +98,12 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     plugins: HashMap<String, String>,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
+    println!("====== inspect_generic_request_map_init ======");
+    println!("====== selected_secpol: {:?}", selected_secpol);
+    //todo need the actual field as param
+    let temp_selected_sergrp = "__default__";
+    let selected_sergrp: Option<&str> = Some(temp_selected_sergrp);
+    println!("====== temp_selected_sergrp: {:?}", selected_sergrp);
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
     let tags = Tags::from_slice(&[(String::from("all"), Location::Request)], VirtualTags::default());
@@ -116,6 +124,8 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, precision_level) =
         match with_config(logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
+            let server_group = match_servergroup(cfg, slogs, selected_sergrp);
+            println!("====== after match_servergroup, got: {:?}", server_group);
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
@@ -145,6 +155,10 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
 
                     let stats = StatsCollect::new(slogs.start, cfg.revision.clone())
                         .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
+
+                    //new: sites data
+
+
                     // if the max depth is equal to 0, the body will not be parsed
                     let reqinfo = map_request(
                         slogs,

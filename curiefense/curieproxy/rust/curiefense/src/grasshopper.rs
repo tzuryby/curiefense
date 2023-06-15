@@ -312,9 +312,35 @@ pub fn challenge_phase02<GH: Grasshopper>(
     };
 
     let mut nheaders = HashMap::<String, String>::new();
-    let mut cookie = "rbzid=".to_string();
-    cookie += &verified.replace('=', "-");
-    cookie += "; Path=/; HttpOnly";
+
+    // let mut cookie = "rbzid=".to_string();
+    // cookie += &verified.replace('=', "-");
+    // cookie += "; Path=/; HttpOnly";
+    // //domain test
+    // let host = reqinfo.rinfo.host;
+    // println!("@@@ host: {}", domain);
+    // let mut domain = "Domain=".to_string();
+    // cookie += host;
+    // println!("@@@ domain: {}", domain);
+
+    //new
+    let host = &reqinfo.rinfo.host;
+    let challenge_cookie_domain = &reqinfo.rinfo.secpolicy.challenge_cookie_domain;
+    let mut domain = String::new();
+    if challenge_cookie_domain == "$host" {
+        domain = host.to_string();
+    } else if challenge_cookie_domain == "$wildcard" {
+        if let Some(index) = host.find('.') {
+            domain = host[index..].to_string();
+        }
+    } else {
+        domain = challenge_cookie_domain.to_string();
+    }
+    let cookie = format!("rbzid={}; Path=/; HttpOnly; Domain={}", verified.replace('=', "-"), domain);
+    println!("@@@ cookie: {}", cookie);
+
+    // cookie += domain;
+    //
 
     nheaders.insert("Set-Cookie".to_string(), cookie);
 

@@ -6,6 +6,7 @@ pub mod limit;
 pub mod matchers;
 pub mod raw;
 pub mod virtualtags;
+pub mod custom;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -23,15 +24,19 @@ use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, PolicyId, SecurityPolicy};
 use matchers::Matching;
-use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawVirtualTag};
+use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawVirtualTag, RawCustom, RawSite};
 use virtualtags::{vtags_resolve, VirtualTags};
+// use custom::Sites;
+use custom::{CustomObject, ContentItem, Site};
+use jsonpath_rust::JsonPathFinder;
 
 use self::flow::FlowMap;
 use self::matchers::RequestSelector;
 use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
-static ALL_CONFIG_FILES: [&str; 10] = [
+// static ALL_CONFIG_FILES: [&str; 10] = [
+static ALL_CONFIG_FILES: [&str; 11] = [
     "actions.json",
     "acl-profiles.json",
     "contentfilter-profiles.json",
@@ -42,6 +47,7 @@ static ALL_CONFIG_FILES: [&str; 10] = [
     "securitypolicy.json",
     "flow-control.json",
     "virtual-tags.json",
+    "custom.json",
 ];
 
 pub struct LockedConfig {
@@ -143,8 +149,10 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     bjson.push("json");
 
     let mut files_to_reload = HashSet::new();
+    println!("^^^ reload_config. filenames: {:?}", filenames);
     if filenames.is_empty() {
         // if not filename was provided, reload all config files
+        println!("^^^ reload_config. ALL_CONFIG_FILES: {:?}", ALL_CONFIG_FILES);
         files_to_reload.extend(ALL_CONFIG_FILES.iter().map(|s| s.to_string()));
     } else {
         for filename in filenames.iter() {
@@ -243,6 +251,25 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         let virtual_tags = vtags_resolve(&mut logs, raw_virtual_tags);
         config.virtual_tags = virtual_tags;
     }
+    //new! custom doc
+    if files_to_reload.contains("custom.json") {
+        println!("--- reload. before rawsites");
+        let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        println!("--- reload. rawsites: {:?}", rawsites);
+        let servergroups_map = Site::resolve(&mut logs, rawsites);
+        println!("--- reload. servergroups_map: {:?}", servergroups_map);
+        config.servergroups_map = servergroups_map;
+    }
+    //old
+    // if files_to_reload.contains("custom.json") {
+    //     println!("^^^ load custom.json:");
+    //     let raw_custom = Config::load_config_file(&mut logs, &bjson, "custom.json");
+    //     println!("^^^ raw_custom: {:?}", raw_custom);
+    //     let sites = CustomObject::resolve(&mut logs, raw_custom);//todo not only sites..
+    //     println!("^^^ sites: {:?}", sites);
+    //     // config.sites = sites;
+    // }
+
 
     config.logs = logs.clone();
 
@@ -270,6 +297,9 @@ pub struct Config {
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
     pub virtual_tags: VirtualTags,
     pub logs: Logs,
+    //todo arbel add sites
+    // pub sites:
+    pub servergroups_map: HashMap<String, Site>,
 
     // Not used when processing request, but to optimize reloading config
     pub actions: HashMap<String, SimpleAction>,
@@ -301,7 +331,9 @@ impl Config {
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
         session: Vec<RequestSelector>,
         session_ids: Vec<RequestSelector>,
+        challenge_cookie_domain: &str,
     ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
+        // println!("~~~ resolve_security_policies ~~~");
         let mut default: Option<Arc<SecurityPolicy>> = None;
         let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
         for rawmap in rawmaps {
@@ -337,6 +369,7 @@ impl Config {
                     logs.debug(|| format!("Trying to add inactive limit {} in map {}", lid, mapname))
                 }
             }
+            // println!("~~~ resolve_security_policies got challenge_cookie_domain: {:?}", challenge_cookie_domain);
             let securitypolicy = SecurityPolicy {
                 policy: PolicyId {
                     id: policyid.to_string(),
@@ -354,7 +387,9 @@ impl Config {
                 content_filter_active: rawmap.content_filter_active,
                 content_filter_profile,
                 limits: olimits,
+                challenge_cookie_domain: challenge_cookie_domain.to_string(),
             };
+            // println!("~~~ resolve_security_policies created securitypolicy: {:?}", securitypolicy);
             if rawmap.match_ == "__default__"
                 || securitypolicy.entry.id == "__default__"
                 || (rawmap.match_ == "/"
@@ -391,6 +426,7 @@ impl Config {
         container_name: Option<String>,
         rawflows: Vec<RawFlowEntry>,
         rawvirtualtags: Vec<RawVirtualTag>,
+        rawsites: Vec<RawSite>,
     ) -> Config {
         let mut logs = logs;
 
@@ -416,6 +452,10 @@ impl Config {
 
         let virtual_tags = vtags_resolve(&mut logs, rawvirtualtags);
 
+        // let servergroups_map = server_groups_resolve(rawsites);//todo need?
+        let servergroups_map = Site::resolve(&mut logs, rawsites);
+        println!("%%%%% servergroups_map: {:?}", servergroups_map);
+
         Config {
             revision,
             securitypolicies_map,
@@ -432,7 +472,75 @@ impl Config {
             global_limits,
             inactive_limits,
             acls,
+            servergroups_map,
         }
+    }
+
+    //custom.json is built differently, use this function to extract needed data
+    // fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> Vec<Site> {
+    fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> Vec<RawSite> {
+    // fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> String {
+        let mut path = base.to_path_buf();
+        path.push(fname);
+        let fullpath = path.to_str().unwrap_or(fname).to_string();
+        let file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            Err(rr) => {
+                logs.error(|| format!("when loading {}: {}", fullpath, rr));
+                // return "error".to_string();
+                return Vec::new();//todo?
+            }
+        };
+        println!("%%% load_custom_config_file file: {:?}", file);
+
+        let mut file_content = String::new();
+        let file_content_res = std::fs::read_to_string(fullpath)
+            .ok()
+            .map(|s| s.trim().to_string());
+        file_content = match file_content_res {
+            Some(content) => {
+                println!("%%% content: {:?}", content);
+                content
+            },
+            None => {"{}".to_string()},
+        };
+
+        let json_path = "$[?(@.id == 'sites')].items.*"; // JSONPath expression to match the element with id 'sites'
+
+        // let mut sites_vec: Vec<Site> = Vec::new();
+        let mut sites_vec: Vec<RawSite> = Vec::new();
+        match JsonPathFinder::from_str(&file_content, json_path) {
+            Ok(finder) => {
+                let found_sites = finder.find();
+                println!("%%% found_sites finder.find: {:?}", found_sites);
+
+                // let mut sites_vec: Vec<Site> = Vec::new();
+                if let serde_json::Value::Array(arr) = found_sites {
+                    println!("%%% in array");
+                    for site in arr {
+                        println!("%%% in site: {:?}", site);
+                        if let serde_json::Value::Object(site_object) = site {
+                            println!("%%% in site serde. site_object: {:?}", site_object);
+                            // if let Ok(site_struct) = serde_json::from_value::<Site>(serde_json::Value::Object(site_object)) {
+                            if let Ok(site_struct) = serde_json::from_value::<RawSite>(serde_json::Value::Object(site_object)) {
+                                println!("%%% ok site_struct: {:?}", site_struct);
+                                sites_vec.push(site_struct);
+                                println!("%%% sites_vec after push: {:?}", sites_vec);
+                            }
+                        }
+                    }
+                }
+                println!("%%% found_sites vec: {:?}", sites_vec);
+            }
+            Err(e) => {
+                println!("%%% when applying JSONPath expression: err: {:?}", e);
+                // "err".to_string()
+            },
+        };
+
+        // "testtesttest".to_string()
+        sites_vec
+
     }
 
     fn load_config_file<A: serde::de::DeserializeOwned>(logs: &mut Logs, base: &Path, fname: &str) -> Vec<A> {
@@ -451,14 +559,21 @@ impl Config {
             Err(rr) => {
                 // if it is not a json array, abort early and do not resolve anything
                 logs.error(|| format!("when parsing {}: {}", fullpath, rr));
+                println!("*** error when parsing {}: {}", fullpath, rr);
                 return Vec::new();
             }
         };
         let mut out = Vec::new();
         for value in values {
+            if fname=="custom.json" {
+                println!("*** loop value: {:?}", value);
+            }
             // for each entry, try to resolve it as a raw configuration value, failing otherwise
             match serde_json::from_value(value) {
-                Err(rr) => logs.error(|| format!("when resolving entry from {}: {}", fullpath, rr)),
+                Err(rr) => {
+                    logs.error(|| format!("when resolving entry from {}: {}", fullpath, rr));
+                    println!("*** error when resolving entry from {}: {}", fullpath, rr);
+                },
                 Ok(v) => out.push(v),
             }
         }
@@ -489,7 +604,9 @@ impl Config {
             Ok(manifest) => manifest.meta.version,
         };
 
+        println!("--- in load() ---");
         let rawactions = Config::load_config_file(&mut logs, &bjson, "actions.json");
+        println!("--- load. rawactions: {:?}", rawactions);
         let securitypolicy = Config::load_config_file(&mut logs, &bjson, "securitypolicy.json");
         let globalfilters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
         let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
@@ -497,6 +614,9 @@ impl Config {
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
         let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
+        // let sites: Vec<Site> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        println!("--- load. rawsites: {:?}", rawsites);
 
         let container_name = container_name();
 
@@ -514,7 +634,8 @@ impl Config {
             content_filter_profiles,
             container_name,
             flows,
-            virtualtags,
+            virtualtags,//todo add custom or sites or something
+            rawsites,
         )
     }
 
@@ -535,6 +656,7 @@ impl Config {
             global_limits: Vec::new(),
             inactive_limits: HashSet::new(),
             acls: HashMap::new(),
+            servergroups_map: HashMap::new(),
         }
     }
 }
@@ -569,9 +691,11 @@ fn sec_pol_resolve(
     let mut default: Option<HostMap> = None;
     let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
     let mut securitypolicies_map = HashMap::new();
-
+    println!("!! sec_pol_resolve");
+    println!("!! sec_pol_resolve rawmaps: {:?}", rawmaps);
     // build the entries while looking for the default entry
     for rawmap in rawmaps {
+        println!("!! sec_pol_resolve in rawmap: {:?}", rawmap);
         let mapname = rawmap.name.clone();
         let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
             Ok(Vec::new())
@@ -596,6 +720,8 @@ fn sec_pol_resolve(
             logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
             Vec::new()
         });
+        let ch_cookie_domain = rawmap.challenge_cookie_domain.unwrap_or_else(|| "$host".to_string());
+        println!("!! sec_pol_resolve before resolve_security_policies");
         let (entries, default_entry) = Config::resolve_security_policies(
             logs,
             &rawmap.id,
@@ -609,7 +735,10 @@ fn sec_pol_resolve(
             content_filter_profiles,
             session,
             session_ids,
+            &ch_cookie_domain,
+            // &rawmap.challenge_cookie_domain,
         );
+        println!("!! sec_pol_resolve after resolve_security_policies");
         if default_entry.is_none() {
             logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
         }
@@ -639,3 +768,13 @@ fn sec_pol_resolve(
 
     (securitypolicies_map, securitypolicies, default)
 }
+
+// fn server_groups_resolve(
+//     sites: vec<Site>
+// ) -> HashMap<String, Site> {
+//     let mut servergroups: Vec<Matching<Site>> = Vec::new();
+//     println!("!! server_groups_resolve");
+//     for site in sites {
+//         println!("!! server_groups_resolve in site: {:?}", site);
+//     }
+// }
