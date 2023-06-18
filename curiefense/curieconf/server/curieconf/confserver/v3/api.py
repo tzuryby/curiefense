@@ -85,7 +85,6 @@ class SecurityPolicy(BaseModel):
     match: StrictStr
     session: anyTypeUnion
     session_ids: anyTypeUnion
-    challenge_cookie_domain: StrictStr
     map: Optional[List[SecProfileMap]]
 
 

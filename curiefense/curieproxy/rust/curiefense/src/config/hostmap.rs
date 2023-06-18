@@ -34,7 +34,6 @@ pub struct SecurityPolicy {
     pub limits: Vec<Limit>,
     pub session: Vec<RequestSelector>,
     pub session_ids: Vec<RequestSelector>,
-    pub challenge_cookie_domain: String,//todo remove
 }
 
 impl Default for SecurityPolicy {
@@ -56,7 +55,6 @@ impl Default for SecurityPolicy {
             limits: Vec::new(),
             session: Vec::new(),
             session_ids: Vec::new(),
-            challenge_cookie_domain: "$host".to_string(),//todo remove
         }
     }
 }
@@ -80,7 +78,6 @@ impl SecurityPolicy {
             limits: Vec::new(),
             session: Vec::new(),
             session_ids: Vec::new(),
-            challenge_cookie_domain: "$host".to_string(),
         };
         out.content_filter_profile.content_type = Vec::new();
         out.content_filter_profile.decoding = Vec::new();

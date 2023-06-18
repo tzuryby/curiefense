@@ -297,8 +297,6 @@ pub struct Config {
     pub content_filter_profiles: HashMap<String, ContentFilterProfile>,
     pub virtual_tags: VirtualTags,
     pub logs: Logs,
-    //todo arbel add sites
-    // pub sites:
     pub servergroups_map: HashMap<String, Site>,
 
     // Not used when processing request, but to optimize reloading config
@@ -331,9 +329,7 @@ impl Config {
         contentfilterprofiles: &HashMap<String, ContentFilterProfile>,
         session: Vec<RequestSelector>,
         session_ids: Vec<RequestSelector>,
-        challenge_cookie_domain: &str,
     ) -> (Vec<Matching<Arc<SecurityPolicy>>>, Option<Arc<SecurityPolicy>>) {
-        // println!("~~~ resolve_security_policies ~~~");
         let mut default: Option<Arc<SecurityPolicy>> = None;
         let mut entries: Vec<Matching<Arc<SecurityPolicy>>> = Vec::new();
         for rawmap in rawmaps {
@@ -369,7 +365,6 @@ impl Config {
                     logs.debug(|| format!("Trying to add inactive limit {} in map {}", lid, mapname))
                 }
             }
-            // println!("~~~ resolve_security_policies got challenge_cookie_domain: {:?}", challenge_cookie_domain);
             let securitypolicy = SecurityPolicy {
                 policy: PolicyId {
                     id: policyid.to_string(),
@@ -387,7 +382,6 @@ impl Config {
                 content_filter_active: rawmap.content_filter_active,
                 content_filter_profile,
                 limits: olimits,
-                challenge_cookie_domain: challenge_cookie_domain.to_string(),
             };
             // println!("~~~ resolve_security_policies created securitypolicy: {:?}", securitypolicy);
             if rawmap.match_ == "__default__"
@@ -720,8 +714,6 @@ fn sec_pol_resolve(
             logs.error(|| format!("error when decoding session_ids in {}, {}", &mapname, rr));
             Vec::new()
         });
-        let ch_cookie_domain = rawmap.challenge_cookie_domain.unwrap_or_else(|| "$host".to_string());
-        println!("!! sec_pol_resolve before resolve_security_policies");
         let (entries, default_entry) = Config::resolve_security_policies(
             logs,
             &rawmap.id,
@@ -735,10 +727,7 @@ fn sec_pol_resolve(
             content_filter_profiles,
             session,
             session_ids,
-            &ch_cookie_domain,
-            // &rawmap.challenge_cookie_domain,
         );
-        println!("!! sec_pol_resolve after resolve_security_policies");
         if default_entry.is_none() {
             logs.warning(format!("HostMap entry '{}' does not have a default entry", &rawmap.name).as_str());
         }

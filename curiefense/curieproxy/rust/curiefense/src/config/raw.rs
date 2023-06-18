@@ -71,7 +71,6 @@ pub struct RawHostMap {
     pub session: Vec<HashMap<String, String>>,
     #[serde(default)]
     pub session_ids: Vec<HashMap<String, String>>,
-    pub challenge_cookie_domain: Option<String>, //todo remove
 }
 
 /// a mapping of the configuration file for security policies

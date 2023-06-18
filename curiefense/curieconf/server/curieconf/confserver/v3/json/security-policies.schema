@@ -61,12 +61,6 @@
         },
         "curiesession": { "$ref": "#/definitions/key-array" },
         "curiesession_ids": { "$ref": "#/definitions/key-array" },
-        "challenge_cookie_domain": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Challenge's Cookie Domain",
-            "description": "Defines the domain Reblaze will use when setting a challenge cookie. The default value (“$host”) tells Reblaze to use the domain being accessed by the user, “$wildcard“ means the domain string from the first “.“ and onward, and also a custom domain is optional"
-        },
         "map": {
             "type": "array",
             "title": "Security Policy Entries List",

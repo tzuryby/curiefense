@@ -15,8 +15,7 @@ pub fn match_servergroup<'a>(
     cfg: &'a Config,
     logs: &mut Logs,
     selected_sergrp: Option<&str>,
-) -> Option<Arc<Site>> {
-// ) -> Arc<Site> {
+) -> Arc<Site> {
     println!("## match_servergroup ##");
     println!("## selected_sergrp: {:?}", selected_sergrp);
     let site: Arc<Site> = match selected_sergrp {
@@ -36,5 +35,5 @@ pub fn match_servergroup<'a>(
 
 
     logs.debug(|| format!("Selected server group entry {}", site.id));
-    Some(site)
+    site
 }

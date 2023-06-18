@@ -71,7 +71,7 @@ local function redis_connect(handle)
     return red
 end
 
-function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
+function session_rust_nginx.inspect(handle, loglevel, secpolid, sergrpid, plugins)
     local rheaders, err = handle.req.get_headers()
     if err == "truncated" then
         handle.log(handle.ERR, "truncated headers: " .. err)
@@ -98,6 +98,9 @@ function session_rust_nginx.inspect(handle, loglevel, secpolid, plugins)
 
     if secpolid then
         params['secpolid'] = secpolid
+    end
+    if sergrpid then
+        params['sergrpid'] = sergrpid
     end
 
     local res = curiefense.inspect_request_init(params)

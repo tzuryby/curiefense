@@ -44,6 +44,7 @@ struct LuaArgs<'l> {
     str_ip: String,
     loglevel: LogLevel,
     secpolid: Option<String>,
+    sergrpid: Option<String>,
     humanity: PrecisionLevel,
     plugins: HashMap<String, String>,
 }
@@ -58,6 +59,7 @@ struct LuaArgs<'l> {
 /// * ip, string representation of the IP address
 /// * hops, optional number. When set the IP is computed from the x-forwarded-for header, defaulting to the ip argument on failure
 /// * secpolid, optional string. When set, bypass hostname matching for security policy selection
+/// * secpolid, selected server group (site)
 /// * configpath, path to the lua configuration files, defaults to /cf-config/current/config
 /// * humanity, PrecisionLevel, only used for the test functions
 fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>, String> {
@@ -72,6 +74,9 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         .map_err(|_| "Missing plugins argument".to_string())?;
     let vsecpolid = args
         .get("secpolid")
+        .map_err(|_| "Missing log level argument".to_string())?;
+     let vsergrpid = args
+        .get("sergrpid")
         .map_err(|_| "Missing log level argument".to_string())?;
     let vhumanity = args.get("human").map_err(|_| "Missing human argument".to_string())?;
     let loglevel = match String::from_lua(vloglevel, lua) {
@@ -108,6 +113,10 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         Err(rr) => return Err(format!("Could not convert the hops argument: {}", rr)),
         Ok(i) => i,
     };
+    let sergrpid = match FromLua::from_lua(vsergrpid, lua) {
+        Err(rr) => return Err(format!("Could not convert the hops argument: {}", rr)),
+        Ok(i) => i,
+    };
     let ip = match hops {
         None => str_ip,
         Some(hops) => curiefense::incremental::extract_ip(hops, &headers).unwrap_or(str_ip),
@@ -136,6 +145,7 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         str_ip: ip,
         loglevel,
         secpolid,
+        sergrpid,
         humanity,
         plugins: mplugins
             .unwrap_or_default()
@@ -161,6 +171,7 @@ fn lua_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectionResu
                 lua_args.str_ip,
                 Some(grasshopper),
                 lua_args.secpolid,
+                lua_args.sergrpid,
                 lua_args.plugins,
             );
             Ok(LuaInspectionResult(res))
@@ -184,6 +195,7 @@ fn lua_inspect_init(lua: &Lua, args: LuaTable) -> LuaResult<LInitResult<APhase1>
                 lua_args.str_ip,
                 Some(grasshopper),
                 lua_args.secpolid,
+                lua_args.sergrpid,
                 lua_args.plugins,
             );
             Ok(match res {
@@ -320,6 +332,7 @@ fn lua_test_inspect_request(lua: &Lua, args: LuaTable) -> LuaResult<LuaInspectio
                 lua_args.str_ip,
                 Some(&gh),
                 lua_args.secpolid,
+                lua_args.sergrpid,
                 lua_args.plugins,
             );
             Ok(LuaInspectionResult(res))
@@ -337,6 +350,7 @@ fn inspect_request<GH: Grasshopper>(
     ip: String,
     grasshopper: Option<&GH>,
     selected_secpol: Option<String>,
+    selected_sergrp: Option<String>,
     plugins: HashMap<String, String>,
 ) -> Result<InspectionResult, String> {
     let mut logs = Logs::default();
@@ -349,7 +363,7 @@ fn inspect_request<GH: Grasshopper>(
         headers,
         mbody,
     };
-    let dec = inspect_generic_request_map(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins);
+    let dec = inspect_generic_request_map(grasshopper, raw, &mut logs, selected_secpol.as_deref(), selected_sergrp.as_deref(), plugins);
 
     Ok(InspectionResult::from_analyze(logs, dec))
 }
@@ -363,6 +377,7 @@ fn inspect_init<GH: Grasshopper>(
     ip: String,
     grasshopper: Option<&GH>,
     selected_secpol: Option<String>,
+    selected_sergrp: Option<String>,
     plugins: HashMap<String, String>,
 ) -> Result<(InitResult, Logs), String> {
     let mut logs = Logs::new(loglevel);
@@ -376,7 +391,7 @@ fn inspect_init<GH: Grasshopper>(
         mbody,
     };
 
-    let p0 = match inspect_generic_request_map_init(grasshopper, raw, &mut logs, selected_secpol.as_deref(), plugins) {
+    let p0 = match inspect_generic_request_map_init(grasshopper, raw, &mut logs, selected_secpol.as_deref(), selected_sergrp.as_deref(), plugins) {
         Err(res) => return Ok((InitResult::Res(res), logs)),
         Ok(p0) => p0,
     };

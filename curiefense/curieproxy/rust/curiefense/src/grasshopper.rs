@@ -325,11 +325,15 @@ pub fn challenge_phase02<GH: Grasshopper>(
 
     //new
     let host = &reqinfo.rinfo.host;
-    let challenge_cookie_domain = &reqinfo.rinfo.secpolicy.challenge_cookie_domain;
+    // let challenge_cookie_domain = &reqinfo.rinfo.secpolicy.challenge_cookie_domain;
+    let challenge_cookie_domain = &reqinfo.rinfo.sergroup.challenge_cookie_domain;
+    println!("@@@ got host: {}", host);
+    // println!("@@@ got secpolicy challenge_cookie_domain: {}", challenge_cookie_domain);
+    println!("@@@ got sergrp challenge_cookie_domain: {}", challenge_cookie_domain);
     let mut domain = String::new();
     if challenge_cookie_domain == "$host" {
         domain = host.to_string();
-    } else if challenge_cookie_domain == "$wildcard" {
+    } else if challenge_cookie_domain == "$domain" {
         if let Some(index) = host.find('.') {
             domain = host[index..].to_string();
         }
@@ -337,7 +341,8 @@ pub fn challenge_phase02<GH: Grasshopper>(
         domain = challenge_cookie_domain.to_string();
     }
     let cookie = format!("rbzid={}; Path=/; HttpOnly; Domain={}", verified.replace('=', "-"), domain);
-    println!("@@@ cookie: {}", cookie);
+    println!("@@@ final domain: {}", domain);
+    println!("@@@ final cookie: {}", cookie);
 
     // cookie += domain;
     //

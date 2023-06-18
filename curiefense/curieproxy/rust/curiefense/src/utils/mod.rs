@@ -19,6 +19,7 @@ use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
 use crate::config::virtualtags::VirtualTags;
+use crate::config::custom::Site;
 use crate::geo::{
     get_ipinfo_asn, get_ipinfo_carrier, get_ipinfo_company, get_ipinfo_location, get_ipinfo_privacy, get_maxmind_asn,
     get_maxmind_city, get_maxmind_country, ipinfo_country_in_eu, ipinfo_resolve_continent, ipinfo_resolve_country_name,
@@ -369,6 +370,7 @@ pub struct RInfo {
     pub qinfo: QueryInfo,
     pub host: String,
     pub secpolicy: Arc<SecurityPolicy>,
+    pub sergroup: Arc<Site>,
     pub container_name: Option<String>,
 }
 
@@ -682,6 +684,7 @@ impl<'a> RawRequest<'a> {
 pub fn map_request(
     logs: &mut Logs,
     secpolicy: Arc<SecurityPolicy>,
+    sergroup: Arc<Site>,
     container_name: Option<String>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
@@ -726,6 +729,7 @@ pub fn map_request(
         qinfo,
         host,
         secpolicy: secpolicy.clone(),
+        sergroup: sergroup.clone(),
         container_name,
     };
 
