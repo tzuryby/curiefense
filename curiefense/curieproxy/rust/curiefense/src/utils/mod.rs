@@ -953,8 +953,17 @@ mod tests {
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
         let mut secpol = SecurityPolicy::empty();
+        let site = Site::default();
         secpol.content_filter_profile.referer_as_uri = true;
-        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None, None, HashMap::new());
+        let ri = map_request(
+            &mut logs,
+            Arc::new(secpol),
+            Arc::new(site),
+            None,
+            &raw,
+            None,
+            HashMap::new(),
+        );
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

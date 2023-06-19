@@ -534,6 +534,7 @@ mod test {
     use std::sync::Arc;
 
     use super::*;
+    use crate::config::custom::Site;
     use crate::config::hostmap::SecurityPolicy;
     use crate::config::virtualtags::VirtualTags;
     use crate::interface::stats::Stats;
@@ -562,13 +563,14 @@ mod test {
             meta,
         };
         let mut secpol = SecurityPolicy::empty();
+        let site = Site::default();
         secpol.content_filter_profile = profile;
         map_request(
             &mut logs,
             Arc::new(secpol),
+            Arc::new(site),
             None,
             &raw_request,
-            None,
             None,
             HashMap::new(),
         )
@@ -771,6 +773,7 @@ mod test {
             meta,
         };
         let mut secpol = SecurityPolicy::default();
+        let site = Site::default();
         secpol.content_filter_profile.decoding = vec![crate::config::contentfilter::Transformation::Base64Decode];
         secpol.content_filter_profile.content_type = vec![crate::config::raw::ContentType::Json];
         secpol.content_filter_profile.referer_as_uri = true;
@@ -783,9 +786,9 @@ mod test {
         let rinfo = map_request(
             &mut logs,
             Arc::new(secpol),
+            Arc::new(site),
             None,
             &raw_request,
-            None,
             None,
             HashMap::new(),
         );
