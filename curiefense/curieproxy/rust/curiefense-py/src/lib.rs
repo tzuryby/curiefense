@@ -44,7 +44,14 @@ fn py_inspect_request(
     };
 
     let grasshopper = DynGrasshopper {};
-    let dec = inspect_generic_request_map(Some(&grasshopper), raw, &mut logs, None, None, plugins.unwrap_or_default());
+    let dec = inspect_generic_request_map(
+        Some(&grasshopper),
+        raw,
+        &mut logs,
+        None,
+        None,
+        plugins.unwrap_or_default(),
+    );
     let res = InspectionResult {
         decision: dec.decision,
         tags: Some(dec.tags),
