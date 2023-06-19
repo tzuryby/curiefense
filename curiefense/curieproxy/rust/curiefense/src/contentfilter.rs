@@ -563,7 +563,7 @@ mod test {
         };
         let mut secpol = SecurityPolicy::empty();
         secpol.content_filter_profile = profile;
-        map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, HashMap::new())
+        map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, None, HashMap::new())
     }
 
     #[test]
@@ -772,7 +772,7 @@ mod test {
         hsection.regex = vec![(regex::Regex::new("^h.*").unwrap(), masksecret())];
         let csection = secpol.content_filter_profile.sections.at(SectionIdx::Cookies);
         csection.regex = vec![(regex::Regex::new(".*").unwrap(), masksecret())];
-        let rinfo = map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, HashMap::new());
+        let rinfo = map_request(&mut logs, Arc::new(secpol), None, &raw_request, None, None, HashMap::new());
 
         let masked = masking(rinfo);
 

@@ -372,6 +372,7 @@ mod test {
             global_limits: Vec::new(),
             inactive_limits: HashSet::new(),
             acls: HashMap::new(),
+            servergroups_map: HashMap::new(),
         }
     }
 

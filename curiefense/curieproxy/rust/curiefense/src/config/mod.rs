@@ -373,7 +373,6 @@ impl Config {
                 content_filter_profile,
                 limits: olimits,
             };
-            // println!("~~~ resolve_security_policies created securitypolicy: {:?}", securitypolicy);
             if rawmap.match_ == "__default__"
                 || securitypolicy.entry.id == "__default__"
                 || (rawmap.match_ == "/"
@@ -436,7 +435,6 @@ impl Config {
 
         let virtual_tags = vtags_resolve(&mut logs, rawvirtualtags);
 
-        // let servergroups_map = server_groups_resolve(rawsites);//todo need?
         let servergroups_map = Site::resolve(&mut logs, rawsites);
         println!("%%%%% servergroups_map: {:?}", servergroups_map);
 
