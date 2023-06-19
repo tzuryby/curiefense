@@ -1,4 +1,5 @@
 pub mod contentfilter;
+pub mod custom;
 pub mod flow;
 pub mod globalfilter;
 pub mod hostmap;
@@ -6,7 +7,6 @@ pub mod limit;
 pub mod matchers;
 pub mod raw;
 pub mod virtualtags;
-pub mod custom;
 
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -20,22 +20,22 @@ use crate::config::limit::Limit;
 use crate::interface::SimpleAction;
 use crate::logs::Logs;
 use contentfilter::{resolve_rules, ContentFilterProfile, ContentFilterRules};
+use custom::Site;
 use flow::flow_resolve;
 use globalfilter::GlobalFilterSection;
 use hostmap::{HostMap, PolicyId, SecurityPolicy};
-use matchers::Matching;
-use raw::{AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawVirtualTag, RawCustom, RawSite};
-use virtualtags::{vtags_resolve, VirtualTags};
-// use custom::Sites;
-use custom::{CustomObject, ContentItem, Site};
 use jsonpath_rust::JsonPathFinder;
+use matchers::Matching;
+use raw::{
+    AclProfile, RawFlowEntry, RawGlobalFilterSection, RawHostMap, RawLimit, RawSecurityPolicy, RawSite, RawVirtualTag,
+};
+use virtualtags::{vtags_resolve, VirtualTags};
 
 use self::flow::FlowMap;
 use self::matchers::RequestSelector;
 use self::raw::RawAclProfile;
 use self::raw::RawManifest;
 
-// static ALL_CONFIG_FILES: [&str; 10] = [
 static ALL_CONFIG_FILES: [&str; 11] = [
     "actions.json",
     "acl-profiles.json",
@@ -260,16 +260,6 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         println!("--- reload. servergroups_map: {:?}", servergroups_map);
         config.servergroups_map = servergroups_map;
     }
-    //old
-    // if files_to_reload.contains("custom.json") {
-    //     println!("^^^ load custom.json:");
-    //     let raw_custom = Config::load_config_file(&mut logs, &bjson, "custom.json");
-    //     println!("^^^ raw_custom: {:?}", raw_custom);
-    //     let sites = CustomObject::resolve(&mut logs, raw_custom);//todo not only sites..
-    //     println!("^^^ sites: {:?}", sites);
-    //     // config.sites = sites;
-    // }
-
 
     config.logs = logs.clone();
 
@@ -470,10 +460,9 @@ impl Config {
         }
     }
 
-    //custom.json is built differently, use this function to extract needed data
-    // fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> Vec<Site> {
+    //custom.json is built differently, use this function to extract needed data.
+    //right now it returns only sites data, can be extended if needed
     fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> Vec<RawSite> {
-    // fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> String {
         let mut path = base.to_path_buf();
         path.push(fname);
         let fullpath = path.to_str().unwrap_or(fname).to_string();
@@ -481,27 +470,23 @@ impl Config {
             Ok(f) => f,
             Err(rr) => {
                 logs.error(|| format!("when loading {}: {}", fullpath, rr));
-                // return "error".to_string();
-                return Vec::new();//todo?
+                return Vec::new();
             }
         };
         println!("%%% load_custom_config_file file: {:?}", file);
 
-        let mut file_content = String::new();
-        let file_content_res = std::fs::read_to_string(fullpath)
-            .ok()
-            .map(|s| s.trim().to_string());
-        file_content = match file_content_res {
+        let file_content_res = std::fs::read_to_string(fullpath).ok().map(|s| s.trim().to_string());
+        let file_content = match file_content_res {
             Some(content) => {
                 println!("%%% content: {:?}", content);
                 content
-            },
-            None => {"{}".to_string()},
+            }
+            None => "{}".to_string(),
         };
 
-        let json_path = "$[?(@.id == 'sites')].items.*"; // JSONPath expression to match the element with id 'sites'
+        // JSONPath expression to match the element with id 'sites'
+        let json_path = "$[?(@.id == 'sites')].items.*";
 
-        // let mut sites_vec: Vec<Site> = Vec::new();
         let mut sites_vec: Vec<RawSite> = Vec::new();
         match JsonPathFinder::from_str(&file_content, json_path) {
             Ok(finder) => {
@@ -515,8 +500,9 @@ impl Config {
                         println!("%%% in site: {:?}", site);
                         if let serde_json::Value::Object(site_object) = site {
                             println!("%%% in site serde. site_object: {:?}", site_object);
-                            // if let Ok(site_struct) = serde_json::from_value::<Site>(serde_json::Value::Object(site_object)) {
-                            if let Ok(site_struct) = serde_json::from_value::<RawSite>(serde_json::Value::Object(site_object)) {
+                            if let Ok(site_struct) =
+                                serde_json::from_value::<RawSite>(serde_json::Value::Object(site_object))
+                            {
                                 println!("%%% ok site_struct: {:?}", site_struct);
                                 sites_vec.push(site_struct);
                                 println!("%%% sites_vec after push: {:?}", sites_vec);
@@ -528,13 +514,11 @@ impl Config {
             }
             Err(e) => {
                 println!("%%% when applying JSONPath expression: err: {:?}", e);
-                // "err".to_string()
-            },
+                logs.error(|| format!("when applying JSONPath expression: err: {:?}", e));
+            }
         };
 
-        // "testtesttest".to_string()
         sites_vec
-
     }
 
     fn load_config_file<A: serde::de::DeserializeOwned>(logs: &mut Logs, base: &Path, fname: &str) -> Vec<A> {
@@ -559,7 +543,7 @@ impl Config {
         };
         let mut out = Vec::new();
         for value in values {
-            if fname=="custom.json" {
+            if fname == "custom.json" {
                 println!("*** loop value: {:?}", value);
             }
             // for each entry, try to resolve it as a raw configuration value, failing otherwise
@@ -567,7 +551,7 @@ impl Config {
                 Err(rr) => {
                     logs.error(|| format!("when resolving entry from {}: {}", fullpath, rr));
                     println!("*** error when resolving entry from {}: {}", fullpath, rr);
-                },
+                }
                 Ok(v) => out.push(v),
             }
         }
@@ -628,7 +612,7 @@ impl Config {
             content_filter_profiles,
             container_name,
             flows,
-            virtualtags,//todo add custom or sites or something
+            virtualtags,
             rawsites,
         )
     }
@@ -757,13 +741,3 @@ fn sec_pol_resolve(
 
     (securitypolicies_map, securitypolicies, default)
 }
-
-// fn server_groups_resolve(
-//     sites: vec<Site>
-// ) -> HashMap<String, Site> {
-//     let mut servergroups: Vec<Matching<Site>> = Vec::new();
-//     println!("!! server_groups_resolve");
-//     for site in sites {
-//         println!("!! server_groups_resolve in site: {:?}", site);
-//     }
-// }

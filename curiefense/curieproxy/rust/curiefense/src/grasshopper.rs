@@ -313,22 +313,10 @@ pub fn challenge_phase02<GH: Grasshopper>(
 
     let mut nheaders = HashMap::<String, String>::new();
 
-    // let mut cookie = "rbzid=".to_string();
-    // cookie += &verified.replace('=', "-");
-    // cookie += "; Path=/; HttpOnly";
-    // //domain test
-    // let host = reqinfo.rinfo.host;
-    // println!("@@@ host: {}", domain);
-    // let mut domain = "Domain=".to_string();
-    // cookie += host;
-    // println!("@@@ domain: {}", domain);
-
-    //new
+    //add the domain part to the challenge cookie according the the requested domain in the UI
     let host = &reqinfo.rinfo.host;
-    // let challenge_cookie_domain = &reqinfo.rinfo.secpolicy.challenge_cookie_domain;
     let challenge_cookie_domain = &reqinfo.rinfo.sergroup.challenge_cookie_domain;
     println!("@@@ got host: {}", host);
-    // println!("@@@ got secpolicy challenge_cookie_domain: {}", challenge_cookie_domain);
     println!("@@@ got sergrp challenge_cookie_domain: {}", challenge_cookie_domain);
     let mut domain = String::new();
     if challenge_cookie_domain == "$host" {
@@ -340,12 +328,13 @@ pub fn challenge_phase02<GH: Grasshopper>(
     } else {
         domain = challenge_cookie_domain.to_string();
     }
-    let cookie = format!("rbzid={}; Path=/; HttpOnly; Domain={}", verified.replace('=', "-"), domain);
+    let cookie = format!(
+        "rbzid={}; Path=/; HttpOnly; Domain={}",
+        verified.replace('=', "-"),
+        domain
+    );
     println!("@@@ final domain: {}", domain);
     println!("@@@ final cookie: {}", cookie);
-
-    // cookie += domain;
-    //
 
     nheaders.insert("Set-Cookie".to_string(), cookie);
 

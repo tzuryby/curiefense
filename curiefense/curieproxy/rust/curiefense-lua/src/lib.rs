@@ -59,7 +59,7 @@ struct LuaArgs<'l> {
 /// * ip, string representation of the IP address
 /// * hops, optional number. When set the IP is computed from the x-forwarded-for header, defaulting to the ip argument on failure
 /// * secpolid, optional string. When set, bypass hostname matching for security policy selection
-/// * secpolid, selected server group (site)
+/// * sergrpid, selected server group (site)
 /// * configpath, path to the lua configuration files, defaults to /cf-config/current/config
 /// * humanity, PrecisionLevel, only used for the test functions
 fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>, String> {
@@ -75,7 +75,7 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
     let vsecpolid = args
         .get("secpolid")
         .map_err(|_| "Missing log level argument".to_string())?;
-     let vsergrpid = args
+    let vsergrpid = args
         .get("sergrpid")
         .map_err(|_| "Missing log level argument".to_string())?;
     let vhumanity = args.get("human").map_err(|_| "Missing human argument".to_string())?;
@@ -363,7 +363,14 @@ fn inspect_request<GH: Grasshopper>(
         headers,
         mbody,
     };
-    let dec = inspect_generic_request_map(grasshopper, raw, &mut logs, selected_secpol.as_deref(), selected_sergrp.as_deref(), plugins);
+    let dec = inspect_generic_request_map(
+        grasshopper,
+        raw,
+        &mut logs,
+        selected_secpol.as_deref(),
+        selected_sergrp.as_deref(),
+        plugins,
+    );
 
     Ok(InspectionResult::from_analyze(logs, dec))
 }
@@ -391,7 +398,14 @@ fn inspect_init<GH: Grasshopper>(
         mbody,
     };
 
-    let p0 = match inspect_generic_request_map_init(grasshopper, raw, &mut logs, selected_secpol.as_deref(), selected_sergrp.as_deref(), plugins) {
+    let p0 = match inspect_generic_request_map_init(
+        grasshopper,
+        raw,
+        &mut logs,
+        selected_secpol.as_deref(),
+        selected_sergrp.as_deref(),
+        plugins,
+    ) {
         Err(res) => return Ok((InitResult::Res(res), logs)),
         Ok(p0) => p0,
     };

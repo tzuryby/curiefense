@@ -88,62 +88,7 @@ pub struct RawSecurityPolicy {
     pub limit_ids: Vec<String>,
 }
 
-/** CUSTOM DOCUMENT **/
-
 /// a mapping of the custom document
-/*#[derive(Debug, Deserialize, Clone)]
-pub struct RawCustom {
-    pub content: Vec<RawCustomItem>,
-}
-#[derive(Debug, Clone, serde::Deserialize)]
-pub enum RawCustomItem {
-    Sites(RawSites),
-    // Add more variants for other object types
-}
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct RawSites {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub items: HashMap<String, RawSite>,
-}
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct RawSite {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub server_names: Vec<String>,
-    pub security_policy: String,
-    pub routing_profile: String,
-    pub proxy_template: String,
-    pub mobile_sdk: String,
-    pub ssl_certificate: String,
-    pub challenge_cookie_domain: String, //new
-}*/
-#[derive(Debug, Deserialize, Clone)]
-pub struct RawCustom {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub items: HashMap<String, RawCustomItem>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum RawCustomItem {
-    Sites(RawSites),
-    // Add more variants for other object types
-    // Add a variant for the "sites" item
-    SitesItem(RawSite),
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct RawSites {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub items: HashMap<String, RawSite>,
-}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawSite {
@@ -158,23 +103,8 @@ pub struct RawSite {
     pub ssl_certificate: String,
     pub challenge_cookie_domain: Option<String>, //new
 }
-/*#[derive(Debug, Clone, serde::Deserialize)]
-pub struct Site {
-    id: String,
-    name: String,
-    description: String,
-    server_names: Vec<String>,
-    security_policy: String,
-    routing_profile: String,
-    proxy_template: String,
-    mobile_sdk: String,
-    ssl_certificate: String,
-    // challenge_cookie_domain: String, //new
-}*/
 
 // Add other necessary structs for the remaining objects in the JSON file
-
-
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "UPPERCASE")]

@@ -35,9 +35,9 @@ use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::config::custom::Site;
 use crate::config::hostmap::SecurityPolicy;
 use crate::interface::SimpleAction;
-use crate::config::custom::Site;
 //todo should receive sdk configuration from config/raw.rs struct, and pass it to gg
 fn challenge_verified<GH: Grasshopper>(gh: &GH, reqinfo: &RequestInfo, logs: &mut Logs) -> PrecisionLevel {
     match gh.is_human(GHQuery {
@@ -203,7 +203,15 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
                 let server_group = Site::default();
-                let rinfo = map_request(logs, Arc::new(secpol), Arc::new(server_group), None, &raw, Some(start), plugins);
+                let rinfo = map_request(
+                    logs,
+                    Arc::new(secpol),
+                    Arc::new(server_group),
+                    None,
+                    &raw,
+                    Some(start),
+                    plugins,
+                );
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -216,7 +224,15 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
                 let server_group = Site::default();
-                let rinfo = map_request(logs, Arc::new(secpol), Arc::new(server_group), None, &raw, Some(start), plugins);
+                let rinfo = map_request(
+                    logs,
+                    Arc::new(secpol),
+                    Arc::new(server_group),
+                    None,
+                    &raw,
+                    Some(start),
+                    plugins,
+                );
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,

@@ -16,11 +16,11 @@ use crate::{
     config::{
         contentfilter::ContentFilterRules,
         contentfilter::{ContentFilterProfile, SectionIdx},
+        custom::Site,
         flow::FlowMap,
         globalfilter::GlobalFilterSection,
         hostmap::SecurityPolicy,
         virtualtags::VirtualTags,
-        custom::Site,
         Config,
     },
     grasshopper::{Grasshopper, PrecisionLevel},
