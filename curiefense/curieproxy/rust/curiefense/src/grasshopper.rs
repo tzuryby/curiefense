@@ -316,8 +316,6 @@ pub fn challenge_phase02<GH: Grasshopper>(
     //add the domain part to the challenge cookie according the the requested domain in the UI
     let host = &reqinfo.rinfo.host;
     let challenge_cookie_domain = &reqinfo.rinfo.sergroup.challenge_cookie_domain;
-    println!("@@@ got host: {}", host);
-    println!("@@@ got sergrp challenge_cookie_domain: {}", challenge_cookie_domain);
     let mut domain = String::new();
     if challenge_cookie_domain == "$host" {
         domain = host.to_string();
@@ -333,8 +331,6 @@ pub fn challenge_phase02<GH: Grasshopper>(
         verified.replace('=', "-"),
         domain
     );
-    println!("@@@ final domain: {}", domain);
-    println!("@@@ final cookie: {}", cookie);
 
     nheaders.insert("Set-Cookie".to_string(), cookie);
 

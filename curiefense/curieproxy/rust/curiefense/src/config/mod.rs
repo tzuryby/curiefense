@@ -149,10 +149,8 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     bjson.push("json");
 
     let mut files_to_reload = HashSet::new();
-    println!("^^^ reload_config. filenames: {:?}", filenames);
     if filenames.is_empty() {
-        // if not filename was provided, reload all config files
-        println!("^^^ reload_config. ALL_CONFIG_FILES: {:?}", ALL_CONFIG_FILES);
+        // if filename was not provided, reload all config files
         files_to_reload.extend(ALL_CONFIG_FILES.iter().map(|s| s.to_string()));
     } else {
         for filename in filenames.iter() {
@@ -253,11 +251,8 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
     }
     //new! custom doc
     if files_to_reload.contains("custom.json") {
-        println!("--- reload. before rawsites");
         let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
-        println!("--- reload. rawsites: {:?}", rawsites);
         let servergroups_map = Site::resolve(&mut logs, rawsites);
-        println!("--- reload. servergroups_map: {:?}", servergroups_map);
         config.servergroups_map = servergroups_map;
     }
 
@@ -436,7 +431,6 @@ impl Config {
         let virtual_tags = vtags_resolve(&mut logs, rawvirtualtags);
 
         let servergroups_map = Site::resolve(&mut logs, rawsites);
-        println!("%%%%% servergroups_map: {:?}", servergroups_map);
 
         Config {
             revision,
@@ -471,14 +465,10 @@ impl Config {
                 return Vec::new();
             }
         };
-        println!("%%% load_custom_config_file file: {:?}", file);
 
         let file_content_res = std::fs::read_to_string(fullpath).ok().map(|s| s.trim().to_string());
         let file_content = match file_content_res {
-            Some(content) => {
-                println!("%%% content: {:?}", content);
-                content
-            }
+            Some(content) => content,
             None => "{}".to_string(),
         };
 
@@ -489,29 +479,21 @@ impl Config {
         match JsonPathFinder::from_str(&file_content, json_path) {
             Ok(finder) => {
                 let found_sites = finder.find();
-                println!("%%% found_sites finder.find: {:?}", found_sites);
 
                 // let mut sites_vec: Vec<Site> = Vec::new();
                 if let serde_json::Value::Array(arr) = found_sites {
-                    println!("%%% in array");
                     for site in arr {
-                        println!("%%% in site: {:?}", site);
                         if let serde_json::Value::Object(site_object) = site {
-                            println!("%%% in site serde. site_object: {:?}", site_object);
                             if let Ok(site_struct) =
                                 serde_json::from_value::<RawSite>(serde_json::Value::Object(site_object))
                             {
-                                println!("%%% ok site_struct: {:?}", site_struct);
                                 sites_vec.push(site_struct);
-                                println!("%%% sites_vec after push: {:?}", sites_vec);
                             }
                         }
                     }
                 }
-                println!("%%% found_sites vec: {:?}", sites_vec);
             }
             Err(e) => {
-                println!("%%% when applying JSONPath expression: err: {:?}", e);
                 logs.error(|| format!("when applying JSONPath expression: err: {:?}", e));
             }
         };
@@ -535,20 +517,15 @@ impl Config {
             Err(rr) => {
                 // if it is not a json array, abort early and do not resolve anything
                 logs.error(|| format!("when parsing {}: {}", fullpath, rr));
-                println!("*** error when parsing {}: {}", fullpath, rr);
                 return Vec::new();
             }
         };
         let mut out = Vec::new();
         for value in values {
-            if fname == "custom.json" {
-                println!("*** loop value: {:?}", value);
-            }
             // for each entry, try to resolve it as a raw configuration value, failing otherwise
             match serde_json::from_value(value) {
                 Err(rr) => {
                     logs.error(|| format!("when resolving entry from {}: {}", fullpath, rr));
-                    println!("*** error when resolving entry from {}: {}", fullpath, rr);
                 }
                 Ok(v) => out.push(v),
             }
@@ -580,9 +557,7 @@ impl Config {
             Ok(manifest) => manifest.meta.version,
         };
 
-        println!("--- in load() ---");
         let rawactions = Config::load_config_file(&mut logs, &bjson, "actions.json");
-        println!("--- load. rawactions: {:?}", rawactions);
         let securitypolicy = Config::load_config_file(&mut logs, &bjson, "securitypolicy.json");
         let globalfilters = Config::load_config_file(&mut logs, &bjson, "globalfilter-lists.json");
         let limits = Config::load_config_file(&mut logs, &bjson, "limits.json");
@@ -590,9 +565,7 @@ impl Config {
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
         let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
-        // let sites: Vec<Site> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
         let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
-        println!("--- load. rawsites: {:?}", rawsites);
 
         let container_name = container_name();
 
@@ -667,11 +640,8 @@ fn sec_pol_resolve(
     let mut default: Option<HostMap> = None;
     let mut securitypolicies: Vec<Matching<HostMap>> = Vec::new();
     let mut securitypolicies_map = HashMap::new();
-    println!("!! sec_pol_resolve");
-    println!("!! sec_pol_resolve rawmaps: {:?}", rawmaps);
     // build the entries while looking for the default entry
     for rawmap in rawmaps {
-        println!("!! sec_pol_resolve in rawmap: {:?}", rawmap);
         let mapname = rawmap.name.clone();
         let msession: anyhow::Result<Vec<RequestSelector>> = if rawmap.session.is_empty() {
             Ok(Vec::new())

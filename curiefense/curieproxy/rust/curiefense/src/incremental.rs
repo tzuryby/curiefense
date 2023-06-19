@@ -96,7 +96,6 @@ pub fn inspect_init(
         selected_secpol,
     );
     let server_group = match_servergroup(config, &mut logs, selected_sergrp);
-    println!("====== INCREMENTAL after match_servergroup, got: {:?}", server_group);
     match mr {
         None => Err("could not find a matching security policy".to_string()),
         Some(secpol) => {

@@ -102,9 +102,6 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     plugins: HashMap<String, String>,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
-    println!("====== inspect_generic_request_map_init ======");
-    println!("====== selected_secpol: {:?}", selected_secpol);
-    println!("====== selected_sergrp: {:?}", selected_sergrp);
 
     // insert the all tag here, to make sure it is always present, even in the presence of early errors
     let tags = Tags::from_slice(&[(String::from("all"), Location::Request)], VirtualTags::default());
@@ -126,7 +123,6 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
         match with_config(logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
             let server_group = match_servergroup(cfg, slogs, selected_sergrp);
-            println!("====== after match_servergroup, got: {:?}", server_group);
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it

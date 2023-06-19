@@ -27,15 +27,8 @@ impl Default for Site {
 impl Site {
     pub fn resolve(logs: &mut Logs, raw_sites: Vec<RawSite>) -> HashMap<String, Site> {
         let mut sites_map: HashMap<String, Site> = HashMap::new();
-        println!("&& server_groups_resolve");
         for raw_site in raw_sites {
-            println!("&& server_groups_resolve in raw_site: {:?}", raw_site);
-
             let challenge_cookie_domain = raw_site.challenge_cookie_domain.unwrap_or_else(|| "$host".to_string());
-            println!(
-                "&& server_groups_resolve challenge_cookie_domain: {}",
-                challenge_cookie_domain
-            );
 
             let site = Site {
                 id: raw_site.id.clone(),
@@ -43,7 +36,6 @@ impl Site {
                 // mobile_sdk: raw_site.mobile_sdk.clone(),
                 challenge_cookie_domain,
             };
-            println!("&& server_groups_resolve sites_map.insert: {:?}", site);
             sites_map.insert(raw_site.id.clone(), site);
         }
         sites_map
