@@ -28,7 +28,17 @@ impl Site {
     pub fn resolve(logs: &mut Logs, raw_sites: Vec<RawSite>) -> HashMap<String, Site> {
         let mut sites_map: HashMap<String, Site> = HashMap::new();
         for raw_site in raw_sites {
-            let challenge_cookie_domain = raw_site.challenge_cookie_domain.unwrap_or_else(|| "$host".to_string());
+            let challenge_cookie_domain = raw_site
+                .challenge_cookie_domain
+                .as_ref()
+                .map(|domain| {
+                    if domain.is_empty() {
+                        "$host".to_string()
+                    } else {
+                        domain.clone()
+                    }
+                })
+                .unwrap_or_else(|| "$host".to_string());
 
             let site = Site {
                 id: raw_site.id.clone(),

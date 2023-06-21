@@ -249,7 +249,6 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         let virtual_tags = vtags_resolve(&mut logs, raw_virtual_tags);
         config.virtual_tags = virtual_tags;
     }
-    //new! custom doc
     if files_to_reload.contains("custom.json") {
         let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
         let servergroups_map = Site::resolve(&mut logs, rawsites);
@@ -480,7 +479,6 @@ impl Config {
             Ok(finder) => {
                 let found_sites = finder.find();
 
-                // let mut sites_vec: Vec<Site> = Vec::new();
                 if let serde_json::Value::Array(arr) = found_sites {
                     for site in arr {
                         if let serde_json::Value::Object(site_object) = site {

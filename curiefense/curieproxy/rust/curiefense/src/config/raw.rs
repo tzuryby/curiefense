@@ -101,7 +101,7 @@ pub struct RawSite {
     pub proxy_template: String,
     pub mobile_sdk: String,
     pub ssl_certificate: String,
-    pub challenge_cookie_domain: Option<String>, //new
+    pub challenge_cookie_domain: Option<String>,
 }
 
 // Add other necessary structs for the remaining objects in the JSON file
