@@ -88,8 +88,9 @@ pub struct RawSecurityPolicy {
     pub limit_ids: Vec<String>,
 }
 
-/// a mapping of the custom document
+/** a mapping of elements in the custom document **/
 
+///mapping for the site element (server group)
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawSite {
     pub id: String,

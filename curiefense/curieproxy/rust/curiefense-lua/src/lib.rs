@@ -74,10 +74,10 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         .map_err(|_| "Missing plugins argument".to_string())?;
     let vsecpolid = args
         .get("secpolid")
-        .map_err(|_| "Missing log level argument".to_string())?;
+        .map_err(|_| "Missing secpolid argument".to_string())?;
     let vsergrpid = args
         .get("sergrpid")
-        .map_err(|_| "Missing log level argument".to_string())?;
+        .map_err(|_| "Missing sergrpid argument".to_string())?;
     let vhumanity = args.get("human").map_err(|_| "Missing human argument".to_string())?;
     let loglevel = match String::from_lua(vloglevel, lua) {
         Err(rr) => return Err(format!("Could not convert the loglevel argument: {}", rr)),
@@ -110,11 +110,11 @@ fn lua_convert_args<'l>(lua: &'l Lua, args: LuaTable<'l>) -> Result<LuaArgs<'l>,
         Ok(i) => i,
     };
     let secpolid = match FromLua::from_lua(vsecpolid, lua) {
-        Err(rr) => return Err(format!("Could not convert the hops argument: {}", rr)),
+        Err(rr) => return Err(format!("Could not convert the secpolid argument: {}", rr)),
         Ok(i) => i,
     };
     let sergrpid = match FromLua::from_lua(vsergrpid, lua) {
-        Err(rr) => return Err(format!("Could not convert the hops argument: {}", rr)),
+        Err(rr) => return Err(format!("Could not convert the sergrpid argument: {}", rr)),
         Ok(i) => i,
     };
     let ip = match hops {

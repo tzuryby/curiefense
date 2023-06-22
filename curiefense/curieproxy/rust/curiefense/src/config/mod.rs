@@ -250,7 +250,7 @@ pub fn reload_config(basepath: &str, filenames: Vec<String>) {
         config.virtual_tags = virtual_tags;
     }
     if files_to_reload.contains("custom.json") {
-        let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        let (rawsites,) = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
         let servergroups_map = Site::resolve(&mut logs, rawsites);
         config.servergroups_map = servergroups_map;
     }
@@ -453,7 +453,7 @@ impl Config {
 
     //custom.json is built differently, use this function to extract needed data.
     //right now it returns only sites data, can be extended if needed
-    fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> Vec<RawSite> {
+    fn load_custom_config_file(logs: &mut Logs, base: &Path, fname: &str) -> (Vec<RawSite>,) {
         let mut path = base.to_path_buf();
         path.push(fname);
         let fullpath = path.to_str().unwrap_or(fname).to_string();
@@ -461,7 +461,7 @@ impl Config {
             Ok(f) => f,
             Err(rr) => {
                 logs.error(|| format!("when loading {}: {}", fullpath, rr));
-                return Vec::new();
+                return (Vec::new(),);
             }
         };
 
@@ -496,7 +496,7 @@ impl Config {
             }
         };
 
-        sites_vec
+        (sites_vec,)
     }
 
     fn load_config_file<A: serde::de::DeserializeOwned>(logs: &mut Logs, base: &Path, fname: &str) -> Vec<A> {
@@ -563,7 +563,8 @@ impl Config {
         let rawcontentfilterprofiles = Config::load_config_file(&mut logs, &bjson, "contentfilter-profiles.json");
         let flows = Config::load_config_file(&mut logs, &bjson, "flow-control.json");
         let virtualtags = Config::load_config_file(&mut logs, &bjson, "virtual-tags.json");
-        let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        // let rawsites: Vec<RawSite> = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
+        let (rawsites,) = Config::load_custom_config_file(&mut logs, &bjson, "custom.json");
 
         let container_name = container_name();
 
