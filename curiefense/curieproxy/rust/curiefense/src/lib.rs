@@ -14,6 +14,7 @@ pub mod logs;
 pub mod redis;
 pub mod requestfields;
 pub mod securitypolicy;
+pub mod servergroup;
 pub mod simple_executor;
 pub mod tagging;
 pub mod utils;
@@ -29,10 +30,12 @@ use interface::stats::{SecpolStats, Stats, StatsCollect};
 use interface::{Action, ActionType, AnalyzeResult, BlockReason, Decision, Location, Tags};
 use logs::Logs;
 use securitypolicy::match_securitypolicy;
+use servergroup::match_servergroup;
 use simple_executor::{Executor, Progress, Task};
 use tagging::tag_request;
 use utils::{map_request, RawRequest, RequestInfo};
 
+use crate::config::custom::Site;
 use crate::config::hostmap::SecurityPolicy;
 use crate::interface::SimpleAction;
 //todo should receive sdk configuration from config/raw.rs struct, and pass it to gg
@@ -76,6 +79,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
     raw: RawRequest,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
+    selected_sergrp: Option<&str>,
     plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
     async_std::task::block_on(inspect_generic_request_map_async(
@@ -83,6 +87,7 @@ pub fn inspect_generic_request_map<GH: Grasshopper>(
         raw,
         logs,
         selected_secpol,
+        selected_sergrp,
         plugins,
     ))
 }
@@ -93,6 +98,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     raw: RawRequest,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
+    selected_sergrp: Option<&str>,
     plugins: HashMap<String, String>,
 ) -> Result<APhase0, AnalyzeResult> {
     let start = chrono::Utc::now();
@@ -116,6 +122,7 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
     let ((mut ntags, globalfilter_dec, stats), flows, reqinfo, precision_level) =
         match with_config(logs, |slogs, cfg| {
             let mmapinfo = match_securitypolicy(&raw.get_host(), &raw.meta.path, cfg, slogs, selected_secpol);
+            let server_group = match_servergroup(cfg, slogs, selected_sergrp);
             match mmapinfo {
                 Some(secpolicy) => {
                     // this part is where we use the configuration as much as possible, while we have a lock on it
@@ -145,10 +152,12 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
 
                     let stats = StatsCollect::new(slogs.start, cfg.revision.clone())
                         .secpol(SecpolStats::build(&secpolicy, cfg.globalfilters.len()));
+
                     // if the max depth is equal to 0, the body will not be parsed
                     let reqinfo = map_request(
                         slogs,
                         secpolicy,
+                        server_group,
                         cfg.container_name.clone(),
                         &raw,
                         Some(start),
@@ -189,7 +198,16 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 logs.debug("No security policy found");
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
-                let rinfo = map_request(logs, Arc::new(secpol), None, &raw, Some(start), plugins);
+                let server_group = Site::default();
+                let rinfo = map_request(
+                    logs,
+                    Arc::new(secpol),
+                    Arc::new(server_group),
+                    None,
+                    &raw,
+                    Some(start),
+                    plugins,
+                );
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -201,7 +219,16 @@ pub fn inspect_generic_request_map_init<GH: Grasshopper>(
                 logs.debug("Something went wrong during security policy searching");
                 let mut secpol = SecurityPolicy::default();
                 secpol.content_filter_profile.ignore_body = true;
-                let rinfo = map_request(logs, Arc::new(secpol), None, &raw, Some(start), plugins);
+                let server_group = Site::default();
+                let rinfo = map_request(
+                    logs,
+                    Arc::new(secpol),
+                    Arc::new(server_group),
+                    None,
+                    &raw,
+                    Some(start),
+                    plugins,
+                );
                 return Err(AnalyzeResult {
                     decision: Decision::pass(Vec::new()),
                     tags,
@@ -228,9 +255,10 @@ pub async fn inspect_generic_request_map_async<GH: Grasshopper>(
     raw: RawRequest<'_>,
     logs: &mut Logs,
     selected_secpol: Option<&str>,
+    selected_sergrp: Option<&str>,
     plugins: HashMap<String, String>,
 ) -> AnalyzeResult {
-    match inspect_generic_request_map_init(mgh, raw, logs, selected_secpol, plugins) {
+    match inspect_generic_request_map_init(mgh, raw, logs, selected_secpol, selected_sergrp, plugins) {
         Err(res) => res,
         Ok(p0) => analyze::analyze(logs, mgh, p0, CfRulesArg::Global).await,
     }

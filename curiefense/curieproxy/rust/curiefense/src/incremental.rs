@@ -16,6 +16,7 @@ use crate::{
     config::{
         contentfilter::ContentFilterRules,
         contentfilter::{ContentFilterProfile, SectionIdx},
+        custom::Site,
         flow::FlowMap,
         globalfilter::GlobalFilterSection,
         hostmap::SecurityPolicy,
@@ -29,6 +30,7 @@ use crate::{
     },
     logs::{LogLevel, Logs},
     securitypolicy::match_securitypolicy,
+    servergroup::match_servergroup,
     tagging::tag_request,
     utils::{map_request, RawRequest, RequestMeta},
 };
@@ -44,6 +46,7 @@ pub struct IData {
     meta: RequestMeta,
     headers: HashMap<String, String>,
     secpol: Arc<SecurityPolicy>,
+    sergroup: Arc<Site>,
     body: Option<Vec<u8>>,
     ipinfo: IPInfo,
     stats: StatsCollect<BStageSecpol>,
@@ -81,6 +84,7 @@ pub fn inspect_init(
     ipinfo: IPInfo,
     start: Option<DateTime<Utc>>,
     selected_secpol: Option<&str>,
+    selected_sergrp: Option<&str>,
     plugins: HashMap<String, String>,
 ) -> Result<IData, String> {
     let mut logs = Logs::new(loglevel);
@@ -91,6 +95,7 @@ pub fn inspect_init(
         &mut logs,
         selected_secpol,
     );
+    let server_group = match_servergroup(config, &mut logs, selected_sergrp);
     match mr {
         None => Err("could not find a matching security policy".to_string()),
         Some(secpol) => {
@@ -102,6 +107,7 @@ pub fn inspect_init(
                 meta,
                 headers: HashMap::new(),
                 secpol,
+                sergroup: server_group,
                 body: None,
                 ipinfo,
                 stats,
@@ -118,6 +124,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
     let ipstr = idata.ip();
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
+    let sergroup = idata.sergroup;
     let rawrequest = RawRequest {
         ipstr,
         headers: idata.headers,
@@ -127,6 +134,7 @@ fn early_block(idata: IData, action: Action, br: BlockReason) -> (Logs, AnalyzeR
     let reqinfo = map_request(
         &mut logs,
         secpolicy,
+        sergroup,
         idata.container_name,
         &rawrequest,
         Some(idata.start),
@@ -267,6 +275,7 @@ pub async fn finalize<GH: Grasshopper>(
     let ipstr = idata.ip();
     let mut logs = idata.logs;
     let secpolicy = idata.secpol;
+    let sergroup = idata.sergroup;
     let rawrequest = RawRequest {
         ipstr,
         headers: idata.headers,
@@ -279,6 +288,7 @@ pub async fn finalize<GH: Grasshopper>(
     let reqinfo = map_request(
         &mut logs,
         secpolicy.clone(),
+        sergroup.clone(),
         idata.container_name,
         &rawrequest,
         Some(idata.start),
@@ -361,6 +371,7 @@ mod test {
             global_limits: Vec::new(),
             inactive_limits: HashSet::new(),
             acls: HashMap::new(),
+            servergroups_map: HashMap::new(),
         }
     }
 
@@ -381,6 +392,7 @@ mod test {
                 requestid: None,
             },
             IPInfo::Ip("1.2.3.4".to_string()),
+            None,
             None,
             None,
             HashMap::new(),

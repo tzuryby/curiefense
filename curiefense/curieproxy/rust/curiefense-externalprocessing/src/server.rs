@@ -69,6 +69,7 @@ async fn configloop(rx: Receiver<CfgRequest>, configpath: &str, loglevel: LogLev
                 IPInfo::Hops(trustedhops as usize),
                 None,
                 None,
+                None,
                 HashMap::new(),
             )
             .map(|o| {

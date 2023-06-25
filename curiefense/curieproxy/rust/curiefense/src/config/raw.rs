@@ -88,6 +88,25 @@ pub struct RawSecurityPolicy {
     pub limit_ids: Vec<String>,
 }
 
+/** a mapping of elements in the custom document **/
+
+///mapping for the site element (server group)
+#[derive(Debug, Deserialize, Clone)]
+pub struct RawSite {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub server_names: Vec<String>,
+    pub security_policy: String,
+    pub routing_profile: String,
+    pub proxy_template: String,
+    pub mobile_sdk: String,
+    pub ssl_certificate: String,
+    pub challenge_cookie_domain: Option<String>,
+}
+
+// Add other necessary structs for the remaining objects in the JSON file
+
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Relation {

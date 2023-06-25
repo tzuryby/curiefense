@@ -312,9 +312,25 @@ pub fn challenge_phase02<GH: Grasshopper>(
     };
 
     let mut nheaders = HashMap::<String, String>::new();
-    let mut cookie = "rbzid=".to_string();
-    cookie += &verified.replace('=', "-");
-    cookie += "; Path=/; HttpOnly";
+
+    //add the domain part to the challenge cookie according the the requested domain in the UI
+    let host = &reqinfo.rinfo.host;
+    let challenge_cookie_domain = &reqinfo.rinfo.sergroup.challenge_cookie_domain;
+    let mut domain = String::new();
+    if challenge_cookie_domain == "$host" {
+        domain = host.to_string();
+    } else if challenge_cookie_domain == "$domain" {
+        if let Some(index) = host.find('.') {
+            domain = host[index..].to_string();
+        }
+    } else {
+        domain = challenge_cookie_domain.to_string();
+    }
+    let cookie = format!(
+        "rbzid={}; Path=/; HttpOnly; Domain={}",
+        verified.replace('=', "-"),
+        domain
+    );
 
     nheaders.insert("Set-Cookie".to_string(), cookie);
 

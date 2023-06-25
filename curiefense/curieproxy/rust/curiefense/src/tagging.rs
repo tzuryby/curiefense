@@ -325,6 +325,7 @@ pub fn tag_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::custom::Site;
     use crate::config::globalfilter::optimize_ipranges;
     use crate::config::globalfilter::GlobalFilterRelation;
     use crate::config::hostmap::SecurityPolicy;
@@ -365,9 +366,11 @@ mod tests {
         let meta = RequestMeta::from_map(attrs).unwrap();
         let mut logs = Logs::default();
         let secpol = SecurityPolicy::default();
+        let site = Site::default();
         map_request(
             &mut logs,
             Arc::new(secpol),
+            Arc::new(site),
             None,
             &RawRequest {
                 ipstr: "52.78.12.56".to_string(),

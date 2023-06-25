@@ -15,6 +15,7 @@ pub mod url;
 
 use crate::body::parse_body;
 use crate::config::contentfilter::Transformation;
+use crate::config::custom::Site;
 use crate::config::hostmap::SecurityPolicy;
 use crate::config::matchers::{RequestSelector, RequestSelectorCondition};
 use crate::config::raw::ContentType;
@@ -369,6 +370,7 @@ pub struct RInfo {
     pub qinfo: QueryInfo,
     pub host: String,
     pub secpolicy: Arc<SecurityPolicy>,
+    pub sergroup: Arc<Site>,
     pub container_name: Option<String>,
 }
 
@@ -682,6 +684,7 @@ impl<'a> RawRequest<'a> {
 pub fn map_request(
     logs: &mut Logs,
     secpolicy: Arc<SecurityPolicy>,
+    sergroup: Arc<Site>,
     container_name: Option<String>,
     raw: &RawRequest,
     ts: Option<DateTime<Utc>>,
@@ -726,6 +729,7 @@ pub fn map_request(
         qinfo,
         host,
         secpolicy: secpolicy.clone(),
+        sergroup: sergroup.clone(),
         container_name,
     };
 
@@ -949,8 +953,17 @@ mod tests {
         };
         let mut logs = Logs::new(crate::logs::LogLevel::Debug);
         let mut secpol = SecurityPolicy::empty();
+        let site = Site::default();
         secpol.content_filter_profile.referer_as_uri = true;
-        let ri = map_request(&mut logs, Arc::new(secpol), None, &raw, None, HashMap::new());
+        let ri = map_request(
+            &mut logs,
+            Arc::new(secpol),
+            Arc::new(site),
+            None,
+            &raw,
+            None,
+            HashMap::new(),
+        );
         let actual_args = ri.rinfo.qinfo.args;
         let actual_path = ri.rinfo.qinfo.path_as_map;
         let mut expected_args = RequestField::new(&[]);

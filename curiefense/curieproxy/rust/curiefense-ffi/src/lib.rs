@@ -235,7 +235,7 @@ pub unsafe extern "C" fn curiefense_str_free(ptr: *mut c_char) {
 /// Simple wrapper to return the reqinfo data
 pub async fn inspect_wrapper<GH: Grasshopper>(logs: Logs, raw: RawRequest<'_>, mgh: Option<&GH>) -> CFDecision {
     let mut mlogs = logs;
-    let result = inspect_generic_request_map_async(mgh, raw, &mut mlogs, None, HashMap::new()).await;
+    let result = inspect_generic_request_map_async(mgh, raw, &mut mlogs, None, None, HashMap::new()).await;
     CFDecision { result, logs: mlogs }
 }
 
@@ -476,6 +476,7 @@ pub unsafe extern "C" fn curiefense_stream_start(
         iconfig.loglevel,
         meta,
         IPInfo::Ip(ip),
+        None,
         None,
         None,
         HashMap::new(),
