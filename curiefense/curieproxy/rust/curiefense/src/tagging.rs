@@ -112,23 +112,20 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
             .as_ref()
             .and_then(|q| check_single(qry, q, Location::Uri)),
         GlobalFilterEntryE::Uri(uri) => check_single(uri, &rinfo.rinfo.qinfo.uri, Location::Uri),
-        GlobalFilterEntryE::Country(cty) => {
-            let result = rinfo
-                .rinfo
-                .geoip
-                .country_iso
-                .as_ref()
-                .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip));
-
-            result.or_else(|| {
+        GlobalFilterEntryE::Country(cty) => rinfo
+            .rinfo
+            .geoip
+            .country_iso
+            .as_ref()
+            .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip))
+            .or_else(|| {
                 rinfo
                     .rinfo
                     .geoip
                     .country_name
                     .as_ref()
                     .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip))
-            })
-        }
+            }),
         GlobalFilterEntryE::Region(cty) => rinfo
             .rinfo
             .geoip
