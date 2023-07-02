@@ -115,7 +115,7 @@ fn check_entry(rinfo: &RequestInfo, tags: &Tags, sub: &GlobalFilterEntry) -> Mat
         GlobalFilterEntryE::Country(cty) => rinfo
             .rinfo
             .geoip
-            .country_iso
+            .country_name
             .as_ref()
             .and_then(|ccty| check_single(cty, ccty.to_lowercase().as_ref(), Location::Ip)),
         GlobalFilterEntryE::Region(cty) => rinfo
