@@ -142,7 +142,11 @@ impl Serialize for BlockReason {
 
 impl std::fmt::Display for BlockReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} - {} - {} - [{}]", self.action, self.initiator, self.name, self.location)
+        write!(
+            f,
+            "{:?} - {} - {} - [{}]",
+            self.action, self.initiator, self.name, self.location
+        )
     }
 }
 
