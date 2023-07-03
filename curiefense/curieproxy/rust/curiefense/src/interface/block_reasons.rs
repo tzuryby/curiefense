@@ -154,8 +154,23 @@ fn extra_locations<'t, I: Iterator<Item = &'t Location>>(i: I) -> (Location, Vec
 }
 
 impl BlockReason {
+    //get the blocking reason for this request
     pub fn block_reason_desc(reasons: &[Self]) -> Option<String> {
         reasons.iter().find(|r| r.action.is_final()).map(|r| r.to_string())
+    }
+    //get the list of all the monitor reasons for this request
+    pub fn monitor_reason_desc(reasons: &[Self]) -> Option<Vec<String>> {
+        let matching_reasons: Vec<String> = reasons
+            .iter()
+            .filter(|r| !r.action.is_final())
+            .map(|r| r.to_string())
+            .collect();
+
+        if matching_reasons.is_empty() {
+            None
+        } else {
+            Some(matching_reasons)
+        }
     }
 
     pub fn global_filter(id: String, name: String, action: RawActionType, locs: &HashSet<Location>) -> Self {
