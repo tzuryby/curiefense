@@ -10,7 +10,7 @@
     },
     "name": "gf challenge (bot)",
     "human": "invalid",
-    "exec": "return function(actual, request_map) return request_map.reason == \"Challenge - global filter - [header gfchallenge=true]\" end",
+    "exec": "return function(actual, request_map) return request_map.reason == \"Challenge - global filter - gf challenge - [header gfchallenge=true]\" end",
     "response": {
       "action": "custom_response",
       "status": 247,

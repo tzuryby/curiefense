@@ -238,6 +238,7 @@ pub fn jsonlog_rinfo(
     proxy: HashMap<String, String>,
     now: &chrono::DateTime<chrono::Utc>,
 ) -> serde_json::Result<Vec<u8>> {
+    //block reason is for the single reason for the blocking of the request, if happened
     let block_reason_desc = if dec.is_final() {
         BlockReason::block_reason_desc(&dec.reasons)
     } else {
@@ -245,6 +246,9 @@ pub fn jsonlog_rinfo(
     };
     let greasons = BlockReason::regroup(&dec.reasons);
     let get_trigger = |k: &InitiatorKind| -> &[&BlockReason] { greasons.get(k).map(|v| v.as_slice()).unwrap_or(&[]) };
+
+    //monitor reason(s) is for the list of reasons for monitor action
+    let monitor_reason_desc = BlockReason::monitor_reason_desc(&dec.reasons);
 
     let mut outbuffer = Vec::<u8>::new();
     let mut ser = serde_json::Serializer::new(&mut outbuffer);
@@ -378,6 +382,7 @@ pub fn jsonlog_rinfo(
     map_ser.serialize_entry("cf_triggers", get_trigger(&InitiatorKind::ContentFilter))?;
     map_ser.serialize_entry("cf_restrict_triggers", get_trigger(&InitiatorKind::Restriction))?;
     map_ser.serialize_entry("reason", &block_reason_desc)?;
+    map_ser.serialize_entry("monitor_reasons", &monitor_reason_desc)?;
 
     let branch_tag = tags.inner().keys().filter_map(|t| t.strip_prefix("branch:")).next();
     map_ser.serialize_entry("branch", &branch_tag)?;
