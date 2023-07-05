@@ -15,12 +15,14 @@
                     "items": { "$ref": "#/definitions/content-filter-entry-match" }
                 },
                 "max_length": {
-                    "type": "number",
+                    "type": "integer",
+                    "minimum": 1,
                     "title": "Max Length",
                     "description": "Max length of characters allowed for each item of the section type in the request"
                 },
                 "max_count": {
-                    "type": "number",
+                    "type": "integer",
+                    "minimum": 1,
                     "title": "Max Count",
                     "description": "Max amount of items of the section type allowed in the request"
                 }
